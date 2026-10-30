@@ -9,6 +9,7 @@ WORKDIR /repo
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY scripts ./scripts
 COPY apps/admin ./apps/admin
+COPY apps/app/package.json ./apps/app/package.json
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile --filter @vesper/admin...
 RUN pnpm --filter @vesper/admin build
