@@ -1,0 +1,51 @@
+name: Bug report
+description: Something does not work the way it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you see instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Settings
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: part
+    attributes:
+      label: Where does it happen?
+      options:
+        - App (desktop)
+        - App (Android)
+        - App (Android TV)
+        - Server
+        - Admin panel
+        - Recording
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown in Settings under About, or `vesper-server --version`.
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Device and system
+      placeholder: Windows 11, Pixel 8 (Android 15), Ubuntu 24.04 ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove passwords and provider addresses first.

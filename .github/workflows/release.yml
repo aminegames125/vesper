@@ -1,0 +1,235 @@
+name: Release
+
+# Push a tag like v0.2.0 (or run this by hand) to build everything and publish a GitHub release:
+#   - Vesper for Windows and Linux, with the server bundled inside
+#   - Vesper for Android and Android TV (APK)
+#   - Vesper Cloud server for Windows, Linux x64 and Linux arm64
+#   - a Docker image of the server on GitHub Container Registry
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to release, for example v0.2.0 (it must already exist)
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  CARGO_TERM_COLOR: always
+
+jobs:
+  draft:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Create the draft if it does not exist yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft --title "Vesper $TAG" --notes-file docs/RELEASE_NOTES.md
+          fi
+
+  server:
+    name: Server (${{ matrix.name }})
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x64, os: ubuntu-22.04, target: x86_64-unknown-linux-gnu, ext: tar.gz }
+          - { name: linux-arm64, os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, ext: tar.gz }
+          - { name: windows-x64, os: windows-latest, target: x86_64-pc-windows-msvc, ext: zip }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the admin panel (embedded into the server)
+        run: pnpm --filter @vesper/admin build
+      - name: Build the server
+        run: cargo build --release -p vesper-server
+      - name: Package
+        id: pack
+        run: |
+          NAME="vesper-server-${TAG}-${{ matrix.name }}"
+          mkdir "$NAME"
+          if [ "${{ matrix.ext }}" = "zip" ]; then BIN=vesper-server.exe; else BIN=vesper-server; fi
+          cp "target/release/$BIN" "$NAME/"
+          cp LICENSE "$NAME/"
+          cp docs/SERVER.md "$NAME/README.md"
+          if [ "${{ matrix.ext }}" = "zip" ]; then
+            7z a "$NAME.zip" "$NAME" >/dev/null
+          else
+            tar czf "$NAME.tar.gz" "$NAME"
+          fi
+          FILE="$NAME.${{ matrix.ext }}"
+          if command -v sha256sum >/dev/null; then sha256sum "$FILE" > "$FILE.sha256"; else shasum -a 256 "$FILE" > "$FILE.sha256"; fi
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "${{ steps.pack.outputs.file }}" "${{ steps.pack.outputs.file }}.sha256" --clobber
+
+  desktop:
+    name: App (${{ matrix.name }})
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows, os: windows-latest }
+          - { name: linux, os: ubuntu-22.04 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Install Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the server that ships inside the app
+        run: node scripts/prepare-sidecar.mjs --release
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          projectPath: apps/app
+          tauriScript: pnpm tauri
+          tagName: ${{ env.TAG }}
+          releaseName: Vesper ${{ env.TAG }}
+          releaseDraft: true
+          prerelease: false
+
+  android:
+    name: App (Android and Android TV)
+    needs: draft
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: Install the NDK
+        run: |
+          sdkmanager "ndk;27.2.12479018"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate the Android project and enable Android TV
+        working-directory: apps/app
+        run: pnpm android:init
+      - name: Set up signing (when a keystore secret exists)
+        id: sign
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -n "$KEYSTORE" ]; then
+            echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
+            cat > apps/app/src-tauri/gen/android/keystore.properties <<EOF
+          password=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$RUNNER_TEMP/release.jks
+          EOF
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+          else
+            echo "No keystore secret: building a debug-signed APK that can be sideloaded."
+            echo "mode=debug" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build the APK
+        working-directory: apps/app
+        run: |
+          if [ "${{ steps.sign.outputs.mode }}" = "release" ]; then
+            pnpm tauri android build --apk --target aarch64 armv7
+          else
+            pnpm tauri android build --apk --debug --target aarch64 armv7
+          fi
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=$(find apps/app/src-tauri/gen/android -name "*.apk" | head -n 1)
+          cp "$APK" "Vesper-${TAG}-android.apk"
+          sha256sum "Vesper-${TAG}-android.apk" > "Vesper-${TAG}-android.apk.sha256"
+          gh release upload "$TAG" "Vesper-${TAG}-android.apk" "Vesper-${TAG}-android.apk.sha256" --clobber
+
+  docker:
+    name: Server image
+    needs: draft
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/vesper-server" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/server/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ env.TAG }}
+            ${{ steps.image.outputs.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish:
+    name: Publish release
+    needs: [server, desktop, android, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "$TAG" --draft=false --latest

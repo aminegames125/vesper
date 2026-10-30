@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vesper · scanline V · colour and type</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&family=Syne:wght@700&family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Instrument+Serif&family=Sora:wght@700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet" />
+<style>
+body { margin:0; background:#161616; color:#eee; font-family:system-ui,sans-serif; padding:24px; }
+h1 { font-size:18px; margin:0 0 16px; font-weight:600; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+.card { border-radius:14px; padding:22px; border:1px solid rgba(255,255,255,.08); }
+.label { font:12px system-ui; opacity:.65; margin-bottom:14px; }
+.lock { display:flex; align-items:center; gap:16px; }
+.name { font-size:40px; line-height:1; }
+.chips { display:flex; gap:6px; margin-top:18px; }
+.chips i { width:28px; height:28px; border-radius:6px; border:1px solid rgba(255,255,255,.15); }
+.small { display:flex; align-items:center; gap:10px; margin-top:16px; }
+.small .name { font-size:16px; }
+</style>
+</head>
+<body>
+<h1>Scanline V — six colour and type pairings</h1>
+<div class="grid" id="grid"></div>
+<script>
+// Bars of the V, top to bottom: [x, y, width]
+const BARS = [[8,8,48],[14,19,36],[20,30,24],[26,41,12],[30,52,4]];
+const mark = (colors, size) => `<svg width="${size}" height="${size}" viewBox="0 0 64 64">${
+  BARS.map(([x,y,w],i)=>`<rect x="${x}" y="${y}" width="${w}" height="6.5" rx="3.25" fill="${colors[i] ?? colors.at(-1)}"/>`).join("")}</svg>`;
+
+const OPTIONS = [
+  { n:"A · Dusk stripes + Unbounded", bg:"#0E0B12", text:"#FFF1D6", bars:["#FF4F2E","#FF7A2E","#FFA63D","#FFCB57","#FFE9A8"], font:"Unbounded", w:600, track:"-0.02em", case:"Vesper" },
+  { n:"B · Phosphor + Space Grotesk", bg:"#0A0C09", text:"#E9EFDD", bars:["#C8F23E","#E9EFDD"], font:"Space Grotesk", w:700, track:"-0.03em", case:"vesper" },
+  { n:"C · Paper + cobalt + Syne", bg:"#F1EDE3", text:"#101010", bars:["#2B44FF","#101010"], font:"Syne", w:700, track:"-0.02em", case:"Vesper" },
+  { n:"D · Hot coral on ink + Bricolage", bg:"#0D0D0F", text:"#F4F1EA", bars:["#FF5C7A","#F4F1EA"], font:"Bricolage Grotesque", w:700, track:"-0.03em", case:"Vesper" },
+  { n:"E · Teal and cream + Sora", bg:"#06161A", text:"#F2EBDD", bars:["#1ED3C0","#7FE9DC","#F2EBDD"], font:"Sora", w:700, track:"-0.03em", case:"vesper" },
+  { n:"F · Mono + one red bar + Instrument Serif", bg:"#111111", text:"#F5F5F2", bars:["#E8392B","#F5F5F2"], font:"Instrument Serif", w:400, track:"-0.01em", case:"Vesper" },
+];
+
+document.getElementById("grid").innerHTML = OPTIONS.map(o => `
+  <div class="card" style="background:${o.bg};color:${o.text}">
+    <div class="label">${o.n}</div>
+    <div class="lock">${mark(o.bars,96)}<span class="name" style="font-family:'${o.font}';font-weight:${o.w};letter-spacing:${o.track}">${o.case}</span></div>
+    <div class="small">${mark(o.bars,24)}<span class="name" style="font-family:'${o.font}';font-weight:${o.w}">${o.case}</span></div>
+    <div class="chips">${[o.bg,...new Set(o.bars),o.text].map(c=>`<i style="background:${c}" title="${c}"></i>`).join("")}</div>
+  </div>`).join("");
+</script>
+</body>
+</html>

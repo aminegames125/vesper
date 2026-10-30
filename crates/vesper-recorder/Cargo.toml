@@ -1,0 +1,10 @@
+[package]
+name = "vesper-recorder"
+description = "Records live IPTV streams to disk without ffmpeg. Shared by the Vesper app and server."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+reqwest.workspace = true
+thiserror.workspace = true

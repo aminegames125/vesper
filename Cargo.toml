@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = ["crates/vesper-recorder", "apps/server", "apps/app/src-tauri"]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/aminegames125/vesper"
+
+[workspace.dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+# Small binaries are the whole point of leaving Electron.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

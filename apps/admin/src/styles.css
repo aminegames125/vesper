@@ -1,0 +1,153 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/bricolage-grotesque";
+
+/* Vesper palette: ink, warm paper, one coral accent. Dark is the default. */
+:root {
+  --ink: #0d0d0f;
+  --panel: #151518;
+  --raised: #1e1e22;
+  --line: #2a2a30;
+  --paper: #f4f1ea;
+  --muted: #9a9aa3;
+  --accent: #ff5c7a;
+  --on-accent: #0d0d0f;
+  --tint: #3a1d27;
+  color-scheme: dark;
+}
+html[data-theme="light"] {
+  --ink: #fbf9f8;
+  --panel: #ffffff;
+  --raised: #f3efee;
+  --line: #e8e2e0;
+  --paper: #1b1b1f;
+  --muted: #6e6a6c;
+  --accent: #d81b60;
+  --on-accent: #ffffff;
+  --tint: #fce4ec;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-paper: var(--paper);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-tint: var(--tint);
+  --font-sans: "Geist Variable", system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    user-select: none;
+  }
+  input,
+  textarea {
+    user-select: text;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 40%, transparent);
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  .fade {
+    transition:
+      background-color 120ms ease,
+      color 120ms ease,
+      border-color 120ms ease,
+      opacity 120ms ease,
+      transform 120ms ease;
+  }
+  .surface {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+  }
+  .lift {
+    transition:
+      transform 160ms ease,
+      border-color 160ms ease;
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklab, var(--accent) 55%, var(--line));
+  }
+  .rail-scroll {
+    scrollbar-width: none;
+  }
+  .rail-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .scrim {
+    background: linear-gradient(to top, rgb(0 0 0 / 0.85), rgb(0 0 0 / 0));
+  }
+  .glass {
+    background: color-mix(in oklab, var(--panel) 80%, transparent);
+    backdrop-filter: blur(18px) saturate(1.4);
+  }
+}
+
+/* Surfaces that stay dark in the light theme: the player and detail heroes. */
+.scope-dark {
+  --ink: #0d0d0f;
+  --panel: #151518;
+  --raised: #1e1e22;
+  --line: #2a2a30;
+  --paper: #f4f1ea;
+  --muted: #a3a1ad;
+  --accent: #ff5c7a;
+  --on-accent: #0d0d0f;
+  --tint: #3a1d27;
+  color: var(--paper);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
