@@ -1,0 +1,29 @@
+{
+  "name": "vesper",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Vesper: a fast, light IPTV player and its optional cloud server.",
+  "license": "MIT",
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "preinstall": "node scripts/only-pnpm.mjs",
+    "dev": "turbo run dev --filter=@vesper/app",
+    "desktop": "turbo run desktop --filter=@vesper/app",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test && cargo test --workspace --exclude vesper",
+    "lint": "biome check . && cargo clippy --workspace --exclude vesper -- -D warnings",
+    "format": "biome check --write . && cargo fmt --all",
+    "server": "cargo run -p vesper-server --",
+    "server:lite": "cargo run -p vesper-server -- --mode lite",
+    "server:full": "cargo run -p vesper-server -- --mode full"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.4",
+    "turbo": "^2.5.0"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  }
+}

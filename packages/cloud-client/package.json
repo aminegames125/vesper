@@ -1,0 +1,17 @@
+{
+  "name": "@vesper/cloud-client",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Typed client for the Vesper Cloud server API, shared by the app and the admin panel.",
+  "license": "MIT",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^5.0.5"
+  }
+}

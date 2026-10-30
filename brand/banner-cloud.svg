@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 280" role="img" aria-label="Vesper Cloud: your own server">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1b1017"/>
+      <stop offset="1" stop-color="#0d0d0f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="280" rx="24" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="1279" height="279" rx="23.5" fill="none" stroke="#2a2a30"/>
+
+  <!-- server rack -->
+  <g transform="translate(72 52)">
+    <rect width="150" height="46" rx="12" fill="#1e1e22" stroke="#2a2a30"/>
+    <rect y="58" width="150" height="46" rx="12" fill="#1e1e22" stroke="#2a2a30"/>
+    <rect y="116" width="150" height="46" rx="12" fill="#1e1e22" stroke="#2a2a30"/>
+    <circle cx="26" cy="23" r="5" fill="#ff5c7a"/>
+    <circle cx="26" cy="81" r="5" fill="#ff5c7a"/>
+    <circle cx="26" cy="139" r="5" fill="#9a9aa3"/>
+    <rect x="48" y="19" width="80" height="8" rx="4" fill="#F4F1EA" opacity="0.7"/>
+    <rect x="48" y="77" width="56" height="8" rx="4" fill="#F4F1EA" opacity="0.7"/>
+    <rect x="48" y="135" width="68" height="8" rx="4" fill="#F4F1EA" opacity="0.4"/>
+  </g>
+
+  <text x="290" y="108" font-family="'Bricolage Grotesque','Segoe UI',system-ui,sans-serif" font-size="58" font-weight="800" fill="#F4F1EA" letter-spacing="-1.5">Vesper Cloud</text>
+  <text x="292" y="150" font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="24" fill="#9a9aa3">Your own server. Your own rules. Record while you are away.</text>
+
+  <g font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="18" font-weight="600">
+    <rect x="292" y="182" width="172" height="40" rx="20" fill="#ff5c7a"/>
+    <text x="378" y="208" text-anchor="middle" fill="#1a0a0f">Lite · no login</text>
+    <rect x="476" y="182" width="226" height="40" rx="20" fill="#1e1e22" stroke="#2a2a30"/>
+    <text x="589" y="208" text-anchor="middle" fill="#F4F1EA">Full · users + admin</text>
+    <rect x="714" y="182" width="176" height="40" rx="20" fill="#1e1e22" stroke="#2a2a30"/>
+    <text x="802" y="208" text-anchor="middle" fill="#F4F1EA">Rust · one binary</text>
+  </g>
+
+  <g fill="none" stroke="#ff5c7a" stroke-width="3" stroke-linecap="round">
+    <path d="M1010 140c0-34 26-60 60-60 8-30 36-50 70-50 40 0 72 28 76 64 24 4 44 24 44 50 0 30-26 52-56 52H1050c-24 0-40-20-40-56z" opacity="0.9"/>
+    <path d="M1090 150l26 24 46-52" stroke="#F4F1EA"/>
+  </g>
+</svg>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-label="Vesper">
+  <defs>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.7">
+      <stop offset="0" stop-color="#ff5c7a" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#ff5c7a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="640" fill="#0d0d0f"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
+  <g transform="translate(496 96) scale(4.5)">
+    <rect x="8" y="10" width="48" height="7" rx="3.5" fill="#FF5C7A"/>
+    <rect x="14" y="21" width="36" height="7" rx="3.5" fill="#F4F1EA"/>
+    <rect x="20" y="32" width="24" height="7" rx="3.5" fill="#F4F1EA"/>
+    <rect x="26" y="43" width="12" height="7" rx="3.5" fill="#F4F1EA"/>
+  </g>
+  <text x="640" y="454" text-anchor="middle" font-family="'Bricolage Grotesque','Segoe UI',system-ui,sans-serif" font-size="112" font-weight="800" fill="#F4F1EA" letter-spacing="-3">Vesper</text>
+  <text x="640" y="512" text-anchor="middle" font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="32" fill="#9a9aa3">A fast, light IPTV player with a cloud of its own</text>
+  <text x="640" y="574" text-anchor="middle" font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="22" fill="#ff5c7a">Windows · Linux · Android · Android TV · Rust server</text>
+</svg>

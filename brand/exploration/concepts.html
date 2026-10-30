@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Vesper logo concepts</title>
+<style>
+@font-face { font-family: Fraunces; src: url("/node_modules/@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2"); font-weight: 100 900; }
+:root { --ink:#0a1112; --panel:#101a1b; --paper:#efe8d8; --star:#f2c14e; --muted:#8e9a96; }
+body { margin:0; background:var(--ink); color:var(--paper); font-family: system-ui, sans-serif; padding:28px; }
+h1 { font: 600 22px Fraunces, serif; margin:0 0 20px; }
+.grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:16px; }
+.card { background:var(--panel); border:1px solid #243131; border-radius:12px; padding:18px; }
+.card h2 { font-size:13px; color:var(--muted); margin:0 0 12px; font-weight:500; }
+.big { display:flex; justify-content:center; padding:14px 0; }
+.row { display:flex; align-items:center; gap:14px; margin-top:8px; }
+.word { font: 600 26px Fraunces, serif; letter-spacing:-0.01em; }
+svg { display:block; }
+.tile { background:var(--ink); border-radius:18px; padding:10px; }
+</style>
+</head>
+<body>
+<h1>Vesper logo concepts</h1>
+<div class="grid">
+
+<div class="card"><h2>0 · Current (V + dot)</h2>
+<div class="big tile"><svg width="120" height="120" viewBox="0 0 64 64"><path d="M13 17h11l8 24 8-24h11L36 51h-8z" fill="#efe8d8"/><circle cx="32" cy="19" r="4.5" fill="#f2c14e"/></svg></div>
+<div class="row"><svg width="24" height="24" viewBox="0 0 64 64"><path d="M13 17h11l8 24 8-24h11L36 51h-8z" fill="#efe8d8"/><circle cx="32" cy="19" r="4.5" fill="#f2c14e"/></svg><span class="word">Vesper</span></div></div>
+
+<div class="card"><h2>1 · Folded V (two-tone ribbon)</h2>
+<div class="big tile"><svg width="120" height="120" viewBox="0 0 64 64"><polygon points="10,12 25,12 32,36 32,58" fill="#efe8d8"/><polygon points="32,58 32,36 39,12 54,12" fill="#f2c14e"/></svg></div>
+<div class="row"><svg width="24" height="24" viewBox="0 0 64 64"><polygon points="10,12 25,12 32,36 32,58" fill="#efe8d8"/><polygon points="32,58 32,36 39,12 54,12" fill="#f2c14e"/></svg><span class="word">Vesper</span></div></div>
+
+<div class="card"><h2>2 · Seal (ring, V, star in the gap)</h2>
+<div class="big tile"><svg width="120" height="120" viewBox="0 0 64 64"><circle cx="32" cy="34" r="22" fill="none" stroke="#f2c14e" stroke-width="3" stroke-dasharray="116 22.2" stroke-dashoffset="22" stroke-linecap="round"/><path d="M20 26h8l4 12 4-12h8L35 48h-6z" fill="#efe8d8"/><circle cx="32" cy="9" r="3.5" fill="#f2c14e"/></svg></div>
+<div class="row"><svg width="24" height="24" viewBox="0 0 64 64"><circle cx="32" cy="34" r="22" fill="none" stroke="#f2c14e" stroke-width="4" stroke-dasharray="116 22.2" stroke-dashoffset="22" stroke-linecap="round"/><path d="M20 26h8l4 12 4-12h8L35 48h-6z" fill="#efe8d8"/><circle cx="32" cy="9" r="4" fill="#f2c14e"/></svg><span class="word">Vesper</span></div></div>
+
+<div class="card"><h2>3 · Arch (the screen at dusk)</h2>
+<div class="big tile"><svg width="120" height="120" viewBox="0 0 64 64"><path d="M13 54V31a19 19 0 0 1 38 0v23z" fill="none" stroke="#efe8d8" stroke-width="4" stroke-linejoin="round"/><circle cx="32" cy="37" r="7.5" fill="#f2c14e"/><path d="M8 54h48" stroke="#efe8d8" stroke-width="4" stroke-linecap="round"/></svg></div>
+<div class="row"><svg width="24" height="24" viewBox="0 0 64 64"><path d="M13 54V31a19 19 0 0 1 38 0v23z" fill="none" stroke="#efe8d8" stroke-width="5" stroke-linejoin="round"/><circle cx="32" cy="37" r="8" fill="#f2c14e"/><path d="M8 54h48" stroke="#efe8d8" stroke-width="5" stroke-linecap="round"/></svg><span class="word">Vesper</span></div></div>
+
+<div class="card"><h2>4 · Scanline V (TV heritage)</h2>
+<div class="big tile"><svg width="120" height="120" viewBox="0 0 64 64"><rect x="10" y="10" width="44" height="7" rx="3.5" fill="#f2c14e"/><rect x="15" y="21" width="34" height="7" rx="3.5" fill="#efe8d8"/><rect x="20" y="32" width="24" height="7" rx="3.5" fill="#efe8d8"/><rect x="25" y="43" width="14" height="7" rx="3.5" fill="#efe8d8"/><rect x="29.5" y="54" width="5" height="5" rx="2.5" fill="#efe8d8"/></svg></div>
+<div class="row"><svg width="24" height="24" viewBox="0 0 64 64"><rect x="8" y="8" width="48" height="9" rx="4.5" fill="#f2c14e"/><rect x="14" y="22" width="36" height="9" rx="4.5" fill="#efe8d8"/><rect x="20" y="36" width="24" height="9" rx="4.5" fill="#efe8d8"/><rect x="26" y="50" width="12" height="9" rx="4.5" fill="#efe8d8"/></svg><span class="word">Vesper</span></div></div>
+
+<div class="card"><h2>5 · Star over the scanlines</h2>
+<div class="big tile"><svg width="120" height="120" viewBox="0 0 64 64"><circle cx="32" cy="23" r="13" fill="#f2c14e"/><rect x="8" y="42" width="48" height="4.5" rx="2.25" fill="#efe8d8"/><rect x="15" y="50" width="34" height="4.5" rx="2.25" fill="#efe8d8"/><rect x="23" y="58" width="18" height="4.5" rx="2.25" fill="#efe8d8"/></svg></div>
+<div class="row"><svg width="24" height="24" viewBox="0 0 64 64"><circle cx="32" cy="22" r="14" fill="#f2c14e"/><rect x="6" y="41" width="52" height="6" rx="3" fill="#efe8d8"/><rect x="14" y="51" width="36" height="6" rx="3" fill="#efe8d8"/></svg><span class="word">Vesper</span></div></div>
+
+</div>
+</body>
+</html>
