@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.0] - 2026-10-31
+
+### Added
+- Focus-driven full-screen TV Home with glass top bar
+
 ## [0.7.0] - 2026-10-31
 
 ### Added
