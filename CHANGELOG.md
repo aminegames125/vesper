@@ -2,6 +2,17 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.22.0] - 2026-10-31 <!-- release: minor; push: 28; changes: 3 -->
+
+### Added
+- Record from Kodi's own Live TV and connect its IPTV providers automatically
+
+### Fixed
+- Prefer HLS variants with sound built in so recordings are not silent
+
+### Changed
+- Describe the Kodi add-on as recording on top of Kodi's Live TV
+
 ## [0.21.0] - 2026-10-31 <!-- release: minor; push: 27; changes: 1 -->
 
 ### Added
