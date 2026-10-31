@@ -32,6 +32,19 @@ jobs:
       - name: Typecheck, test and build
         run: pnpm turbo run typecheck test build
 
+  kodi:
+    name: Kodi add-on
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test (without a server)
+        run: python -I -m unittest discover -s apps/kodi/tests -v
+      - name: Pack
+        run: python -I apps/kodi/build.py --version 0.0.0
+
   rust:
     name: Rust (recorder and server)
     runs-on: ubuntu-latest

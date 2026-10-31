@@ -1,0 +1,40 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en_GB\n"
+
+msgctxt "#30000"
+msgid "Server"
+msgstr ""
+
+msgctxt "#30001"
+msgid "Your Vesper server"
+msgstr ""
+
+msgctxt "#30002"
+msgid "Address (leave empty to find it)"
+msgstr ""
+
+msgctxt "#30003"
+msgid "Find Vesper on this network"
+msgstr ""
+
+msgctxt "#30004"
+msgid "Username (only if the server asks)"
+msgstr ""
+
+msgctxt "#30005"
+msgid "Password"
+msgstr ""
+
+msgctxt "#30006"
+msgid "Playback"
+msgstr ""
+
+msgctxt "#30007"
+msgid "Offer to resume where I stopped"
+msgstr ""
+
+msgctxt "#30008"
+msgid "Play recordings with InputStream Adaptive"
+msgstr ""
