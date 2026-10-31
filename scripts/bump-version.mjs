@@ -174,6 +174,13 @@ function setVersion(version) {
       .replace(/-PversionName=[\d.]+ -PversionCode=\d+/, `-PversionName=${version} -PversionCode=${versionCode(version)}`),
   );
 
+  // The Kodi add-on manifest carries the add-on's own version; Kodi only offers an update when it
+  // grows, so a change under apps/kodi/ has to move it. Only the add-on is bumped, never the
+  // repository add-on, which stays at its install-time version.
+  edit("apps/kodi/plugin.video.vesper/addon.xml", (text) =>
+    text.replace(/(<addon\b[^>]*\bversion=")[^"]+(")/, `$1${version}$2`),
+  );
+
   edit("README.md", (text) =>
     text
       .replace(
