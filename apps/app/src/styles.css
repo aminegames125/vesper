@@ -65,6 +65,11 @@ html[data-theme="light"] {
   h3 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  time,
+  [data-num] {
+    font-variant-numeric: tabular-nums;
   }
   button {
     cursor: pointer;
@@ -92,6 +97,9 @@ html[data-theme="light"] {
 }
 
 @layer components {
+  .fade:active:not(:disabled) {
+    transform: scale(0.97);
+  }
   .fade {
     transition:
       background-color 120ms ease,
@@ -107,12 +115,18 @@ html[data-theme="light"] {
   }
   .lift {
     transition:
-      transform 160ms ease,
+      transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
       border-color 160ms ease;
   }
   .lift:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px) scale(1.015);
     border-color: color-mix(in oklab, var(--accent) 55%, var(--line));
+    box-shadow: 0 14px 28px -12px rgb(0 0 0 / 0.55);
+  }
+  .lift:active {
+    transform: translateY(0) scale(0.99);
+    transition-duration: 80ms;
   }
   .cv-auto {
     content-visibility: auto;

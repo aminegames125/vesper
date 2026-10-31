@@ -156,7 +156,6 @@ export function TvHome() {
 
   const billboard = resume
     ? {
-        eyebrow: "Continue watching",
         title: resume.item.title,
         meta: resume.item.subtitle ?? "",
         image: resume.item.poster,
@@ -166,7 +165,6 @@ export function TvHome() {
       }
     : featured
       ? {
-          eyebrow: "Featured",
           title: featured.name,
           meta: `${featured.group}${featured.rating ? ` · ★ ${featured.rating.toFixed(1)}` : ""}`,
           image: featured.poster,
@@ -191,12 +189,7 @@ export function TvHome() {
           <div className="absolute inset-0 bg-linear-to-r from-ink via-ink/70 to-transparent" />
           <div className="absolute inset-0 bg-linear-to-t from-ink to-transparent" />
           <div className="tv-pad relative flex h-full max-w-[60vw] flex-col justify-end pb-8">
-            <p className="text-sm font-bold uppercase tracking-widest text-accent">
-              {billboard.eyebrow}
-            </p>
-            <h1 className="mt-2 line-clamp-2 text-6xl leading-[1.05] font-bold">
-              {billboard.title}
-            </h1>
+            <h1 className="line-clamp-2 text-6xl leading-[1.05] font-bold">{billboard.title}</h1>
             {billboard.meta && <p className="mt-3 text-lg text-muted">{billboard.meta}</p>}
             {billboard.progress > 0 && (
               <div className="mt-4 h-1.5 w-72 overflow-hidden rounded-full bg-raised">

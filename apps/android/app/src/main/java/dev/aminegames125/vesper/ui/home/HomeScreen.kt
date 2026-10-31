@@ -138,22 +138,24 @@ private fun Billboard(home: HomeData, tv: Boolean, viewModel: HomeViewModel, onO
     val featured = home.featured
     val image = resume?.image ?: featured?.poster
     val title = resume?.title ?: featured?.name ?: return
-    val eyebrow = if (resume != null) "Continue watching" else "Featured"
-    val meta = resume?.subtitle ?: featured?.let { m -> listOfNotNull(m.grp, m.rating?.let { "★ %.1f".format(it) }).joinToString(" · ") }
+    val meta = if (resume != null) {
+        listOfNotNull("Continue watching", resume.subtitle).joinToString(" · ")
+    } else {
+        featured?.let { m -> listOfNotNull("Movie", m.grp, m.rating?.let { "★ %.1f".format(it) }).joinToString(" · ") }
+    }
     val focus = remember { FocusRequester() }
     // On a TV the first thing a remote should land on is Play.
     LaunchedEffect(tv) { if (tv) runCatching { focus.requestFocus() } }
 
-    Box(Modifier.fillMaxWidth().height(if (tv) 360.dp else 260.dp)) {
+    Box(Modifier.fillMaxWidth().height(if (tv) 360.dp else 300.dp)) {
         RemoteImage(image, Modifier.fillMaxSize())
         val ink = MaterialTheme.colorScheme.background
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(ink, ink.copy(alpha = 0.75f), Color.Transparent))))
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, ink))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(ink.copy(alpha = 0.55f), Color.Transparent, ink))))
         Column(
             Modifier.align(Alignment.BottomStart).padding(horizontal = if (tv) 48.dp else 16.dp, vertical = 20.dp).fillMaxWidth(if (tv) 0.55f else 0.9f),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            BoldLabel(eyebrow)
             Text(title, style = if (tv) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (!meta.isNullOrBlank()) {
                 Text(meta, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)

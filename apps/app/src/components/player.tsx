@@ -419,10 +419,10 @@ export default function Player({ item }: { item: Playable }) {
 
       {item.next && !upNextDismissed && time.total > 60 && time.total - time.now < 20 && (
         <div className="glass absolute bottom-32 right-6 w-72 rounded-2xl border border-line p-4 shadow-xl">
-          <p className="text-xs font-bold uppercase tracking-wider text-accent">
-            Up next in {Math.max(0, Math.ceil(time.total - time.now))}s
+          <p className="truncate font-semibold">{item.next.title}</p>
+          <p className="mt-0.5 text-sm tabular-nums text-muted">
+            Starts in {Math.max(0, Math.ceil(time.total - time.now))}s
           </p>
-          <p className="mt-1 truncate font-semibold">{item.next.title}</p>
           <div className="mt-3 flex gap-2">
             <button
               type="button"

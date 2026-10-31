@@ -219,24 +219,25 @@ function Billboard({ items }: { items: Featured[] }) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <img
-        key={current.image}
-        decoding="async"
-        src={current.image}
-        alt=""
-        className="absolute inset-0 size-full scale-110 object-cover object-top blur-sm"
-      />
+      {items.map((f, i) => (
+        <img
+          key={f.item.id}
+          decoding="async"
+          src={f.image}
+          alt=""
+          className={`absolute inset-0 size-full scale-110 object-cover object-top blur-sm transition-opacity duration-700 ease-out ${i === index % items.length ? "opacity-100" : "opacity-0"}`}
+        />
+      ))}
       <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/70 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-transparent to-transparent" />
       <div className="absolute inset-y-0 left-0 flex max-w-2xl flex-col justify-end p-8 md:p-10">
-        <p className="text-xs font-bold uppercase tracking-wider text-accent">
-          {kind === "movie" ? "Featured movie" : "Featured series"}
-        </p>
-        <h2 className="mt-2 line-clamp-2 font-display text-4xl font-bold md:text-5xl">
-          {item.name}
-        </h2>
+        <h2 className="line-clamp-2 font-display text-4xl font-bold md:text-5xl">{item.name}</h2>
         <p className="mt-2 text-sm text-muted">
-          {[item.group, item.rating ? `★ ${item.rating.toFixed(1)}` : null]
+          {[
+            kind === "movie" ? "Movie" : "Series",
+            item.group,
+            item.rating ? `★ ${item.rating.toFixed(1)}` : null,
+          ]
             .filter(Boolean)
             .join(" · ")}
         </p>

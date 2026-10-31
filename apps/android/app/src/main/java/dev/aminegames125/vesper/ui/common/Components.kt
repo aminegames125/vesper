@@ -1,6 +1,8 @@
 package dev.aminegames125.vesper.ui.common
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,7 +43,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -54,11 +59,16 @@ import coil.compose.AsyncImage
 /** On a TV the focused item grows and gets a ring; elsewhere it is a plain clickable. */
 fun Modifier.tvFocus(shape: Shape = RoundedCornerShape(14.dp)): Modifier = composed {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.07f else 1f, label = "focus-scale")
+    val scale by animateFloatAsState(
+        if (focused) 1.07f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "focus-scale",
+    )
     val ring = MaterialTheme.colorScheme.onBackground
     this
         .onFocusChanged { focused = it.isFocused }
         .scale(scale)
+        .then(if (focused) Modifier.shadow(18.dp, shape, ambientColor = Color.Black, spotColor = Color.Black) else Modifier)
         .then(if (focused) Modifier.border(BorderStroke(3.dp, ring), shape) else Modifier)
 }
 
@@ -90,14 +100,9 @@ fun PosterCard(
             if (rank != null) {
                 Text(
                     "$rank",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape)
-                        .size(28.dp)
-                        .padding(top = 2.dp),
-                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = 52.sp),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = 2.dp),
                 )
             }
         }

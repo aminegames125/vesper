@@ -91,8 +91,7 @@ export function Tips() {
       aria-label="Tip"
       className="surface fixed bottom-5 left-[6.25rem] z-10 w-80 p-4 shadow-xl"
     >
-      <p className="text-xs font-bold uppercase tracking-wider text-accent">Tip</p>
-      <p className="mt-1 min-h-10 text-sm">{TIPS[index]}</p>
+      <p className="min-h-10 text-sm">{TIPS[index]}</p>
       <div className="mt-3 flex items-center gap-2">
         <span className="text-xs text-muted">
           {index + 1} / {TIPS.length}
