@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -59,6 +60,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.hilt.navigation.compose.hiltViewModel
 import dev.aminegames125.vesper.player.PlayerScreen
 import dev.aminegames125.vesper.player.PlayerSession
 import dev.aminegames125.vesper.ui.catalog.CatalogScreen
@@ -140,11 +142,28 @@ fun VesperRoot(session: PlayerSession) {
 
             // A television gets a centred row of tabs along the top, like Netflix.
             FormFactor.Tv -> Box(Modifier.fillMaxSize()) {
-                Column(Modifier.fillMaxSize()) {
-                    if (!inDetail) TvTopBar(route, ::go)
-                    Box(Modifier.weight(1f)) { Graph(nav, form) }
+                val overHero = route == Home.route
+                Box(Modifier.fillMaxSize().padding(top = if (inDetail || overHero) 0.dp else 76.dp)) { Graph(nav, form) }
+                if (!inDetail) {
+                    Box(
+                        Modifier.fillMaxWidth().background(
+                            if (overHero) Brush.verticalGradient(listOf(MaterialTheme.colorScheme.background.copy(alpha = 0.85f), Color.Transparent))
+                            else Brush.verticalGradient(listOf(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background)),
+                        ),
+                    ) { TvTopBar(route, ::go) }
                 }
             }
+        }
+
+        val onboarding: OnboardingViewModel = hiltViewModel()
+        val needed by onboarding.needed.collectAsState()
+        if (needed) {
+            OnboardingScreen(
+                form = form,
+                onAddSource = { onboarding.finish(); nav.navigate(Sources.route) },
+                onDemo = onboarding::demo,
+                onSkip = onboarding::finish,
+            )
         }
 
         current?.let { PlayerScreen(it) }

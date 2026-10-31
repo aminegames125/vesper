@@ -1,6 +1,15 @@
 package dev.aminegames125.vesper.ui.home
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -163,50 +172,120 @@ private fun <T> LazyListScope.railOf(
     item(key) { Rail(title, items, itemKey, itemWidth = width, horizontalPadding = gutter, content = content) }
 }
 
-/** The big banner at the top: where you left off, or something worth watching. */
+/** One slide of the billboard. */
+private data class Feature(
+    val title: String,
+    val image: String?,
+    val meta: String,
+    val plot: String?,
+    val playLabel: String,
+    val onPlay: () -> Unit,
+    val onInfo: (() -> Unit)?,
+)
+
+/** The full-bleed banner at the top: where you left off, then a few titles worth watching. */
 @Composable
 private fun Billboard(home: HomeData, tv: Boolean, viewModel: HomeViewModel, onOpenDetail: (String, String) -> Unit) {
-    val resume = home.resume.firstOrNull()
-    val featured = home.featured
-    val image = resume?.image ?: featured?.poster
-    val title = resume?.title ?: featured?.name ?: return
-    val meta = if (resume != null) {
-        listOfNotNull("Continue watching", resume.subtitle).joinToString(" · ")
-    } else {
-        featured?.let { m -> listOfNotNull("Movie", m.grp, m.rating?.let { "★ %.1f".format(it) }).joinToString(" · ") }
+    val features = buildList {
+        home.resume.firstOrNull()?.let { r ->
+            add(Feature(r.title, r.image, listOfNotNull("Continue watching", r.subtitle).joinToString(" · "), null, "Resume", { viewModel.play(r) }, null))
+        }
+        val movies = home.newest.filter { it.poster != null }.take(3)
+        val shows = home.topShows.filter { it.cover != null }.take(3)
+        for (i in 0 until maxOf(movies.size, shows.size)) {
+            movies.getOrNull(i)?.let { m ->
+                add(
+                    Feature(
+                        m.name, m.poster,
+                        listOfNotNull("Movie", m.grp, m.rating?.let { "★ %.1f".format(it) }).joinToString(" · "),
+                        null, "Play", { viewModel.playMovie(m) }, { onOpenDetail("movie", m.id) },
+                    ),
+                )
+            }
+            shows.getOrNull(i)?.let { s ->
+                add(
+                    Feature(
+                        s.name, s.cover,
+                        listOfNotNull("Series", s.year, s.rating?.let { "★ %.1f".format(it) }).joinToString(" · "),
+                        s.plot, "Watch", { onOpenDetail("show", s.id) }, null,
+                    ),
+                )
+            }
+        }
     }
+    if (features.isEmpty()) return
+
+    var index by remember { mutableIntStateOf(0) }
+    var inside by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     // On a TV the first thing a remote should land on is Play.
     LaunchedEffect(tv) { if (tv) runCatching { focus.requestFocus() } }
+    // Rotate every few seconds, but never while someone is on a button.
+    LaunchedEffect(features.size, inside) {
+        if (features.size < 2 || inside) return@LaunchedEffect
+        while (true) {
+            delay(8_000)
+            index = (index + 1) % features.size
+        }
+    }
 
-    Box(Modifier.fillMaxWidth().height(if (tv) 420.dp else 300.dp)) {
-        RemoteImage(image, Modifier.fillMaxSize())
-        val ink = MaterialTheme.colorScheme.background
-        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(ink, ink.copy(alpha = 0.75f), Color.Transparent))))
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(ink.copy(alpha = 0.55f), Color.Transparent, ink))))
-        Column(
-            Modifier.align(Alignment.BottomStart).padding(horizontal = if (tv) 48.dp else 16.dp, vertical = 20.dp).fillMaxWidth(if (tv) 0.55f else 0.9f),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(title, style = if (tv) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (!meta.isNullOrBlank()) {
-                Text(meta, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-            }
-            Spacer(Modifier.height(8.dp))
-            Row {
-                Button(
-                    onClick = { if (resume != null) viewModel.play(resume) else featured?.let(viewModel::playMovie) },
-                    modifier = Modifier.focusRequester(focus).tvFocus(RoundedCornerShape(50)),
+    val ink = MaterialTheme.colorScheme.background
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(if (tv) 520.dp else 340.dp)
+            .onFocusChanged { inside = it.hasFocus },
+    ) {
+        Crossfade(targetState = features[index % features.size], animationSpec = tween(700), label = "billboard") { f ->
+            Box(Modifier.fillMaxSize()) {
+                RemoteImage(f.image, Modifier.fillMaxSize())
+                Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(ink, ink.copy(alpha = 0.8f), Color.Transparent))))
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(ink.copy(alpha = 0.55f), Color.Transparent, ink))))
+                Column(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = if (tv) 64.dp else 16.dp, end = 16.dp, bottom = if (tv) 40.dp else 20.dp)
+                        .fillMaxWidth(if (tv) 0.5f else 0.9f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(if (resume != null) "Resume" else "Play")
-                }
-                if (featured != null && resume == null) {
-                    Spacer(Modifier.width(12.dp))
-                    FilledTonalButton(onClick = { onOpenDetail("movie", featured.id) }, modifier = Modifier.tvFocus(RoundedCornerShape(50))) {
-                        Text("More info")
+                    Text(
+                        f.title,
+                        style = if (tv) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(f.meta, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    if (tv && !f.plot.isNullOrBlank()) {
+                        Text(f.plot, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 3, overflow = TextOverflow.Ellipsis)
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(onClick = f.onPlay, modifier = Modifier.focusRequester(focus).tvFocus(RoundedCornerShape(50))) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text(f.playLabel)
+                        }
+                        f.onInfo?.let { info ->
+                            FilledTonalButton(onClick = info, modifier = Modifier.tvFocus(RoundedCornerShape(50))) { Text("More info") }
+                        }
+                    }
+                }
+            }
+        }
+        if (features.size > 1) {
+            Row(
+                Modifier.align(Alignment.BottomEnd).padding(end = if (tv) 64.dp else 16.dp, bottom = 22.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                features.forEachIndexed { i, _ ->
+                    Box(
+                        Modifier
+                            .height(4.dp)
+                            .width(if (i == index % features.size) 24.dp else 8.dp)
+                            .clip(CircleShape)
+                            .background(if (i == index % features.size) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)),
+                    )
                 }
             }
         }
