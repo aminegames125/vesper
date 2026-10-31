@@ -44,5 +44,30 @@ class IptvSimple(unittest.TestCase):
             self.assertEqual(pvr.find(profile), [])
 
 
+class Matching(unittest.TestCase):
+    def test_names_match_however_they_are_written(self):
+        rows = [{"name": "BBC One"}, {"name": "BBC One HD"}]
+        self.assertEqual(pvr.best_match(rows, "bbc-one hd")["name"], "BBC One HD")
+
+    def test_one_candidate_is_taken_but_several_are_not_guessed(self):
+        self.assertEqual(pvr.best_match([{"name": "Sky News HD"}], "Sky News")["name"], "Sky News HD")
+        self.assertIsNone(pvr.best_match([{"name": "A 1"}, {"name": "A 2"}], "A"))
+
+    def test_only_providers_the_server_lacks_are_listed(self):
+        found = [{"name": "a", "url": "http://x/1"}, {"name": "b", "url": "http://x/2"}]
+        self.assertEqual(pvr.missing(found, [{"url": "http://x/1 "}]), [found[1]])
+
+    def test_a_guide_entry_is_over_airing_or_later(self):
+        import time as t
+
+        now = 1_800_000_000
+        iso = lambda e: t.strftime("%Y-%m-%d %H:%M:%S", t.gmtime(e))
+        entry = lambda a, b: {"starttime": iso(now + a), "endtime": iso(now + b)}
+        self.assertEqual(pvr.programme(entry(-600, -60), now)[2], "over")
+        self.assertEqual(pvr.programme(entry(-60, 600), now)[2], "airing")
+        self.assertEqual(pvr.programme(entry(600, 900), now), (now + 600, now + 900, "later"))
+        self.assertIsNone(pvr.programme({"starttime": "", "endtime": ""}, now))
+
+
 if __name__ == "__main__":
     unittest.main()

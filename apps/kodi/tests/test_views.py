@@ -27,6 +27,7 @@ class Fake:
         self.ended = None
         self.answers = {}
         self.typed = []
+        self.labels, self.visible, self.rpc = {}, set(), {}
         self.content = None
 
     def install(self, settings):
@@ -88,6 +89,9 @@ class Fake:
 
         xbmc = types.ModuleType("xbmc")
         xbmc.executebuiltin = lambda cmd: fake.builtins.append(cmd)
+        xbmc.getInfoLabel = lambda key: fake.labels.get(key, '')
+        xbmc.getCondVisibility = lambda cond: cond in fake.visible
+        xbmc.executeJSONRPC = lambda request: __import__('json').dumps(fake.rpc)
         xbmcgui = types.ModuleType("xbmcgui")
         xbmcgui.ListItem, xbmcgui.Dialog = ListItem, Dialog
         xbmcgui.NOTIFICATION_ERROR = xbmcgui.NOTIFICATION_INFO = xbmcgui.ALPHANUM_HIDE_INPUT = 0
@@ -148,10 +152,10 @@ class Setup(unittest.TestCase):
 
 
 class StubClient:
-    """Stands in for the server so the provider screens run without one."""
+    """Stands in for the server so the Kodi-side behaviour runs without one."""
 
-    def __init__(self, sources=()):
-        self.saved, self.removed = list(sources), []
+    def __init__(self, sources=(), channels=()):
+        self.saved, self.found, self.recorded = list(sources), list(channels), []
 
     def recordings(self, **_):
         return {"recordings": []}
@@ -160,70 +164,92 @@ class StubClient:
         return self.saved
 
     def add_source(self, name, kind, url, username="", password=""):
-        self.saved.append({"id": "s%d" % len(self.saved), "name": name, "kind": kind, "url": url, "username": username})
+        self.saved.append({"id": "s%d" % len(self.saved), "name": name, "kind": kind, "url": url})
 
-    def remove_source(self, sid):
-        self.removed.append(sid)
+    def channels(self, source="all", q="", **_):
+        return {"channels": [c for c in self.found if q.lower() in c["name"].lower()]}
+
+    def record(self, title, url, seconds, **extra):
+        self.recorded.append(dict(title=title, url=url, seconds=seconds, **extra))
 
 
-class Providers(unittest.TestCase):
+def write_iptv_simple(url="http://p.example/get.php?u=1", name="Sky"):
+    folder = os.path.join(views.bridge.xbmcvfs.translatePath(""), "addon_data", "pvr.iptvsimple")
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, "instance-settings-1.xml"), "w", encoding="utf-8") as f:
+        f.write(
+            '<settings version="2"><setting id="kodi_addon_instance_name">%s</setting>'
+            '<setting id="m3uPathType">1</setting><setting id="m3uUrl">%s</setting></settings>' % (name, url)
+        )
+
+
+class OnTopOfKodi(unittest.TestCase):
     def setUp(self):
         fake.reset()
         settings.clear()
         settings["server"] = "http://127.0.0.1:8484"
-        self.stub = StubClient()
+        self.stub = StubClient(channels=[{"name": "BBC One HD", "url": "http://p.example/bbc1.m3u8", "alt": ["http://b.example/bbc1"]}])
         real = views.common.client
         self.addCleanup(setattr, views.common, "client", real)
         views.common.client = lambda: self.stub
 
-    def test_with_no_provider_the_home_screen_leads_with_adding_one(self):
+    def test_the_home_screen_is_only_recordings_and_schedules(self):
+        self.stub.saved = [{"id": "s0", "name": "x", "kind": "m3u", "url": "u"}]
         views.route("")
-        self.assertEqual(labels()[0], "Add your IPTV provider")
-        self.assertNotIn("IPTV providers", labels())
+        self.assertEqual(labels(), ["Continue watching", "Recording now and coming up", "Recordings", "Schedules"])
 
-    def test_a_playlist_link_is_saved_on_the_server(self):
-        fake.answers["select"] = 0
-        fake.typed = ["http://iptv.example/list.m3u", "Home TV"]
-        views.route("?action=add_provider")
-        self.assertEqual(self.stub.saved[0]["kind"], "m3u")
-        self.assertEqual(self.stub.saved[0]["url"], "http://iptv.example/list.m3u")
-        self.assertEqual(self.stub.saved[0]["name"], "Home TV")
+    def test_with_no_provider_it_offers_to_read_them_from_kodi(self):
+        views.route("")
+        self.assertEqual(labels()[-1], "Connect my IPTV providers")
 
-    def test_an_xtream_login_needs_all_three_parts(self):
-        fake.answers["select"] = 1
-        fake.typed = ["http://host:8080", "me", "", ]
-        views.route("?action=add_provider")
-        self.assertEqual(self.stub.saved, [])
-        fake.typed = ["http://host:8080", "me", "secret", "Cable"]
-        views.route("?action=add_provider")
-        self.assertEqual((self.stub.saved[0]["kind"], self.stub.saved[0]["username"]), ("xtream", "me"))
-
-    def test_nothing_is_saved_when_the_dialog_is_cancelled(self):
-        fake.answers["select"] = -1
-        views.route("?action=add_provider")
-        self.assertEqual(self.stub.saved, [])
-
-    def test_the_provider_in_kodi_live_tv_is_offered_and_used(self):
-        folder = os.path.join(views.xbmcvfs.translatePath(""), "addon_data", "pvr.iptvsimple")
-        os.makedirs(folder)
-        with open(os.path.join(folder, "instance-settings-1.xml"), "w", encoding="utf-8") as f:
-            f.write(
-                '<settings version="2"><setting id="kodi_addon_instance_name">Sky</setting>'
-                '<setting id="m3uPathType">1</setting><setting id="m3uUrl">http://p.example/get.php?u=1</setting></settings>'
-            )
-        fake.answers["select"] = 2
-        views.route("?action=add_provider")
+    def test_providers_set_up_in_kodi_are_connected_once(self):
+        write_iptv_simple()
+        self.assertEqual(views.bridge.sync(), 1)
         self.assertEqual((self.stub.saved[0]["name"], self.stub.saved[0]["url"]), ("Sky", "http://p.example/get.php?u=1"))
+        self.assertEqual(views.bridge.sync(), 0)
+        self.assertEqual(len(self.stub.saved), 1)
 
-    def test_providers_are_listed_and_can_be_removed(self):
-        self.stub.saved = [{"id": "s0", "name": "Home TV", "kind": "m3u", "url": "x", "username": ""}]
-        views.route("")
-        self.assertIn("IPTV providers", labels())
-        fake.reset()
-        views.route("?action=providers")
-        self.assertEqual(labels(), ["Add a provider", "Home TV"])
-        views.route("?action=provider_menu&id=s0&name=Home+TV")
-        self.assertEqual(self.stub.removed, ["s0"])
+    def test_the_sync_button_runs_the_same_thing_and_refreshes(self):
+        write_iptv_simple()
+        views.route("?action=sync")
+        self.assertEqual(len(self.stub.saved), 1)
+        self.assertIn("Container.Refresh", fake.builtins)
+
+    def test_a_channel_in_kodis_list_is_recorded_for_the_chosen_length(self):
+        fake.labels.update({"ListItem.ChannelName": "BBC One HD", "ListItem.DBID": "12"})
+        fake.answers["select"] = 1  # one hour
+        views.bridge.record_from_kodi()
+        (r,) = self.stub.recorded
+        self.assertEqual((r["title"], r["url"], r["seconds"], r["backup_url"]), ("BBC One HD", "http://p.example/bbc1.m3u8", 3600, "http://b.example/bbc1"))
+        self.assertIsNone(r["start_at"])
+
+    def test_a_programme_in_the_guide_is_scheduled_with_padding(self):
+        import time as t
+
+        start = int(t.time()) + 7200
+        iso = lambda e: t.strftime("%Y-%m-%d %H:%M:%S", t.gmtime(e))
+        fake.labels.update({"ListItem.ChannelName": "bbc one hd", "ListItem.Title": "Evening News", "ListItem.DBID": "99"})
+        fake.visible.add("Window.IsActive(tvguide)")
+        fake.rpc = {"result": {"broadcastdetails": {"title": "Evening News", "starttime": iso(start), "endtime": iso(start + 1800)}}}
+        views.bridge.record_from_kodi()
+        (r,) = self.stub.recorded
+        self.assertEqual(r["title"], "Evening News")
+        self.assertAlmostEqual(r["start_at"], start - 60, delta=2)
+        self.assertEqual(r["seconds"], 1800 + 180 + 60)
+
+    def test_a_programme_that_is_over_is_refused(self):
+        fake.labels.update({"ListItem.ChannelName": "BBC One HD", "ListItem.DBID": "99"})
+        fake.visible.add("Window.IsActive(tvguide)")
+        fake.rpc = {"result": {"broadcastdetails": {"starttime": "2000-01-01 10:00:00", "endtime": "2000-01-01 11:00:00"}}}
+        views.bridge.record_from_kodi()
+        self.assertEqual(self.stub.recorded, [])
+        self.assertTrue(any("over" in n for n in fake.notes), fake.notes)
+
+    def test_a_channel_vesper_does_not_have_says_how_to_add_it(self):
+        fake.labels["ListItem.ChannelName"] = "Mystery TV"
+        views.bridge.record_from_kodi()
+        self.assertEqual(self.stub.recorded, [])
+        self.assertTrue(any("PVR IPTV Simple" in n for n in fake.notes), fake.notes)
 
 
 @unittest.skipUnless(LIVE, "set VESPER_URL to a lite-mode server")
@@ -243,8 +269,8 @@ class Screens(unittest.TestCase):
     def test_the_home_screen_has_the_main_places(self):
         views.route("")
         self.assertEqual(
-            [x for x in labels() if not x.startswith("Continue")],
-            ["Recording now and coming up", "Recordings", "Live TV", "Movies", "Series", "Schedules", "Search channels"],
+            [x for x in labels() if not x.startswith(("Continue", "Connect"))],
+            ["Recording now and coming up", "Recordings", "Schedules"],
         )
 
     def test_a_recording_in_progress_is_listed_playable_and_stoppable(self):
@@ -281,14 +307,6 @@ class Screens(unittest.TestCase):
         self.assertIn("Container.Refresh", fake.builtins)
         self.client.record("replacement", "http://127.0.0.1:1/x.ts", 30)  # keeps tearDown simple
         self.rid = self.client.recordings()["recordings"][0]["id"]
-
-    def test_record_now_sends_the_chosen_length(self):
-        fake.answers["select"] = 1  # one hour
-        views.route("?action=record&url=http%3A%2F%2F127.0.0.1%3A1%2Fy.ts&name=Sports")
-        made = [r for r in self.client.recordings()["recordings"] if r["title"] == "Sports"]
-        self.assertEqual(len(made), 1)
-        self.assertEqual(made[0]["maxSeconds"], 3600)
-        self.client.delete(made[0]["id"])
 
     def test_schedules_screen_loads_when_there_are_none(self):
         views.route("?action=schedules")

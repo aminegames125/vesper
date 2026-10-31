@@ -17,6 +17,13 @@
             <close>true</close>
           </control>
         </setting>
+        <setting id="sync" type="action" label="30009" help="">
+          <level>0</level>
+          <data>RunPlugin(plugin://plugin.video.vesper/?action=sync)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
         <setting id="username" type="string" label="30004" help="">
           <level>0</level>
           <default></default>

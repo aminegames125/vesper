@@ -7,9 +7,17 @@
     <provides>video</provides>
   </extension>
   <extension point="xbmc.service" library="service.py" start="login"/>
+  <extension point="kodi.context.item">
+    <menu id="kodi.core.main">
+      <item library="context.py">
+        <label>30010</label>
+        <visible>Window.IsActive(tvchannels) | Window.IsActive(tvguide) | Window.IsActive(tvsearch)</visible>
+      </item>
+    </menu>
+  </extension>
   <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Your Vesper recordings and channels on the big screen</summary>
-    <description lang="en_GB">Watch what Vesper recorded while you were away, resume where you stopped, and record a channel or a programme with one press. Works with a Vesper server on your network, found automatically. Playlists and recordings stay on your server; Kodi just plays them.</description>
+    <summary lang="en_GB">Record and schedule from Kodi's own Live TV</summary>
+    <description lang="en_GB">Adds recording to the Live TV you already have. It finds your Vesper server and your IPTV providers on its own; press the menu button on a channel or a programme and choose Record with Vesper. Watch your recordings and resume where you stopped. Recordings are made and kept by your Vesper server.</description>
     <disclaimer lang="en_GB">Vesper records only the sources you add yourself. Use it for content you have the right to record.</disclaimer>
     <platform>all</platform>
     <license>MIT</license>

@@ -7,15 +7,13 @@ import urllib.parse
 import xbmc
 import xbmcgui
 import xbmcplugin
-import xbmcvfs
 
-from . import api, common, discovery, pvr
+from . import api, bridge, common, discovery
 
 HANDLE = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else -1
 BASE = "plugin://plugin.video.vesper/"
 
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-LENGTHS = [("30 minutes", 1800), ("1 hour", 3600), ("2 hours", 7200), ("Until I stop it", 0)]
 
 
 # -- small helpers --------------------------------------------------------------------------
@@ -109,12 +107,6 @@ def root():
         add(url(action="settings"), item("Open settings"), False)
         say(str(e), error=True)
         return finish()
-    if not providers:
-        add(
-            url(action="add_provider"),
-            item("Add your IPTV provider", plot="Paste your playlist link or Xtream login, or use the one already in Kodi's Live TV. Then you can record any channel."),
-            False,
-        )
     live = sum(1 for r in rows if r["status"] == "recording")
     soon = sum(1 for r in rows if r["status"] in ("scheduled", "queued"))
     resumable = sum(1 for r in rows if r["status"] == "done" and not r["watched"] and r["positionS"] > 20)
@@ -126,13 +118,13 @@ def root():
     add(url(action="recordings", view="continue"), item("Continue watching" + (" (%d)" % resumable if resumable else "")), True)
     add(url(action="recordings", view="active"), item("Recording now and coming up", plot=", ".join(parts)), True)
     add(url(action="recordings", view="done"), item("Recordings"), True)
-    add(url(action="channels", kind="live"), item("Live TV"), True)
-    add(url(action="channels", kind="movie"), item("Movies"), True)
-    add(url(action="channels", kind="series"), item("Series"), True)
     add(url(action="schedules"), item("Schedules", plot="What records on its own."), True)
-    add(url(action="search"), item("Search channels"), True)
-    if providers:
-        add(url(action="providers"), item("IPTV providers", plot=", ".join(p["name"] for p in providers)), True)
+    if not providers:
+        add(
+            url(action="sync"),
+            item("Connect my IPTV providers", plot="Reads the playlists set up in Kodi's Live TV. To record, press the menu button on a channel or programme and choose Record with Vesper."),
+            False,
+        )
     finish()
 
 
@@ -161,59 +153,6 @@ def discover():
     common.set_setting("server", chosen["address"])
     say("Connected to " + chosen["name"])
     refresh()
-
-
-# -- IPTV providers -------------------------------------------------------------------------
-
-
-def providers():
-    try:
-        rows = get_client().sources()
-    except api.VesperError as e:
-        return failed(e)
-    add(url(action="add_provider"), item("Add a provider", plot="A playlist link, an Xtream login, or the one already in Kodi's Live TV."), False)
-    for p in rows:
-        kind = "Xtream" if p["kind"] == "xtream" else "Playlist link"
-        add(url(action="provider_menu", id=p["id"], name=p["name"]), item(p["name"], plot=kind), False)
-    finish()
-
-
-def add_provider():
-    dialog = xbmcgui.Dialog()
-    already = pvr.find(xbmcvfs.translatePath("special://profile/"))
-    options = ["Playlist link (M3U)", "Xtream login (server, username, password)"]
-    options += ["Use \"%s\" from Kodi's Live TV" % p["name"] for p in already]
-    pick = dialog.select("Add your IPTV provider", options)
-    if pick < 0:
-        return
-    username = password = ""
-    if pick >= 2:
-        name, link, kind = already[pick - 2]["name"], already[pick - 2]["url"], "m3u"
-    elif pick == 0:
-        link = dialog.input("Playlist link (http://...)")
-        name, kind = dialog.input("Name", defaultt="My IPTV") if link else "", "m3u"
-    else:
-        link = dialog.input("Server (http://host:port)")
-        username = dialog.input("Username") if link else ""
-        password = dialog.input("Password", option=xbmcgui.ALPHANUM_HIDE_INPUT) if username else ""
-        name, kind = dialog.input("Name", defaultt="My IPTV") if password else "", "xtream"
-    if not (link and name) or (kind == "xtream" and not (username and password)):
-        return
-    progress = xbmcgui.DialogProgress()
-    progress.create("Vesper", "Checking your provider and loading its channels...")
-    try:
-        get_client().add_source(name, kind, link.strip(), username, password)
-    except api.VesperError as e:
-        progress.close()
-        return say(str(e), error=True)
-    progress.close()
-    say("%s added. You can record any of its channels now." % name)
-    refresh()
-
-
-def provider_menu(sid, name):
-    if xbmcgui.Dialog().yesno(name, "Remove this provider from the server? Recordings already made stay.", yeslabel="Remove", nolabel="Keep it"):
-        act(lambda c: c.remove_source(sid), "Removed")
 
 
 # -- recordings -----------------------------------------------------------------------------
@@ -334,91 +273,6 @@ def act(call, done):
     refresh()
 
 
-# -- channels -------------------------------------------------------------------------------
-
-
-def channels(kind="live", group="", q="", offset=0):
-    offset = int(offset)
-    try:
-        c = get_client()
-        data = c.channels("all", group=group, kind=kind, q=q, offset=offset)
-    except api.VesperError as e:
-        return failed(e)
-    if not group and not q and data.get("groups"):
-        for name in data["groups"]:
-            add(url(action="channels", kind=kind, group=name), item(name), True)
-    if group or q or not data.get("groups"):
-        for ch in data.get("channels", []):
-            li = channel_item(ch)
-            add(url(action="live", url=ch["url"], name=ch["name"]), li, False)
-        if offset + len(data.get("channels", [])) < data.get("total", 0):
-            add(url(action="channels", kind=kind, group=group, q=q, offset=offset + 200), item("More..."), True)
-    finish("videos")
-
-
-def channel_item(ch):
-    menu = [("Record now", "RunPlugin(%s)" % url(action="record", url=ch["url"], name=ch["name"], alt=(ch.get("alt") or [""])[0]))]
-    if ch.get("kind", "live") == "live":
-        menu.append(("What's on (record a programme)", "Container.Update(%s)" % url(action="guide", name=ch["name"], epg=ch.get("id", ""), url=ch["url"])))
-    else:
-        menu.append(("Download to the server", "RunPlugin(%s)" % url(action="download", url=ch["url"], name=ch["name"])))
-    art = {"icon": ch.get("logo", ""), "thumb": ch.get("logo", "")}
-    return item(ch["name"], art, ch.get("group", ""), True, menu=menu)
-
-
-def live(target, name):
-    li = xbmcgui.ListItem(label=name, path=target)
-    xbmcplugin.setResolvedUrl(HANDLE, True, li)
-
-
-def search():
-    text = xbmcgui.Dialog().input("Search channels")
-    if not text:
-        return xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-    channels(kind="", q=text)
-
-
-def record(target, name, alt=""):
-    pick = xbmcgui.Dialog().select("Record " + name, [label for label, _ in LENGTHS])
-    if pick < 0:
-        return
-    seconds = LENGTHS[pick][1]
-    act(lambda c: c.record(name, target, seconds, channel_name=name, backup_url=alt or None), "Recording " + name)
-
-
-def download(target, name):
-    act(lambda c: c.download(name, target), "Saving %s on the server" % name)
-
-
-def guide(name, epg="", target=""):
-    try:
-        c = get_client()
-        shows = c.guide(epg_id=epg, name=name)
-    except api.VesperError as e:
-        return failed(e)
-    if not shows:
-        add(url(action="noop"), item("No guide for this channel yet"), False)
-    for p in shows:
-        airing = p["startAt"] <= time.time() < p["stopAt"]
-        label = ("[B]%s[/B]  " if airing else "%s  ") % when(p["startAt"]) + p["title"]
-        add(
-            url(action="record_show", url=target, name=name, title=p["title"], start=p["startAt"], stop=p["stopAt"]),
-            item(label, plot=p.get("description", "")),
-            False,
-        )
-    finish("episodes")
-
-
-def record_show(target, name, title, start, stop):
-    start, stop = int(start), int(stop)
-    if stop <= time.time():
-        return say("That programme is over.", error=True)
-    if not xbmcgui.Dialog().yesno("Record", "Record \"%s\" on %s, %s?" % (title, name, when(start))):
-        return
-    begin = max(start - 60, int(time.time()))
-    act(lambda c: c.record(title, target, stop + 180 - begin, channel_name=name, start_at=begin), "Will record " + title)
-
-
 # -- schedules ------------------------------------------------------------------------------
 
 
@@ -449,7 +303,7 @@ def schedules():
             label = "[COLOR FF9A9AA3]%s (paused)[/COLOR]" % label
         add(url(action="schedule_menu", id=s["id"], paused="1" if paused else "0", title=s["title"]), item(label, plot=plot), False)
     if not rows:
-        add(url(action="noop"), item("No schedules. Make them in the Vesper app or admin panel."), False)
+        add(url(action="noop"), item("No repeating schedules. Make them in the Vesper app; one-off ones come from Kodi's TV guide."), False)
     finish("videos")
 
 
@@ -476,20 +330,6 @@ def route(query):
         recordings(q.get("view", "done"), q.get("tag", ""))
     elif action == "play":
         play(q["id"])
-    elif action == "channels":
-        channels(q.get("kind", "live"), q.get("group", ""), q.get("q", ""), q.get("offset", 0))
-    elif action == "live":
-        live(q["url"], q.get("name", ""))
-    elif action == "search":
-        search()
-    elif action == "record":
-        record(q["url"], q.get("name", ""), q.get("alt", ""))
-    elif action == "download":
-        download(q["url"], q.get("name", ""))
-    elif action == "guide":
-        guide(q.get("name", ""), q.get("epg", ""), q.get("url", ""))
-    elif action == "record_show":
-        record_show(q["url"], q.get("name", ""), q.get("title", ""), q["start"], q["stop"])
     elif action == "schedules":
         schedules()
     elif action == "schedule_menu":
@@ -503,12 +343,9 @@ def route(query):
         act(lambda c: c.patch(q["id"], watched=on, position_s=0), "Done")
     elif action == "delete":
         confirm_delete(q["id"], q.get("title", "this recording"))
-    elif action == "providers":
-        providers()
-    elif action == "add_provider":
-        add_provider()
-    elif action == "provider_menu":
-        provider_menu(q["id"], q.get("name", "this provider"))
+    elif action == "sync":
+        bridge.sync(loud=True)
+        refresh()
     elif action == "discover":
         discover()
     elif action == "type_address":

@@ -1,6 +1,8 @@
 # Vesper for Kodi
 
-An add-on for [Kodi](https://kodi.tv) 19 (Matrix) and later. It is a thin remote for your Vesper server: recordings, playlists and schedules stay on the server, and Kodi only plays them. It works on every Kodi (Android TV and Fire TV, LibreELEC, CoreELEC, Windows, Linux, macOS) because it is plain Python.
+Recording and scheduling on top of the Live TV you already have in Kodi. The add-on does not bring its own channel lists: it reads the IPTV providers Kodi already uses, and adds **Record with Vesper** to Kodi's own channel list and TV guide. Your Vesper server makes and keeps the recordings; Kodi plays them back.
+
+Works on Kodi 19 (Matrix) and later, on every Kodi (Android TV and Fire TV, LibreELEC, CoreELEC, Windows, Linux, macOS), because it is plain Python.
 
 ## Install (recommended: the repository, so it updates itself)
 
@@ -9,48 +11,46 @@ An add-on for [Kodi](https://kodi.tv) 19 (Matrix) and later. It is a thin remote
 3. **Add-ons > Install from zip file** and pick it.
 4. **Add-ons > Install from repository > Vesper repository > Video add-ons > Vesper > Install.**
 
-From then on Kodi checks for new versions on its own. The repository is rebuilt after every Vesper release.
+Or install a single `plugin.video.vesper-….zip` from the [latest release](https://github.com/aminegames125/vesper/releases/latest) the same way (no automatic updates). Build it yourself with `python apps/kodi/build.py`.
 
-## Install from a single zip (no updates)
+That is all. About 20 seconds after Kodi starts, the add-on:
 
-1. Download `plugin.video.vesper-….zip` from the [latest release](https://github.com/aminegames125/vesper/releases/latest).
-2. In Kodi: **Settings > System > Add-ons**, turn on **Unknown sources**.
-3. **Add-ons > Install from zip file** and pick the zip. (On a TV box, put the zip on a USB stick, a network share, or fetch it with a file manager.)
-4. Open **Add-ons > Video add-ons > Vesper**. With no address saved it offers **Find Vesper on this network**; pick your server and you are in.
+1. **finds your Vesper server** on the network (when there is exactly one), and
+2. **connects your IPTV providers**: every playlist set up in Kodi's Live TV (*PVR IPTV Simple Client*) is handed to the server, once. It checks again every 6 hours, so a provider you add later is picked up too.
 
-Building the zip yourself: `python apps/kodi/build.py` (writes `apps/kodi/dist/`).
+## Record
 
-## Add your IPTV provider from Kodi
+Open Kodi's **TV > Channels** or **TV > Guide**, press the menu button on a channel or a programme (hold OK, or `C` on a keyboard), and choose **Record with Vesper**.
 
-You do not need the phone app or the admin panel. On first start the home screen leads with **Add your IPTV provider**; later it lives under **IPTV providers**. Pick one of:
+- **A channel:** pick how long: 30 minutes, 1 or 2 hours, or until you stop it. It starts now.
+- **A programme in the guide:** it records that programme, with a minute before and three after. If it has not started it is **scheduled**; if it is on now it records from now until it ends.
 
-- **Playlist link (M3U)**: paste the link your provider gave you.
-- **Xtream login**: server address, username and password.
-- **Use the one from Kodi's Live TV**: if you already set a playlist up in *PVR IPTV Simple Client*, Vesper finds its link and offers it, so you do not type it twice. (Playlists that are files on the device are skipped, because the server cannot read them.)
+If a channel has a backup address on the server (the same channel from another provider), it is used when the first one fails.
 
-The server checks the provider and loads its channels. They show up under Live TV, Movies and Series, and each one has **Record now** in its context menu. The provider is saved on the server, so the Android app sees it too. Remove one from **IPTV providers**; recordings already made stay.
+## Watch and manage recordings
 
-## What it does
+**Add-ons > Video add-ons > Vesper** has only what Kodi cannot do itself:
 
 | Screen | What you can do |
 | --- | --- |
 | **Continue watching** | Recordings you started and did not finish. Playing one offers to resume where you stopped. |
-| **Recording now and coming up** | See what is being captured and what starts next. Open a recording that is still in progress to watch it live from the start. |
-| **Recordings** | Everything finished, with folders. Open the context menu (hold OK, or press `C` on a keyboard) to keep one forever, mark it watched, stop it or delete it. |
-| **Live TV, Movies, Series** | Your server's playlists, by group. Press OK to watch. The context menu has **Record now** (30 minutes, 1 or 2 hours, or until you stop it), **What's on** (the TV guide; pick a programme to record it) and, for movies and episodes, **Download to the server**. |
-| **Schedules** | See what records on its own. Pause or resume one, run it now, or delete it. Create them in the Vesper app or the admin panel. |
+| **Recording now and coming up** | What is being captured and what starts next. Open a recording in progress to watch it from the start. |
+| **Recordings** | Everything finished, with folders. The context menu keeps one forever, marks it watched, stops it or deletes it. |
+| **Schedules** | Repeating schedules made in the Vesper app: pause, resume, run now, delete. |
 
 Where you stop is saved on the server, so the Android app and any other Kodi pick up from the same place.
 
 ## Settings
 
-- **Address**: leave empty to find the server automatically (uses mDNS on the local network; some guest Wi-Fi, VPN and Docker bridge setups block it, so you can also type `192.168.1.20:8484`).
+- **Address**: leave empty to find the server automatically (mDNS; some guest Wi-Fi, VPN and Docker bridge setups block it, so you can also type `192.168.1.20:8484`).
+- **Connect my Kodi IPTV providers now**: runs the provider step straight away instead of waiting.
 - **Username and password**: only when the server runs in *full* mode. Lite mode needs none.
-- **Play recordings with InputStream Adaptive**: off by default, because Kodi's own player handles HLS. Turn it on if a recording stutters.
+- **Play recordings with InputStream Adaptive**: off by default. Turn it on if a recording stutters.
 
 ## Good to know
 
-- Live channels play straight from your provider, from the Kodi device, so they use one of your provider connections while you watch. Recording happens on the server.
-- Kodi has no cast sender, so casting stays in the Android app.
-- Vesper does not add channels to Kodi's own Live TV window; it has its own Live TV list. Recording is done by the server, not by Kodi.
-- Tested here: the add-on's logic against a real Vesper server (lite and full mode), adding and removing a provider, and network discovery. The "use the one from Kodi's Live TV" import is tested against sample settings files only, not a real PVR IPTV Simple install. It has **not** been run inside a real Kodi yet, so how the menus look and feel on your TV, and the context menu on your remote, is untested. Please open an issue if something is off.
+- **Which providers work.** Playlists in *PVR IPTV Simple Client* (including Xtream providers that give you an M3U link) are connected automatically. A playlist that is a file on the device is skipped, because the server cannot read it. Other Live TV add-ons (Tvheadend, Zattoo and so on) do not reveal their stream addresses, so Vesper cannot record those; it tells you so instead of failing quietly. Add the provider's M3U link to *PVR IPTV Simple Client* and it works.
+- **Channel names must match.** Vesper finds the channel by name (case and punctuation do not matter). If several channels match, it asks which one.
+- **Repeating schedules** (every day at 20:00) are made in the Vesper app or admin panel. From Kodi you schedule single programmes.
+- **Live viewing** stays Kodi's own: it uses one of your provider connections from the Kodi device, while recording uses one from the server.
+- **Not tested in a real Kodi.** Tested here: the matching, time handling, provider connection and recording calls, against a real Vesper server (lite and full mode) with a stand-in for Kodi; the provider import against sample settings files; and network discovery. Not tested: how the entry appears in Kodi's Live TV menus on your TV or remote, whether Kodi gives the add-on the guide entry it expects, and its UTC guide times. The entry is added to the TV channels, guide and search windows only; it is not available while a channel is playing full screen. Please open an issue if something is off.

@@ -3,9 +3,11 @@
 No Kodi imports, so it can be tested on its own: it reads the settings files that add-on keeps.
 """
 
+import calendar
 import glob
 import os
 import re
+import time
 import xml.etree.ElementTree as ET
 
 ADDON = "pvr.iptvsimple"
@@ -38,3 +40,41 @@ def find(profile_dir):
         name = values.get("kodi_addon_instance_name") or "Kodi Live TV"
         found.append({"name": name, "url": link})
     return found
+
+
+def missing(found, sources):
+    """The Kodi providers the server does not have yet."""
+    have = {s.get("url", "").strip() for s in sources}
+    return [p for p in found if p["url"].strip() not in have]
+
+
+def norm(name):
+    """`BBC One HD` and `bbc-one hd` compare equal."""
+    return re.sub(r"[^0-9a-z]+", "", (name or "").lower())
+
+
+def best_match(channels, name):
+    """The server channel that is the one Kodi shows, or None when it is not clear-cut."""
+    wanted = norm(name)
+    exact = [c for c in channels if norm(c.get("name")) == wanted]
+    if exact:
+        return exact[0]
+    return channels[0] if len(channels) == 1 else None
+
+
+def _utc(text):
+    try:
+        return calendar.timegm(time.strptime(text[:19], "%Y-%m-%d %H:%M:%S"))
+    except (TypeError, ValueError):
+        return None
+
+
+def programme(details, now):
+    """What recording a Kodi guide entry means: `(start, stop, state)` with state `over`, `airing`
+    or `later`. Kodi's JSON-RPC gives times in UTC. None when the entry has no usable times."""
+    start, stop = _utc(details.get("starttime")), _utc(details.get("endtime"))
+    if start is None or stop is None or stop <= start:
+        return None
+    if stop <= now:
+        return start, stop, "over"
+    return start, stop, "airing" if start <= now else "later"

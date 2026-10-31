@@ -38,3 +38,11 @@ msgstr ""
 msgctxt "#30008"
 msgid "Play recordings with InputStream Adaptive"
 msgstr ""
+
+msgctxt "#30009"
+msgid "Connect my Kodi IPTV providers now"
+msgstr ""
+
+msgctxt "#30010"
+msgid "Record with Vesper"
+msgstr ""

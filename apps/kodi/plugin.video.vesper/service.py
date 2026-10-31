@@ -5,7 +5,7 @@ import threading
 
 import xbmc
 
-from resources.lib import api, common
+from resources.lib import api, bridge, common, discovery
 
 
 class Watcher(xbmc.Player):
@@ -55,11 +55,32 @@ class Watcher(xbmc.Player):
         threading.Thread(target=send, daemon=True).start()
 
 
+def find_server():
+    """First start: use the one Vesper server on the network, so there is nothing to set up."""
+    if api.normalise(common.setting("server")):
+        return
+    found = discovery.discover(3.5)
+    if len(found) == 1:
+        common.set_setting("server", found[0]["address"])
+        bridge.say("Found %s. Press the menu button on a channel to record." % found[0]["name"])
+
+
+SYNC_EVERY = 6 * 3600
+
+
 def run():
     monitor = xbmc.Monitor()
     player = Watcher()
+    if not monitor.waitForAbort(20):  # let Kodi finish starting and loading Live TV
+        find_server()
+        bridge.sync()
+    waited = 0
     while not monitor.waitForAbort(5):
         player.tick()
+        waited += 5
+        if waited >= SYNC_EVERY:
+            waited = 0
+            bridge.sync()
 
 
 run()
