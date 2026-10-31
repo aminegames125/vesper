@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.1] - 2026-10-31 <!-- release: patch; push: 14; changes: 1 -->
+
+### Fixed
+- Readable text in the dark theme and a proper adaptive, themed app icon
+
 ## [0.11.0] - 2026-10-31 <!-- release: minor; push: 13; changes: 1 -->
 
 ### Added
