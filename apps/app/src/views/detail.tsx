@@ -179,6 +179,10 @@ function ShowDetailPage({ show }: { show: Show }) {
   );
   const episodes = data?.episodes.filter((e) => e.season === season) ?? [];
   const first = data?.episodes[0];
+  const playEpisode = (e: Episode) => {
+    const all = data?.episodes ?? [];
+    play(episodePlayable(show, e, all[all.indexOf(e) + 1]));
+  };
   const info = data?.detail;
 
   return (
@@ -204,11 +208,7 @@ function ShowDetailPage({ show }: { show: Show }) {
           <p className="mt-5 leading-relaxed text-paper/90">{info?.plot ?? show.plot ?? ""}</p>
           <div className="mt-6 flex gap-3">
             {first && (
-              <Button
-                variant="primary"
-                icon={PlayIcon}
-                onClick={() => play(episodePlayable(show, first))}
-              >
+              <Button variant="primary" icon={PlayIcon} onClick={() => playEpisode(first)}>
                 Play S{first.season} E{first.number}
               </Button>
             )}
@@ -242,7 +242,7 @@ function ShowDetailPage({ show }: { show: Show }) {
                   <li key={e.id}>
                     <button
                       type="button"
-                      onClick={() => play(episodePlayable(show, e))}
+                      onClick={() => playEpisode(e)}
                       className="surface fade flex w-full items-center gap-4 p-3 text-left hover:border-accent"
                     >
                       <span className="relative block h-20 w-36 flex-none overflow-hidden rounded-lg bg-raised">

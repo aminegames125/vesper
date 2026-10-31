@@ -25,13 +25,14 @@ export const moviePlayable = (movie: Movie, auth: XtreamAuth): Playable => ({
   poster: movie.poster,
 });
 
-export const episodePlayable = (show: Show, episode: Episode): Playable => ({
+export const episodePlayable = (show: Show, episode: Episode, following?: Episode): Playable => ({
   id: `${show.id}:${episode.id}`,
   title: `${show.name} · S${episode.season} E${episode.number}`,
   subtitle: episode.title,
   url: episode.url,
   live: false,
   poster: episode.image ?? show.cover,
+  next: following ? episodePlayable(show, following) : undefined,
 });
 
 export const catchupPlayable = (

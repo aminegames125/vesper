@@ -2,7 +2,9 @@ import Hls from "hls.js";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useCloud } from "../lib/cloud";
 import { formatClock, nowNext } from "../lib/epg";
+import { isDesktop } from "../lib/fetch-text";
 import { useGuide } from "../lib/guide-cache";
+import { NativeLoader } from "../lib/hls-loader";
 import { channelPlayable } from "../lib/playable";
 import { beginRecording, canRecord } from "../lib/recorder";
 import { useStore } from "../lib/store";
@@ -84,6 +86,20 @@ export default function Player({ item }: { item: Playable }) {
   const [speed, setSpeed] = useState(1);
   const [full, setFull] = useState(false);
   const [buffering, setBuffering] = useState(true);
+  const [buffered, setBuffered] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [audio, setAudio] = useState<{ id: number; name: string }[]>([]);
+  const [audioId, setAudioId] = useState(0);
+  const [subs, setSubs] = useState<{ id: number; name: string }[]>([]);
+  const [subId, setSubId] = useState(-1);
+  const [upNextDismissed, setUpNextDismissed] = useState(false);
+
+  const flash = useCallback((text: string) => {
+    setToast(text);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 900);
+  }, []);
 
   const channel = item.channel;
   const guide = useGuide(
@@ -101,13 +117,28 @@ export default function Player({ item }: { item: Playable }) {
     setBuffering(true);
     setLevels([]);
     setLevel(-1);
+    setAudio([]);
+    setSubs([]);
+    setUpNextDismissed(false);
+    try {
+      const saved = localStorage.getItem("vesper.volume");
+      if (saved !== null) el.volume = Math.min(1, Math.max(0, Number(saved)));
+    } catch {
+      // storage can be unavailable; the default volume is fine
+    }
 
     const isHls = item.live || /\.m3u8(\?|$)/i.test(item.url);
     const resume = () => {
       if (resumeAt.current > 5) el.currentTime = resumeAt.current;
     };
     if (isHls && Hls.isSupported()) {
-      const instance = new Hls({ lowLatencyMode: true });
+      const instance = new Hls({
+        lowLatencyMode: true,
+        // On desktop, load through the native client: IPTV hosts rarely allow cross-origin requests.
+        ...(isDesktop()
+          ? { loader: NativeLoader as unknown as typeof Hls.DefaultConfig.loader }
+          : {}),
+      });
       hls.current = instance;
       instance.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         setLevels(
@@ -118,11 +149,31 @@ export default function Player({ item }: { item: Playable }) {
       instance.on(Hls.Events.LEVEL_SWITCHED, (_, data) =>
         setHeight(instance.levels[data.level]?.height ?? 0),
       );
+      const syncTracks = () => {
+        setAudio(
+          instance.audioTracks.map((t) => ({
+            id: t.id,
+            name: t.name || t.lang || `Track ${t.id + 1}`,
+          })),
+        );
+        setAudioId(instance.audioTrack);
+        setSubs(
+          instance.subtitleTracks.map((t) => ({
+            id: t.id,
+            name: t.name || t.lang || `Track ${t.id + 1}`,
+          })),
+        );
+        setSubId(instance.subtitleTrack);
+      };
+      instance.on(Hls.Events.AUDIO_TRACKS_UPDATED, syncTracks);
+      instance.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, syncTracks);
+      let retries = 0;
       instance.on(Hls.Events.ERROR, (_, data) => {
         if (!data.fatal) return;
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) instance.startLoad();
-        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) instance.recoverMediaError();
-        else setError("This stream could not be played.");
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && ++retries <= 3) instance.startLoad();
+        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && retries++ < 3)
+          instance.recoverMediaError();
+        else setError(`This stream could not be played (${data.details}).`);
       });
       instance.loadSource(item.url);
       instance.attachMedia(el);
@@ -183,11 +234,16 @@ export default function Player({ item }: { item: Playable }) {
     else el.pause();
   }, []);
 
-  const seek = useCallback((delta: number) => {
-    const el = video.current;
-    if (el && Number.isFinite(el.duration))
-      el.currentTime = Math.max(0, Math.min(el.duration, el.currentTime + delta));
-  }, []);
+  const seek = useCallback(
+    (delta: number) => {
+      const el = video.current;
+      if (el && Number.isFinite(el.duration)) {
+        el.currentTime = Math.max(0, Math.min(el.duration, el.currentTime + delta));
+        flash(delta > 0 ? `+${delta}s` : `${delta}s`);
+      }
+    },
+    [flash],
+  );
 
   const step = useCallback(
     (dir: 1 | -1) => {
@@ -223,11 +279,31 @@ export default function Player({ item }: { item: Playable }) {
           if (video.current) video.current.muted = !video.current.muted;
           break;
         case "ArrowLeft":
+        case "j":
           if (!item.live) seek(-10);
           break;
         case "ArrowRight":
+        case "l":
           if (!item.live) seek(10);
           break;
+        case "Home":
+        case "End":
+          if (!item.live && video.current && Number.isFinite(video.current.duration))
+            video.current.currentTime = e.key === "Home" ? 0 : video.current.duration - 1;
+          break;
+        case "<":
+        case ">": {
+          const el = video.current;
+          if (el && !item.live) {
+            el.playbackRate = Math.min(
+              2,
+              Math.max(0.5, el.playbackRate + (e.key === ">" ? 0.25 : -0.25)),
+            );
+            setSpeed(el.playbackRate);
+            flash(`${el.playbackRate}x`);
+          }
+          break;
+        }
         case "ArrowUp":
           if (item.live) step(-1);
           else if (video.current) video.current.volume = Math.min(1, video.current.volume + 0.1);
@@ -237,11 +313,18 @@ export default function Player({ item }: { item: Playable }) {
           else if (video.current) video.current.volume = Math.max(0, video.current.volume - 0.1);
           break;
         default:
+          if (
+            /^[0-9]$/.test(e.key) &&
+            !item.live &&
+            video.current &&
+            Number.isFinite(video.current.duration)
+          )
+            video.current.currentTime = (Number(e.key) / 10) * video.current.duration;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [close, fullscreen, item.live, menu, seek, step, togglePlay, wake]);
+  }, [close, flash, fullscreen, item.live, menu, seek, step, togglePlay, wake]);
 
   const record = async (minutes: number) => {
     setMenu(null);
@@ -273,7 +356,6 @@ export default function Player({ item }: { item: Playable }) {
     }
   };
 
-  const pct = time.total > 0 ? (time.now / time.total) * 100 : 0;
   const untilEnd = now ? Math.max(1, Math.ceil((now.end - Date.now() / 1000) / 60)) : 0;
 
   return (
@@ -291,7 +373,16 @@ export default function Player({ item }: { item: Playable }) {
           setMenu(null);
           if (!item.live) togglePlay();
         }}
-        onDoubleClick={() => void fullscreen()}
+        onDoubleClick={(e) => {
+          const box = e.currentTarget.getBoundingClientRect();
+          const x = (e.clientX - box.left) / box.width;
+          if (!item.live && x < 0.33) seek(-10);
+          else if (!item.live && x > 0.67) seek(10);
+          else void fullscreen();
+        }}
+        onEnded={() => {
+          if (item.next) play(item.next);
+        }}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onWaiting={() => setBuffering(true)}
@@ -300,6 +391,17 @@ export default function Player({ item }: { item: Playable }) {
         onVolumeChange={(e) => {
           setMuted(e.currentTarget.muted);
           setVolume(e.currentTarget.volume);
+          try {
+            localStorage.setItem("vesper.volume", String(e.currentTarget.volume));
+          } catch {
+            // not worth failing playback over
+          }
+        }}
+        onProgress={(e) => {
+          const el = e.currentTarget;
+          for (let i = 0; i < el.buffered.length; i++)
+            if (el.currentTime >= el.buffered.start(i) && el.currentTime <= el.buffered.end(i))
+              setBuffered(el.buffered.end(i));
         }}
         onTimeUpdate={(e) =>
           setTime({ now: e.currentTarget.currentTime, total: e.currentTarget.duration })
@@ -308,6 +410,37 @@ export default function Player({ item }: { item: Playable }) {
         style={{ objectFit: fit }}
         className="size-full"
       />
+
+      {toast && (
+        <div className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 rounded-full bg-black/70 px-5 py-2 text-lg font-semibold backdrop-blur">
+          {toast}
+        </div>
+      )}
+
+      {item.next && !upNextDismissed && time.total > 60 && time.total - time.now < 20 && (
+        <div className="glass absolute bottom-32 right-6 w-72 rounded-2xl border border-line p-4 shadow-xl">
+          <p className="text-xs font-bold uppercase tracking-wider text-accent">
+            Up next in {Math.max(0, Math.ceil(time.total - time.now))}s
+          </p>
+          <p className="mt-1 truncate font-semibold">{item.next.title}</p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => item.next && play(item.next)}
+              className="fade rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-black hover:bg-white/90"
+            >
+              Play now
+            </button>
+            <button
+              type="button"
+              onClick={() => setUpNextDismissed(true)}
+              className="fade rounded-full bg-white/10 px-4 py-1.5 text-sm hover:bg-white/20"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {buffering && !error && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -413,6 +546,47 @@ export default function Player({ item }: { item: Playable }) {
                         {l.height}p
                       </Pill>
                     ))}
+                </Group>
+              )}
+              {audio.length > 1 && (
+                <Group label="Audio">
+                  {audio.map((t) => (
+                    <Pill
+                      key={t.id}
+                      on={audioId === t.id}
+                      onClick={() => {
+                        if (hls.current) hls.current.audioTrack = t.id;
+                        setAudioId(t.id);
+                      }}
+                    >
+                      {t.name}
+                    </Pill>
+                  ))}
+                </Group>
+              )}
+              {subs.length > 0 && (
+                <Group label="Subtitles">
+                  <Pill
+                    on={subId === -1}
+                    onClick={() => {
+                      if (hls.current) hls.current.subtitleTrack = -1;
+                      setSubId(-1);
+                    }}
+                  >
+                    Off
+                  </Pill>
+                  {subs.map((t) => (
+                    <Pill
+                      key={t.id}
+                      on={subId === t.id}
+                      onClick={() => {
+                        if (hls.current) hls.current.subtitleTrack = t.id;
+                        setSubId(t.id);
+                      }}
+                    >
+                      {t.name}
+                    </Pill>
+                  ))}
                 </Group>
               )}
               <Group label="Picture">
@@ -540,20 +714,13 @@ export default function Player({ item }: { item: Playable }) {
           ) : (
             <div className="mb-3 flex items-center gap-3 text-xs tabular-nums">
               <span>{clock(time.now)}</span>
-              <input
-                type="range"
-                min={0}
-                max={Number.isFinite(time.total) ? time.total : 0}
-                step={1}
-                value={time.now}
-                aria-label="Seek"
-                onChange={(e) => {
-                  if (video.current) video.current.currentTime = Number(e.target.value);
+              <SeekBar
+                now={time.now}
+                total={time.total}
+                buffered={buffered}
+                onSeek={(t) => {
+                  if (video.current) video.current.currentTime = t;
                 }}
-                style={{
-                  background: `linear-gradient(to right, var(--accent) ${pct}%, rgb(255 255 255 / 0.25) ${pct}%)`,
-                }}
-                className="h-1 flex-1 cursor-pointer appearance-none rounded-full accent-[var(--accent)]"
               />
               <span>{clock(time.total)}</span>
             </div>
@@ -690,5 +857,78 @@ function Pill({
     >
       {children}
     </button>
+  );
+}
+
+/** Scrubbing bar with a buffered range and a time tooltip that follows the pointer. */
+function SeekBar({
+  now,
+  total,
+  buffered,
+  onSeek,
+}: {
+  now: number;
+  total: number;
+  buffered: number;
+  onSeek: (seconds: number) => void;
+}) {
+  const bar = useRef<HTMLDivElement>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const dragging = useRef(false);
+  const valid = Number.isFinite(total) && total > 0;
+  const at = (clientX: number) => {
+    const box = bar.current?.getBoundingClientRect();
+    if (!box || !valid) return 0;
+    return Math.min(1, Math.max(0, (clientX - box.left) / box.width));
+  };
+  const pct = valid ? (now / total) * 100 : 0;
+
+  return (
+    <div
+      ref={bar}
+      role="slider"
+      tabIndex={0}
+      aria-label="Seek"
+      aria-valuemin={0}
+      aria-valuemax={valid ? Math.round(total) : 0}
+      aria-valuenow={Math.round(now)}
+      onPointerDown={(e) => {
+        dragging.current = true;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        onSeek(at(e.clientX) * total);
+      }}
+      onPointerMove={(e) => {
+        setHover(at(e.clientX));
+        if (dragging.current) onSeek(at(e.clientX) * total);
+      }}
+      onPointerUp={() => {
+        dragging.current = false;
+      }}
+      onPointerLeave={() => setHover(null)}
+      className="group relative flex h-5 flex-1 cursor-pointer items-center"
+    >
+      <div className="relative h-1 w-full rounded-full bg-white/25 transition-all group-hover:h-2">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-white/30"
+          style={{ width: `${valid ? Math.min(100, (buffered / total) * 100) : 0}%` }}
+        />
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-accent"
+          style={{ width: `${pct}%` }}
+        />
+        <div
+          className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 scale-0 rounded-full bg-accent transition-transform group-hover:scale-100"
+          style={{ left: `${pct}%` }}
+        />
+      </div>
+      {hover !== null && valid && (
+        <span
+          className="pointer-events-none absolute -top-7 -translate-x-1/2 rounded-md bg-black/80 px-2 py-0.5 text-xs tabular-nums"
+          style={{ left: `${hover * 100}%` }}
+        >
+          {clock(hover * total)}
+        </span>
+      )}
+    </div>
   );
 }

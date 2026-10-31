@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChannelCard, PosterCard, Rail } from "../components/cards";
 import { PlayIcon } from "../components/icons";
 import { Button } from "../components/ui";
-import { moviePlayable, useAuth } from "../lib/playable";
+import { moviePlayable } from "../lib/playable";
 import { useStore } from "../lib/store";
-import type { Movie } from "../lib/types";
+import type { Movie, Show } from "../lib/types";
 import { NoSources } from "./no-sources";
 
 const percent = (position: number, duration: number) =>
@@ -36,92 +36,33 @@ export function Home() {
     () => [...shows].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 24),
     [shows],
   );
-  const hero = useMemo(() => {
-    const pool = movies.filter((m) => m.poster);
-    return pool[Math.floor(pool.length / 3)] as Movie | undefined;
-  }, [movies]);
-  const heroAuth = useAuth(hero?.providerId);
-  const openDetail = useStore((s) => s.openDetail);
+  const featured = useMemo<Featured[]>(() => {
+    const moviePicks = movies
+      .filter((m) => m.poster)
+      .sort((x, y) => (y.rating ?? 0) - (x.rating ?? 0))
+      .slice(0, 3)
+      .map((m): Featured => ({ kind: "movie", item: m, image: m.poster as string }));
+    const showPicks = shows
+      .filter((x) => x.cover)
+      .sort((x, y) => (y.rating ?? 0) - (x.rating ?? 0))
+      .slice(0, 3)
+      .map((x): Featured => ({ kind: "show", item: x, image: x.cover as string }));
+    return moviePicks.flatMap((m, i) => (showPicks[i] ? [m, showPicks[i]] : [m]));
+  }, [movies, shows]);
+  const top10 = useMemo(
+    () =>
+      [...movies, ...shows]
+        .filter((x) => (x as Movie).poster || (x as Show).cover)
+        .sort((x, y) => (y.rating ?? 0) - (x.rating ?? 0))
+        .slice(0, 10),
+    [movies, shows],
+  );
 
   if (channels.length + movies.length + shows.length === 0) return <NoSources what="content" />;
 
-  const resume = history[0];
-
   return (
     <div>
-      {resume ? (
-        <section className="surface mb-9 flex items-center gap-6 overflow-hidden p-5">
-          {resume.item.poster && (
-            <img
-              decoding="async"
-              src={resume.item.poster}
-              alt=""
-              className="h-28 w-20 rounded-lg object-cover"
-            />
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase tracking-wider text-accent">
-              Pick up where you left off
-            </p>
-            <h2 className="mt-1 truncate text-2xl font-bold">{resume.item.title}</h2>
-            {resume.item.subtitle && (
-              <p className="truncate text-sm text-muted">{resume.item.subtitle}</p>
-            )}
-            <div className="mt-3 h-1 max-w-sm overflow-hidden rounded-full bg-raised">
-              <div
-                className="h-full bg-accent"
-                style={{ width: `${percent(resume.position, resume.duration)}%` }}
-              />
-            </div>
-          </div>
-          <Button variant="primary" icon={PlayIcon} onClick={() => play(resume.item)}>
-            Resume
-          </Button>
-        </section>
-      ) : (
-        hero && (
-          <section className="relative mb-9 overflow-hidden rounded-3xl bg-raised">
-            {hero.poster && (
-              <img
-                decoding="async"
-                src={hero.poster}
-                alt=""
-                className="absolute inset-0 size-full scale-110 object-cover opacity-30 blur-2xl"
-              />
-            )}
-            <div className="relative flex items-center gap-8 p-8">
-              {hero.poster && (
-                <img
-                  decoding="async"
-                  src={hero.poster}
-                  alt=""
-                  className="h-56 w-40 rounded-xl object-cover shadow-2xl"
-                />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold uppercase tracking-wider text-accent">Featured</p>
-                <h2 className="mt-1 line-clamp-2 text-4xl font-bold">{hero.name}</h2>
-                <p className="mt-2 text-sm text-muted">
-                  {hero.group}
-                  {hero.rating ? ` · ★ ${hero.rating.toFixed(1)}` : ""}
-                </p>
-                <div className="mt-5 flex gap-3">
-                  {heroAuth && (
-                    <Button
-                      variant="primary"
-                      icon={PlayIcon}
-                      onClick={() => play(moviePlayable(hero, heroAuth))}
-                    >
-                      Play
-                    </Button>
-                  )}
-                  <Button onClick={() => openDetail("movie", hero.id)}>Details</Button>
-                </div>
-              </div>
-            </div>
-          </section>
-        )
-      )}
+      <Billboard items={featured} />
 
       {history.length > 0 && (
         <Rail title="Continue watching">
@@ -199,6 +140,16 @@ export function Home() {
         </Rail>
       )}
 
+      {top10.length >= 5 && (
+        <Rail title="Top 10 on Vesper">
+          {top10.map((x, i) => (
+            <div key={x.id} className="w-44 flex-none">
+              <PosterCard kind={"poster" in x ? "movie" : "show"} item={x} rank={i + 1} />
+            </div>
+          ))}
+        </Rail>
+      )}
+
       {newest.length > 0 && (
         <Rail
           title="New movies"
@@ -233,5 +184,83 @@ export function Home() {
         </Rail>
       )}
     </div>
+  );
+}
+
+type Featured = { kind: "movie" | "show"; item: Movie | Show; image: string };
+
+/** A full-width featured title that rotates every few seconds, like the big streaming apps. */
+function Billboard({ items }: { items: Featured[] }) {
+  const play = useStore((s) => s.play);
+  const openDetail = useStore((s) => s.openDetail);
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (paused || items.length < 2) return;
+    const timer = setInterval(() => setIndex((i) => (i + 1) % items.length), 8000);
+    return () => clearInterval(timer);
+  }, [paused, items.length]);
+
+  const current = items[index % Math.max(1, items.length)];
+  if (!current) return null;
+  const { item, kind } = current;
+  const plot = (item as Show).plot;
+
+  const playNow = () => {
+    if (kind !== "movie") return openDetail("show", item.id);
+    const auth = useStore.getState().providers.find((p) => p.id === item.providerId)?.xtream;
+    if (auth) play(moviePlayable(item as Movie, auth));
+  };
+
+  return (
+    <section
+      className="relative -mx-1 mb-9 aspect-[21/9] min-h-72 overflow-hidden rounded-3xl bg-raised"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <img
+        key={current.image}
+        decoding="async"
+        src={current.image}
+        alt=""
+        className="absolute inset-0 size-full scale-110 object-cover object-top blur-sm"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/70 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-transparent to-transparent" />
+      <div className="absolute inset-y-0 left-0 flex max-w-2xl flex-col justify-end p-8 md:p-10">
+        <p className="text-xs font-bold uppercase tracking-wider text-accent">
+          {kind === "movie" ? "Featured movie" : "Featured series"}
+        </p>
+        <h2 className="mt-2 line-clamp-2 font-display text-4xl font-bold md:text-5xl">
+          {item.name}
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          {[item.group, item.rating ? `★ ${item.rating.toFixed(1)}` : null]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        {plot && <p className="mt-3 line-clamp-2 text-sm text-paper/80">{plot}</p>}
+        <div className="mt-5 flex gap-3">
+          <Button variant="primary" icon={PlayIcon} onClick={playNow}>
+            {kind === "movie" ? "Play" : "Watch"}
+          </Button>
+          <Button onClick={() => openDetail(kind, item.id)}>More info</Button>
+        </div>
+      </div>
+      {items.length > 1 && (
+        <div className="absolute bottom-5 right-6 flex gap-1.5">
+          {items.map((f, i) => (
+            <button
+              key={f.item.id}
+              type="button"
+              aria-label={`Show ${f.item.name}`}
+              onClick={() => setIndex(i)}
+              className={`h-1.5 rounded-full transition-all ${i === index ? "w-6 bg-accent" : "w-2 bg-white/40"}`}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

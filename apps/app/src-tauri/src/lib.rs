@@ -270,8 +270,40 @@ mod local_server {
             use std::os::windows::process::CommandExt;
             command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
         }
-        *slot = Some(command.spawn().map_err(|e| e.to_string())?);
-        Ok(())
+        // Keep the server's output so a failed start can say why.
+        let log_path = data.join("server.log");
+        if let Ok(log) = fs::File::create(&log_path) {
+            if let Ok(err) = log.try_clone() {
+                command.stdout(log).stderr(err);
+            }
+        }
+        command.stdin(std::process::Stdio::null());
+        let mut child = command.spawn().map_err(|e| e.to_string())?;
+
+        // Wait until it accepts connections, or report why it did not.
+        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+        for _ in 0..50 {
+            if let Ok(Some(status)) = child.try_wait() {
+                let log = fs::read_to_string(&log_path).unwrap_or_default();
+                let tail: Vec<&str> = log.lines().rev().take(3).collect();
+                let tail: Vec<&str> = tail.into_iter().rev().collect();
+                return Err(format!(
+                    "The server stopped right away ({status}). {}",
+                    tail.join(" ")
+                ));
+            }
+            if std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(100))
+                .is_ok()
+            {
+                *slot = Some(child);
+                return Ok(());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+        let _ = child.kill();
+        Err(format!(
+            "The server did not start listening on port {port} in time."
+        ))
     }
 
     #[tauri::command]

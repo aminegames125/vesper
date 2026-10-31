@@ -94,6 +94,8 @@ export interface Playable {
   live: boolean;
   poster?: string;
   channel?: Channel;
+  /** The episode that follows this one, so the player can offer it when this one ends. */
+  next?: Playable;
 }
 
 /** A programme the viewer asked to have recorded when it starts. Times are epoch seconds. */

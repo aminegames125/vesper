@@ -249,8 +249,6 @@ function LocalServer() {
       else {
         await invoke("server_start", { port: Number(port), mode });
         const url = `http://127.0.0.1:${port}`;
-        // Give the server a moment to bind, then connect this app to it.
-        await new Promise((r) => setTimeout(r, 1200));
         const info = await makeClient(url, null).info();
         const user = info.mode === "lite" ? await makeClient(url, null).me() : null;
         setCloud({ url, token: null, user, info });
@@ -260,9 +258,12 @@ function LocalServer() {
             : "Server started and connected.",
         );
       }
-      setStatus(await invoke("server_status"));
     } catch (e) {
       notify(String(e));
+    } finally {
+      setStatus(
+        await invoke<{ running: boolean; available: boolean }>("server_status").catch(() => status),
+      );
     }
   };
 
