@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.0] - 2026-10-31 <!-- release: minor; push: 22; changes: 1 -->
+
+### Added
+- Picture quality for watch and cast, landing page, new banner, and fixes for the open findings
+
 ## [0.15.0] - 2026-10-31 <!-- release: minor; push: 21; changes: 1 -->
 
 ### Added
