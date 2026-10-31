@@ -87,10 +87,11 @@ private val Recordings = Dest("recordings", "Recordings", Icons.Filled.FiberManu
 private val Sources = Dest("sources", "Sources", Icons.Filled.Storage)
 private val Settings = Dest("settings", "Settings", Icons.Filled.Settings)
 private val More = Dest("more", "Library", Icons.Filled.Menu)
+private val MyVesper = Dest("more", "My Vesper", Icons.Filled.Menu)
 
 private val PhoneTabs = listOf(Home, Live, Movies, Series, More)
 private val RailTabs = listOf(Home, Live, Movies, Series, Search, Favorites, Recordings, Sources, Settings)
-private val TvTabs = listOf(Search, Home, Live, Movies, Series, Favorites, Recordings, Sources, Settings)
+private val TvTabs = listOf(Search, Home, Live, Movies, Series, MyVesper)
 private val MoreItems = listOf(Search, Favorites, Recordings, Sources, Settings)
 
 @Composable
@@ -137,10 +138,12 @@ fun VesperRoot(session: PlayerSession) {
                 Box(Modifier.weight(1f).statusBarsPadding()) { Graph(nav, form) }
             }
 
-            // A television gets a slim icon rail on the left that opens with labels when it takes focus.
+            // A television gets a centred row of tabs along the top, like Netflix.
             FormFactor.Tv -> Box(Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxSize().padding(start = if (inDetail) 0.dp else RailWidth)) { Graph(nav, form) }
-                if (!inDetail) TvRail(route, ::go, Modifier.align(Alignment.CenterStart))
+                Column(Modifier.fillMaxSize()) {
+                    if (!inDetail) TvTopBar(route, ::go)
+                    Box(Modifier.weight(1f)) { Graph(nav, form) }
+                }
             }
         }
 
@@ -148,55 +151,49 @@ fun VesperRoot(session: PlayerSession) {
     }
 }
 
-private val RailWidth = 72.dp
-
 @Composable
-private fun TvRail(route: String, onSelect: (Dest) -> Unit, modifier: Modifier = Modifier) {
-    var expanded by remember { mutableStateOf(false) }
-    val width by animateDpAsState(if (expanded) 232.dp else RailWidth, label = "rail-width")
+private fun TvTopBar(route: String, onSelect: (Dest) -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Column(
-        modifier
-            .fillMaxHeight()
-            .width(width)
-            .background(if (expanded) colors.surface else colors.background)
-            .onFocusChanged { expanded = it.hasFocus }
-            .focusGroup()
-            .padding(horizontal = 12.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
-    ) {
-        TvTabs.forEach { d ->
-            var focused by remember { mutableStateOf(false) }
-            val selected = route == d.route
-            val fg = when {
-                focused -> colors.onPrimary
-                selected -> colors.onBackground
-                else -> colors.onSurfaceVariant
-            }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(
-                        when {
-                            focused -> colors.primary
-                            selected -> colors.surfaceVariant
-                            else -> Color.Transparent
-                        },
-                    )
-                    .onFocusChanged { focused = it.isFocused }
-                    .clickable { onSelect(d) }
-                    .padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(d.icon, d.label, tint = fg)
-                if (expanded) {
-                    Spacer(Modifier.width(16.dp))
-                    Text(d.label, color = fg, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    Box(Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 14.dp)) {
+        Row(
+            Modifier.align(Alignment.Center),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TvTabs.forEach { d ->
+                var focused by remember { mutableStateOf(false) }
+                val selected = route == d.route || (d.route == More.route && route in MoreItems.map { it.route })
+                val fg = when {
+                    focused -> colors.background
+                    selected -> colors.onBackground
+                    else -> colors.onSurfaceVariant
+                }
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            when {
+                                focused -> colors.onBackground
+                                selected -> colors.surfaceVariant
+                                else -> Color.Transparent
+                            },
+                        )
+                        .onFocusChanged { focused = it.isFocused }
+                        .clickable { onSelect(d) }
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (d == Search) Icon(d.icon, d.label, tint = fg) else Text(d.label, color = fg, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
+        Text(
+            "Vesper",
+            color = colors.primary,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier.align(Alignment.CenterEnd),
+        )
     }
 }
 

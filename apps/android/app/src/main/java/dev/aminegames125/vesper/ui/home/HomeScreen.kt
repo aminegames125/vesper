@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.aminegames125.vesper.ui.common.BoldLabel
 import dev.aminegames125.vesper.ui.common.ChannelTile
+import dev.aminegames125.vesper.ui.common.ExpandRow
 import dev.aminegames125.vesper.ui.common.FormFactor
 import dev.aminegames125.vesper.ui.common.LoadingBox
 import dev.aminegames125.vesper.ui.common.Message
@@ -109,12 +110,42 @@ private fun HomeContent(
             )
         }
 
-        railOf("movies", "New movies", if (options.movies) home.newest else emptyList(), posterWidth, gutter, { it.id }) { m ->
-            PosterCard(m.name, m.poster, onClick = { onOpenDetail("movie", m.id) })
+        if (tv) {
+            item("movies-tv") {
+                ExpandRow(
+                    "New movies",
+                    if (options.movies) home.newest else emptyList(),
+                    { it.id },
+                    { it.poster },
+                    { it.name },
+                    { listOfNotNull(it.grp, it.rating?.let { r -> "★ %.1f".format(r) }).joinToString(" · ") },
+                    { onOpenDetail("movie", it.id) },
+                    gutter,
+                )
+            }
+        } else {
+            railOf("movies", "New movies", if (options.movies) home.newest else emptyList(), posterWidth, gutter, { it.id }) { m ->
+                PosterCard(m.name, m.poster, onClick = { onOpenDetail("movie", m.id) })
+            }
         }
 
-        railOf("shows", "Top series", if (options.shows) home.topShows else emptyList(), posterWidth, gutter, { it.id }) { s ->
-            PosterCard(s.name, s.cover, onClick = { onOpenDetail("show", s.id) })
+        if (tv) {
+            item("shows-tv") {
+                ExpandRow(
+                    "Top series",
+                    if (options.shows) home.topShows else emptyList(),
+                    { it.id },
+                    { it.cover },
+                    { it.name },
+                    { listOfNotNull(it.year, it.grp, it.rating?.let { r -> "★ %.1f".format(r) }).joinToString(" · ") },
+                    { onOpenDetail("show", it.id) },
+                    gutter,
+                )
+            }
+        } else {
+            railOf("shows", "Top series", if (options.shows) home.topShows else emptyList(), posterWidth, gutter, { it.id }) { s ->
+                PosterCard(s.name, s.cover, onClick = { onOpenDetail("show", s.id) })
+            }
         }
     }
 }

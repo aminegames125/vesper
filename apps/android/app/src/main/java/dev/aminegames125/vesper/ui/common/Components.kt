@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -259,4 +261,70 @@ fun BoldLabel(text: String, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.primary,
         modifier = modifier,
     )
+}
+
+/**
+ * Netflix-style row for TV: posters in a line, and the one under focus opens into a wide card
+ * with its details underneath.
+ */
+@Composable
+fun <T> ExpandRow(
+    title: String,
+    items: List<T>,
+    key: (T) -> Any,
+    image: (T) -> String?,
+    name: (T) -> String,
+    meta: (T) -> String?,
+    onClick: (T) -> Unit,
+    gutter: Dp,
+) {
+    if (items.isEmpty()) return
+    var focusedIndex by remember { mutableStateOf(-1) }
+    val ring = MaterialTheme.colorScheme.onBackground
+    Column(Modifier.padding(bottom = 12.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = gutter, vertical = 8.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = gutter, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            itemsIndexed(items, key = { _, item -> key(item) }) { index, item ->
+                val focused = focusedIndex == index
+                val width by animateDpAsState(if (focused) 380.dp else 150.dp, label = "expand")
+                Box(
+                    Modifier
+                        .width(width)
+                        .height(225.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .then(if (focused) Modifier.border(BorderStroke(3.dp, ring), RoundedCornerShape(12.dp)) else Modifier)
+                        .onFocusChanged { state ->
+                            if (state.isFocused) focusedIndex = index else if (focusedIndex == index) focusedIndex = -1
+                        }
+                        .clickable { onClick(item) },
+                ) {
+                    RemoteImage(image(item), Modifier.fillMaxSize())
+                    if (focused) {
+                        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)))))
+                        Text(
+                            name(item),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.align(Alignment.BottomStart).padding(14.dp),
+                        )
+                    }
+                }
+            }
+        }
+        // Reserved so the rows below do not jump while focus moves.
+        val current = items.getOrNull(focusedIndex)
+        Column(Modifier.padding(horizontal = gutter).height(44.dp)) {
+            if (current != null) {
+                Text(name(current), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                meta(current)?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
+            }
+        }
+    }
 }
