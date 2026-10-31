@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.14.1] - 2026-10-31 <!-- release: patch; push: 20; changes: 1 -->
+
+### Fixed
+- Reconnect stalled streams, keep one open playlist, enforce quota while recording, cap downloads, guard lite mode and pin DNS
+
 ## [0.14.0] - 2026-10-31 <!-- release: minor; push: 19; changes: 1 -->
 
 ### Added
