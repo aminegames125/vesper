@@ -54,6 +54,7 @@ interface State {
   theme: ThemeMode;
   seenVersion: string | null;
   tipsDismissed: boolean;
+  onboarded: boolean;
   recordMinutes: number;
   /** Home rows the viewer switched off in Settings. */
   hiddenRows: string[];
@@ -93,6 +94,7 @@ interface State {
   toggleRow: (id: string) => void;
   markVersionSeen: () => void;
   dismissTips: () => void;
+  finishOnboarding: () => void;
   addRecording: (recording: Recording) => void;
   updateRecording: (id: string, patch: Partial<Recording>) => void;
   removeRecording: (id: string) => void;
@@ -117,6 +119,7 @@ export const useStore = create<State>()(
       theme: "dark",
       seenVersion: null,
       tipsDismissed: false,
+      onboarded: false,
       recordMinutes: 60,
       hiddenRows: [],
 
@@ -213,6 +216,7 @@ export const useStore = create<State>()(
         })),
       markVersionSeen: () => set({ seenVersion: CURRENT_VERSION }),
       dismissTips: () => set({ tipsDismissed: true }),
+      finishOnboarding: () => set({ onboarded: true }),
 
       addRecording: (recording) =>
         set(({ recordings }) => ({ recordings: [recording, ...recordings] })),
@@ -254,6 +258,7 @@ export const useStore = create<State>()(
         theme,
         seenVersion,
         tipsDismissed,
+        onboarded,
         recordMinutes,
         hiddenRows,
       }) => ({
@@ -268,6 +273,7 @@ export const useStore = create<State>()(
         theme,
         seenVersion,
         tipsDismissed,
+        onboarded,
         recordMinutes,
         hiddenRows,
       }),

@@ -11,8 +11,6 @@ import {
   HouseIcon,
   IconButton,
   MoonIcon,
-  PanelLeftCloseIcon,
-  PanelLeftOpenIcon,
   RefreshCwIcon,
   ServerIcon,
   SettingsIcon,
@@ -23,20 +21,20 @@ import {
 import { LogoMark } from "./logo";
 import { SearchBox } from "./ui";
 
-const MAIN: { view: View; label: string; icon: AnimIcon }[] = [
+const TABS: { view: View; label: string; icon: AnimIcon }[] = [
   { view: "home", label: "Home", icon: HouseIcon },
   { view: "live", label: "Live TV", icon: TvIcon },
-  { view: "guide", label: "Guide", icon: CalendarDaysIcon },
   { view: "movies", label: "Movies", icon: FilmIcon },
   { view: "series", label: "Series", icon: ClapperboardIcon },
-  { view: "catchup", label: "Catch-up", icon: HistoryIcon },
-  { view: "favorites", label: "Favourites", icon: HeartIcon },
-  { view: "recordings", label: "Recordings", icon: CircleDotIcon },
+  { view: "guide", label: "Guide", icon: CalendarDaysIcon },
 ];
 
-const FOOT: { view: View; label: string; icon: AnimIcon }[] = [
+/** Everything that is yours rather than the catalogue, one click behind "Library". */
+const LIBRARY: { view: View; label: string; icon: AnimIcon }[] = [
+  { view: "favorites", label: "Favourites", icon: HeartIcon },
+  { view: "recordings", label: "Recordings", icon: CircleDotIcon },
+  { view: "catchup", label: "Catch-up", icon: HistoryIcon },
   { view: "sources", label: "Sources", icon: ServerIcon },
-  { view: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
 /** Reads a media query and follows it as the window is resized. */
@@ -52,19 +50,79 @@ export function useMedia(query: string) {
   return match;
 }
 
-const COLLAPSE_KEY = "vesper.nav.collapsed";
+function Tab({ view, label }: { view: View; label: string }) {
+  const current = useStore((s) => s.view);
+  const setView = useStore((s) => s.setView);
+  return (
+    <button
+      type="button"
+      onClick={() => setView(view)}
+      aria-current={current === view ? "page" : undefined}
+      className="fade rounded-full px-4 py-1.5 text-sm font-medium text-muted hover:text-paper aria-[current=page]:bg-paper aria-[current=page]:text-ink"
+    >
+      {label}
+    </button>
+  );
+}
 
-function NavItem({
-  view,
-  label,
-  icon: Icon,
-  wide,
-}: {
-  view: View;
-  label: string;
-  icon: AnimIcon;
-  wide: boolean;
-}) {
+function LibraryMenu() {
+  const view = useStore((s) => s.view);
+  const setView = useStore((s) => s.setView);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const active = LIBRARY.some((l) => l.view === view);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => {
+      if (
+        e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)
+      )
+        setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-current={active ? "page" : undefined}
+        onClick={() => setOpen(!open)}
+        className="fade rounded-full px-4 py-1.5 text-sm font-medium text-muted hover:text-paper aria-[current=page]:bg-paper aria-[current=page]:text-ink"
+      >
+        Library
+      </button>
+      {open && (
+        <ul className="glass absolute left-1/2 top-full z-40 mt-2 w-52 -translate-x-1/2 rounded-2xl border border-line p-1.5 shadow-xl">
+          {LIBRARY.map(({ view: v, label, icon: Icon }) => (
+            <li key={v}>
+              <button
+                type="button"
+                onClick={() => {
+                  setView(v);
+                  setOpen(false);
+                }}
+                className="fade flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-raised"
+              >
+                <Icon size={18} color="currentColor" />
+                {label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function BottomItem({ view, label, icon: Icon }: { view: View; label: string; icon: AnimIcon }) {
   const current = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
   const { ref, handlers } = useIconHover();
@@ -73,13 +131,8 @@ function NavItem({
       type="button"
       onClick={() => setView(view)}
       aria-current={current === view ? "page" : undefined}
-      title={wide ? undefined : label}
       {...handlers}
-      className={`fade relative flex w-full items-center rounded-xl font-medium text-muted hover:bg-raised hover:text-paper aria-[current=page]:bg-tint aria-[current=page]:text-accent max-md:min-w-[4.25rem] max-md:flex-none max-md:flex-col max-md:gap-1 max-md:py-1.5 max-md:text-[11px] ${
-        wide
-          ? "flex-row gap-3.5 px-3.5 py-2.5 text-sm md:justify-start"
-          : "flex-col gap-1 py-2.5 text-[11px]"
-      }`}
+      className="fade flex min-w-[4.25rem] flex-none flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium text-muted aria-[current=page]:text-accent"
     >
       <Icon ref={ref} size={22} color="currentColor" />
       {label}
@@ -88,71 +141,11 @@ function NavItem({
 }
 
 /**
- * The app's main places. It follows the window: a bottom bar on phones, an icon rail on small
- * windows, and a labelled sidebar on wide ones that can be folded back into the rail.
+ * The top bar: the mark on the left, five places in the middle, search and tools on the right.
+ * On a phone-width window it becomes a bottom bar instead.
  */
 export function Nav() {
   const setView = useStore((s) => s.setView);
-  const roomy = useMedia("(min-width: 1280px)");
-  const [collapsed, setCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem(COLLAPSE_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
-  const wide = roomy && !collapsed;
-  const toggle = () => {
-    setCollapsed(!collapsed);
-    try {
-      localStorage.setItem(COLLAPSE_KEY, collapsed ? "0" : "1");
-    } catch {
-      /* ignore */
-    }
-  };
-  return (
-    <nav
-      aria-label="Main"
-      className={`flex flex-none flex-col gap-1 border-r border-line bg-panel px-2 py-3 transition-[width] duration-200 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:w-full max-md:flex-row max-md:border-r-0 max-md:border-t max-md:px-1 max-md:py-1 ${
-        wide ? "w-56" : "w-[5.25rem]"
-      }`}
-    >
-      <div
-        className={`mb-3 flex items-center max-md:hidden ${wide ? "justify-between pl-1.5" : "flex-col gap-2"}`}
-      >
-        <button
-          type="button"
-          onClick={() => setView("home")}
-          aria-label="Vesper home"
-          className="fade flex items-center gap-3 rounded-xl p-2 hover:bg-raised"
-        >
-          <LogoMark size={30} />
-          {wide && <span className="font-display text-lg font-bold">Vesper</span>}
-        </button>
-        {roomy && (
-          <IconButton
-            icon={wide ? PanelLeftCloseIcon : PanelLeftOpenIcon}
-            label={wide ? "Fold the sidebar" : "Unfold the sidebar"}
-            onClick={toggle}
-          />
-        )}
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto max-md:flex-row max-md:overflow-x-auto max-md:overflow-y-hidden">
-        {MAIN.map((item) => (
-          <NavItem key={item.view} {...item} wide={wide} />
-        ))}
-      </div>
-      <div className="flex flex-col gap-1 border-t border-line pt-2 max-md:flex-row max-md:border-0 max-md:pt-0">
-        {FOOT.map((item) => (
-          <NavItem key={item.view} {...item} wide={wide} />
-        ))}
-      </div>
-    </nav>
-  );
-}
-
-/** Search, refresh and theme, always within reach. Ctrl+K jumps to search from anywhere. */
-export function TopBar() {
   const query = useStore((s) => s.query);
   const view = useStore((s) => s.view);
   const status = useStore((s) => s.status);
@@ -174,10 +167,10 @@ export function TopBar() {
   }, []);
 
   const onSearch = (value: string) => {
-    const { setView, setQuery } = useStore.getState();
+    const { setView: go, setQuery } = useStore.getState();
     // Pages with their own list filter in place; everywhere else the query opens search.
     if (value && !["live", "movies", "series", "catchup", "search", "favorites"].includes(view)) {
-      setView("search");
+      go("search");
     }
     setQuery(value);
   };
@@ -187,27 +180,57 @@ export function TopBar() {
     (theme === "system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
 
   return (
-    <div className="flex items-center gap-3 border-b border-line px-8 py-3 max-md:px-4">
-      <div ref={inputWrap} className="flex-1">
-        <SearchBox
-          value={query}
-          onChange={onSearch}
-          placeholder="Search channels, movies, series  (Ctrl+K)"
-        />
-      </div>
-      {status === "loading" && <span className="text-xs text-muted">Loading library…</span>}
-      <IconButton
-        icon={RefreshCwIcon}
-        label="Refresh sources"
-        disabled={!hasSources || status === "loading"}
-        onClick={() => void refresh()}
-      />
-      <IconButton
-        icon={dark ? SunIcon : MoonIcon}
-        label={dark ? "Switch to light theme" : "Switch to dark theme"}
-        onClick={() => setTheme(dark ? "light" : "dark")}
-      />
-    </div>
+    <>
+      <header className="grid flex-none grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-line px-6 py-3 max-md:grid-cols-[auto_1fr] max-md:px-4">
+        <button
+          type="button"
+          onClick={() => setView("home")}
+          aria-label="Vesper home"
+          className="fade flex items-center gap-2.5 justify-self-start rounded-xl p-1"
+        >
+          <LogoMark size={28} />
+          <span className="font-display text-lg font-bold max-lg:hidden">Vesper</span>
+        </button>
+
+        <nav aria-label="Main" className="flex items-center gap-1 max-md:hidden">
+          {TABS.map((t) => (
+            <Tab key={t.view} view={t.view} label={t.label} />
+          ))}
+          <LibraryMenu />
+        </nav>
+
+        <div className="flex items-center justify-end gap-1.5">
+          <div ref={inputWrap} className="w-full max-w-64">
+            <SearchBox value={query} onChange={onSearch} placeholder="Search  (Ctrl+K)" />
+          </div>
+          {status === "loading" && <span className="text-xs text-muted">Loading…</span>}
+          <IconButton
+            icon={RefreshCwIcon}
+            label="Refresh sources"
+            disabled={!hasSources || status === "loading"}
+            onClick={() => void refresh()}
+          />
+          <IconButton
+            icon={dark ? SunIcon : MoonIcon}
+            label={dark ? "Switch to light theme" : "Switch to dark theme"}
+            onClick={() => setTheme(dark ? "light" : "dark")}
+          />
+          <IconButton icon={SettingsIcon} label="Settings" onClick={() => setView("settings")} />
+        </div>
+      </header>
+
+      <nav
+        aria-label="Main"
+        className="fixed inset-x-0 bottom-0 z-30 hidden gap-1 overflow-x-auto border-t border-line bg-panel px-1 py-1 max-md:flex"
+      >
+        {TABS.map((t) => (
+          <BottomItem key={t.view} {...t} />
+        ))}
+        <BottomItem view="favorites" label="Favourites" icon={HeartIcon} />
+        <BottomItem view="recordings" label="Recordings" icon={CircleDotIcon} />
+        <BottomItem view="sources" label="Sources" icon={ServerIcon} />
+      </nav>
+    </>
   );
 }
 

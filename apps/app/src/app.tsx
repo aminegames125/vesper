@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Tips, WhatsNew } from "./components/onboarding";
-import { Nav, Toast, TopBar } from "./components/shell";
+import { WhatsNew } from "./components/onboarding";
+import { Nav, Toast } from "./components/shell";
 import { TvHome, TvShell } from "./components/tv";
+import { Welcome } from "./components/welcome";
 import { isTvMode, useCloudSync } from "./lib/cloud";
 import { useRecordingEvents, useScheduler } from "./lib/recorder";
 import { useSpatialNav } from "./lib/spatial-nav";
@@ -42,6 +43,7 @@ export function App() {
   const playing = useStore((s) => s.playing);
   const theme = useStore((s) => s.theme);
   const refresh = useStore((s) => s.refresh);
+  const firstRun = useStore((s) => !s.onboarded && s.providers.length === 0);
 
   useEffect(() => {
     void refresh();
@@ -59,8 +61,8 @@ export function App() {
   const overlays = (
     <>
       <WhatsNew />
-      <Tips />
       <Toast />
+      {firstRun && !tv && <Welcome />}
       {playing && (
         <Suspense fallback={null}>
           <Player key={playing.id} item={playing} />
@@ -79,16 +81,13 @@ export function App() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col">
       <Nav />
-      <div className="flex min-w-0 flex-1 flex-col">
-        {!detail && <TopBar />}
-        <main
-          className={`min-h-0 flex-1 overflow-y-auto ${detail ? "" : "px-8 py-6 max-md:px-4 max-md:pb-24"}`}
-        >
-          {detail ? <Detail /> : <View />}
-        </main>
-      </div>
+      <main
+        className={`min-h-0 flex-1 overflow-y-auto ${detail ? "" : "px-8 py-6 max-md:px-4 max-md:pb-24"}`}
+      >
+        {detail ? <Detail /> : <View />}
+      </main>
       {overlays}
     </div>
   );

@@ -1,20 +1,8 @@
 import { PlusIcon, TvIcon } from "../components/icons";
 import { LogoMark } from "../components/logo";
+import { addDemoSource } from "../components/source-form";
 import { Button, Notice, Spinner } from "../components/ui";
 import { useStore } from "../lib/store";
-
-export const DEMO_URL = "https://iptv-org.github.io/iptv/countries/us.m3u";
-
-export function addDemoSource() {
-  const { addProvider, notify } = useStore.getState();
-  void addProvider({
-    id: crypto.randomUUID(),
-    name: "Free public channels",
-    kind: "m3u",
-    url: DEMO_URL,
-    addedAt: Date.now(),
-  }).then(() => notify("Loaded free public channels"));
-}
 
 /** Shown on any page that needs a library before one exists. */
 export function NoSources({ what = "channels" }: { what?: string }) {
@@ -38,7 +26,7 @@ export function NoSources({ what = "channels" }: { what?: string }) {
           <Button variant="primary" icon={PlusIcon} onClick={() => setView("sources")}>
             Add a source
           </Button>
-          <Button icon={TvIcon} onClick={addDemoSource}>
+          <Button icon={TvIcon} onClick={() => void addDemoSource()}>
             Try free public channels
           </Button>
         </div>

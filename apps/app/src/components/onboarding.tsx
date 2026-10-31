@@ -1,6 +1,6 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { useStore } from "../lib/store";
-import { CURRENT_VERSION, RELEASES, TIPS } from "../lib/whats-new";
+import { CURRENT_VERSION, RELEASES } from "../lib/whats-new";
 import { IconButton, XIcon } from "./icons";
 import { Button } from "./ui";
 
@@ -39,10 +39,10 @@ export function Dialog({
   );
 }
 
-export function ReleaseList() {
+export function ReleaseList({ limit }: { limit?: number }) {
   return (
     <div className="flex flex-col gap-6">
-      {RELEASES.map((r) => (
+      {RELEASES.slice(0, limit).map((r) => (
         <section key={r.version}>
           <p className="text-xs text-muted">
             v{r.version} · {r.date}
@@ -68,41 +68,12 @@ export function WhatsNew() {
 
   return (
     <Dialog title="What's new" onClose={markSeen}>
-      <ReleaseList />
+      <ReleaseList limit={3} />
       <div className="mt-6 flex justify-end">
         <Button variant="primary" onClick={markSeen}>
           Got it
         </Button>
       </div>
     </Dialog>
-  );
-}
-
-/** Small dismissible tips card, bottom left. */
-export function Tips() {
-  const dismissed = useStore((s) => s.tipsDismissed);
-  const dismiss = useStore((s) => s.dismissTips);
-  const playing = useStore((s) => s.playing);
-  const [index, setIndex] = useState(0);
-  if (dismissed || playing) return null;
-
-  return (
-    <aside
-      aria-label="Tip"
-      className="surface fixed bottom-5 left-[6.25rem] z-10 w-80 p-4 shadow-xl"
-    >
-      <p className="min-h-10 text-sm">{TIPS[index]}</p>
-      <div className="mt-3 flex items-center gap-2">
-        <span className="text-xs text-muted">
-          {index + 1} / {TIPS.length}
-        </span>
-        <div className="ml-auto flex gap-1">
-          <Button variant="ghost" onClick={dismiss}>
-            Hide
-          </Button>
-          <Button onClick={() => setIndex((index + 1) % TIPS.length)}>Next</Button>
-        </div>
-      </div>
-    </aside>
   );
 }

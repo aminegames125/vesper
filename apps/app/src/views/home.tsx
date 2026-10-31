@@ -51,6 +51,19 @@ export function Home() {
       .map((x): Featured => ({ kind: "show", item: x, image: x.cover as string }));
     return moviePicks.flatMap((m, i) => (showPicks[i] ? [m, showPicks[i]] : [m]));
   }, [movies, shows]);
+  // Libraries with only live TV still deserve a full Home: one rail per category.
+  const groups = useMemo(() => {
+    if (movies.length + shows.length > 0) return [];
+    const byGroup = new Map<string, typeof channels>();
+    for (const c of channels) {
+      const key = c.group.split(";")[0]?.trim() || "Other";
+      byGroup.set(key, [...(byGroup.get(key) ?? []), c]);
+    }
+    return [...byGroup.entries()]
+      .filter(([, list]) => list.length >= 6)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 8);
+  }, [channels, movies.length, shows.length]);
   const top10 = useMemo(
     () =>
       [...movies, ...shows]
@@ -141,6 +154,17 @@ export function Home() {
           ))}
         </Rail>
       )}
+
+      {show("live") &&
+        groups.map(([name, list]) => (
+          <Rail key={name} title={name}>
+            {list.slice(0, 14).map((c) => (
+              <div key={c.id} className="w-60 flex-none">
+                <ChannelCard channel={c} list={list} />
+              </div>
+            ))}
+          </Rail>
+        ))}
 
       {top10.length >= 5 && show("top10") && (
         <Rail title="Top 10 on Vesper">

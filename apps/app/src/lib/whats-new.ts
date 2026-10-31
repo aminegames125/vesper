@@ -1,3 +1,5 @@
+import changelog from "../../../../CHANGELOG.md?raw";
+
 export interface Release {
   version: string;
   date: string;
@@ -5,27 +7,26 @@ export interface Release {
   notes: string[];
 }
 
-export const CURRENT_VERSION = "0.1.0";
+/** The version this build was made from; the release workflow keeps package.json current. */
+export const CURRENT_VERSION: string = __APP_VERSION__;
 
-export const RELEASES: Release[] = [
-  {
-    version: "0.1.0",
-    date: "2026-10-30",
-    title: "Vesper begins",
-    notes: [
-      "New name and a redesigned app: Home, Live, Guide timeline, Favourites.",
-      "Xtream Codes and M3U sources, side by side.",
-      "Live TV, programme guide, catch-up, movies and series.",
-      "Recording from live TV, catch-up and the guide, built in (no ffmpeg needed).",
-      "Built on Tauri instead of Electron, so it installs small and starts fast.",
-    ],
-  },
-];
+/** Reads the repository's CHANGELOG.md, so the in-app notes are never written by hand. */
+export function parseChangelog(text: string): Release[] {
+  const releases: Release[] = [];
+  for (const block of text.split(/^## \[/m).slice(1)) {
+    const head = /^([^\]]+)\]\s*-\s*(\S+)/.exec(block);
+    if (!head) continue;
+    const notes = [...block.matchAll(/^- (.+)$/gm)].map((m) =>
+      (m[1] ?? "").replace(/\*\*/g, "").trim(),
+    );
+    releases.push({
+      version: head[1] ?? "",
+      date: head[2] ?? "",
+      title: `Vesper ${head[1]}`,
+      notes,
+    });
+  }
+  return releases;
+}
 
-export const TIPS = [
-  "Add an Xtream login or an M3U link under Sources to get started.",
-  "Press F in the player for fullscreen and M to mute.",
-  "Heart a channel to find it again under Favourites.",
-  "Catch-up lists channels whose provider keeps past programmes.",
-  "Press the record button in the player, or schedule a programme from the Guide.",
-];
+export const RELEASES: Release[] = parseChangelog(changelog);
