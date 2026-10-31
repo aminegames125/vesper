@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.12.0] - 2026-10-31 <!-- release: minor; push: 16; changes: 1 -->
+
+### Added
+- Repeating schedules, padding, reconnect on drop, disk check, playlists and channel search
+
 ## [0.11.2] - 2026-10-31 <!-- release: patch; push: 15; changes: 1 -->
 
 ### Changed
