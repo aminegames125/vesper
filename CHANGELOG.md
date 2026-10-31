@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.21.0] - 2026-10-31 <!-- release: minor; push: 27; changes: 1 -->
+
+### Added
+- Add and manage IPTV providers from inside Kodi
+
 ## [0.20.0] - 2026-10-31 <!-- release: minor; push: 26; changes: 1 -->
 
 ### Added
