@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,7 +68,21 @@ fun TvHome(home: HomeData, viewModel: HomeViewModel, onOpenDetail: (String, Stri
     // Channels have no artwork of their own, so the backdrop keeps the last picture.
     var backdrop by remember(first) { mutableStateOf(first?.image) }
     val start = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { start.requestFocus() } }
+    // The first row that is actually shown owns the initial focus, whichever rows are switched off.
+    val firstRow = when {
+        home.resume.isNotEmpty() -> "resume"
+        options.live && home.channels.isNotEmpty() -> "live"
+        options.movies && home.newest.isNotEmpty() -> "movies"
+        options.shows && home.topShows.isNotEmpty() -> "shows"
+        else -> null
+    }
+    // Wait a frame so the lazy rows have composed the tile that carries the requester.
+    LaunchedEffect(firstRow) {
+        if (firstRow != null) {
+            withFrameNanos { }
+            runCatching { start.requestFocus() }
+        }
+    }
 
     fun show(next: Spot) {
         spot = next
@@ -104,7 +119,7 @@ fun TvHome(home: HomeData, viewModel: HomeViewModel, onOpenDetail: (String, Stri
                         items(home.resume, key = { it.id }) { r ->
                             Tile(
                                 width = 270.dp, height = 152.dp,
-                                modifier = if (r == home.resume.first()) Modifier.focusRequester(start) else Modifier,
+                                modifier = if (firstRow == "resume" && r == home.resume.first()) Modifier.focusRequester(start) else Modifier,
                                 onFocus = { show(Spot("r:${r.id}", r.title, r.subtitle.orEmpty(), null, r.image)) },
                                 onClick = { viewModel.play(r) },
                             ) {
@@ -121,7 +136,7 @@ fun TvHome(home: HomeData, viewModel: HomeViewModel, onOpenDetail: (String, Stri
                         items(home.channels, key = { it.id }) { c ->
                             Tile(
                                 width = 270.dp, height = 152.dp,
-                                modifier = if (home.resume.isEmpty() && c == home.channels.first() && home.newest.isEmpty()) Modifier.focusRequester(start) else Modifier,
+                                modifier = if (firstRow == "live" && c == home.channels.first()) Modifier.focusRequester(start) else Modifier,
                                 onFocus = { show(Spot("c:${c.id}", c.name, c.grp, null, null)) },
                                 onClick = { viewModel.playChannel(c) },
                             ) {
@@ -137,7 +152,7 @@ fun TvHome(home: HomeData, viewModel: HomeViewModel, onOpenDetail: (String, Stri
                         items(home.newest, key = { it.id }) { m ->
                             Tile(
                                 width = 150.dp, height = 225.dp,
-                                modifier = if (home.resume.isEmpty() && m == home.newest.first()) Modifier.focusRequester(start) else Modifier,
+                                modifier = if (firstRow == "movies" && m == home.newest.first()) Modifier.focusRequester(start) else Modifier,
                                 onFocus = {
                                     show(Spot("m:${m.id}", m.name, listOfNotNull("Movie", m.grp, m.rating?.let { r -> "★ %.1f".format(r) }).joinToString(" · "), null, m.poster))
                                 },
@@ -151,6 +166,7 @@ fun TvHome(home: HomeData, viewModel: HomeViewModel, onOpenDetail: (String, Stri
                         items(home.topShows, key = { it.id }) { s ->
                             Tile(
                                 width = 150.dp, height = 225.dp,
+                                modifier = if (firstRow == "shows" && s == home.topShows.first()) Modifier.focusRequester(start) else Modifier,
                                 onFocus = {
                                     show(Spot("s:${s.id}", s.name, listOfNotNull("Series", s.year, s.rating?.let { r -> "★ %.1f".format(r) }).joinToString(" · "), s.plot, s.cover))
                                 },

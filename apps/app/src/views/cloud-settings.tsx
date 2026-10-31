@@ -27,6 +27,15 @@ export function CloudSettings() {
   const [password, setPassword] = useState("");
   const [invite, setInvite] = useState("");
 
+  // The server's setup and registration state changes while the app is away; look again on open.
+  useEffect(() => {
+    if (!cloud.url) return;
+    makeClient(cloud.url, null)
+      .info()
+      .then((info) => setCloud({ info }))
+      .catch(() => undefined);
+  }, [cloud.url, setCloud]);
+
   const guard = async (work: () => Promise<void>) => {
     setBusy(true);
     setError(null);
@@ -235,6 +244,7 @@ function LocalServer() {
   const [status, setStatus] = useState<{ running: boolean; available: boolean } | null>(null);
   const [mode, setMode] = useState<"lite" | "full">("lite");
   const [port, setPort] = useState("8484");
+  const [lan, setLan] = useState(false);
 
   useEffect(() => {
     void invoke<{ running: boolean; available: boolean }>("server_status")
@@ -247,7 +257,7 @@ function LocalServer() {
     try {
       if (status.running) await invoke("server_stop");
       else {
-        await invoke("server_start", { port: Number(port), mode });
+        await invoke("server_start", { port: Number(port), mode, lan });
         const url = `http://127.0.0.1:${port}`;
         const info = await makeClient(url, null).info();
         const user = info.mode === "lite" ? await makeClient(url, null).me() : null;
@@ -275,9 +285,23 @@ function LocalServer() {
             <MonitorIcon size={16} color="currentColor" /> Run a server on this PC
           </p>
           <p className="text-xs text-muted">
-            Your phone and TV can then record and sync through this computer. Use this PC's network
-            address from them, for example 192.168.1.20:{port}.
+            Record and sync through this computer. Turn on sharing to let your phone and TV connect
+            with this PC's network address, for example 192.168.1.20:{port}.
           </p>
+          {!status.running && (
+            <label className="mt-2 flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={lan}
+                onChange={(e) => setLan(e.target.checked)}
+                className="accent-[var(--accent)]"
+              />
+              Share with other devices on my network
+              {lan && mode === "lite" && (
+                <span className="text-muted">· anyone on the network can use a Lite server</span>
+              )}
+            </label>
+          )}
         </div>
         {!status.running && (
           <>

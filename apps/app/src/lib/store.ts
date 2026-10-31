@@ -104,6 +104,7 @@ interface State {
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+let refreshes = 0;
 
 export const useStore = create<State>()(
   persist(
@@ -174,7 +175,13 @@ export const useStore = create<State>()(
         })),
 
       addProvider: async (provider) => {
-        set(({ providers }) => ({ providers: [...providers, provider] }));
+        // Having a source is what ends first run, so removing every source later is not first run again.
+        // A brand-new install has nothing to catch up on, so it skips the release notes once.
+        set(({ providers, onboarded, seenVersion }) => ({
+          providers: [...providers, provider],
+          onboarded: true,
+          seenVersion: onboarded || providers.length > 0 ? seenVersion : CURRENT_VERSION,
+        }));
         await get().refresh();
       },
       removeProvider: (id) => {
@@ -183,6 +190,8 @@ export const useStore = create<State>()(
       },
 
       refresh: async () => {
+        // Only the newest refresh may write, so a slow earlier one cannot bring back a removed source.
+        const mine = ++refreshes;
         const { providers } = get();
         if (providers.length === 0) {
           set({ channels: [], movies: [], shows: [], status: "idle", errors: [] });
@@ -190,7 +199,9 @@ export const useStore = create<State>()(
         }
         set({ status: "loading", errors: [] });
         const library = await loadLibrary(providers);
+        if (mine !== refreshes) return;
         set({ ...library, status: "idle" });
+        if (library.errors[0]) get().notify(library.errors[0]);
       },
 
       setCloud: (patch) => set(({ cloud }) => ({ cloud: { ...cloud, ...patch } })),
@@ -246,6 +257,17 @@ export const useStore = create<State>()(
       version: 5,
       // Earlier versions stored a different shape; start clean rather than guess.
       migrate: (persisted, version) => (version >= 4 ? (persisted as never) : ({} as never)),
+      // A recording still marked "recording" at startup was cut short when the app closed.
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<State>;
+        return {
+          ...current,
+          ...saved,
+          recordings: (saved.recordings ?? []).map((r) =>
+            r.status === "recording" ? { ...r, status: "failed" as const } : r,
+          ),
+        };
+      },
       partialize: ({
         cloud,
         syncOptions,

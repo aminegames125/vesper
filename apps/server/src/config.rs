@@ -45,6 +45,11 @@ pub struct Config {
     /// Let the proxy and recorder reach addresses on private networks. Always on in lite mode.
     #[arg(long, env = "VESPER_ALLOW_PRIVATE")]
     pub allow_private: bool,
+
+    /// Trust the X-Forwarded-For header from a reverse proxy in front of this server, so sign-in
+    /// limits count each real client instead of the proxy.
+    #[arg(long, env = "VESPER_TRUST_PROXY")]
+    pub trust_proxy: bool,
 }
 
 impl Config {

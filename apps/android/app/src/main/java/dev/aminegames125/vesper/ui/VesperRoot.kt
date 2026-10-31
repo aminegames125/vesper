@@ -157,9 +157,13 @@ fun VesperRoot(session: PlayerSession) {
 
         val onboarding: OnboardingViewModel = hiltViewModel()
         val needed by onboarding.needed.collectAsState()
+        val onboardingBusy by onboarding.busy.collectAsState()
+        val onboardingError by onboarding.error.collectAsState()
         if (needed) {
             OnboardingScreen(
                 form = form,
+                busy = onboardingBusy,
+                error = onboardingError,
                 onAddSource = { onboarding.finish(); nav.navigate(Sources.route) },
                 onDemo = onboarding::demo,
                 onSkip = onboarding::finish,

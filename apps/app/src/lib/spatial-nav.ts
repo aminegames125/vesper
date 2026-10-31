@@ -82,9 +82,14 @@ export function useSpatialNav(enabled: boolean) {
     const onKey = (e: KeyboardEvent) => {
       const direction = KEYS[e.key];
       if (!direction || e.defaultPrevented) return;
-      // The player and text fields use the arrow keys themselves.
-      if (document.querySelector("[data-player]")) return;
       const active = document.activeElement as HTMLElement | null;
+      // The player keeps the arrow keys for zapping and seeking until focus is on one of its
+      // controls (OK opens them); from there the arrows move between the controls.
+      if (
+        document.querySelector("[data-player]") &&
+        !active?.closest("[data-player] button, [data-player] [role=slider], [data-player] input")
+      )
+        return;
       if (active && ownsArrow(active.tagName, (active as HTMLInputElement).type ?? "", direction))
         return;
 

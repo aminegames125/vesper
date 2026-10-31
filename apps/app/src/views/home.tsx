@@ -309,15 +309,17 @@ function Hero({ items }: { items: Featured[] }) {
       </div>
 
       {items.length > 1 && (
-        <div className="absolute bottom-24 left-10 flex gap-1.5 max-md:left-4">
+        <div className="absolute bottom-6 left-10 flex max-md:left-4">
           {items.map((f, i) => (
             <button
               key={f.item.id}
               type="button"
               aria-label={`Show ${f.item.name}`}
               onClick={() => setIndex(i)}
-              className={dot(i === at)}
-            />
+              className="px-0.5 py-3"
+            >
+              <span className={`block ${dot(i === at)}`} />
+            </button>
           ))}
         </div>
       )}

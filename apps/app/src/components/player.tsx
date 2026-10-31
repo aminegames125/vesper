@@ -67,6 +67,7 @@ export default function Player({ item }: { item: Playable }) {
   const video = useRef<HTMLVideoElement>(null);
   const hls = useRef<Hls | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const lastSeen = useRef({ at: 0, of: 0 });
   const resumeAt = useRef(
     useStore.getState().history.find((h) => h.item.id === item.id)?.position ?? 0,
   );
@@ -168,13 +169,23 @@ export default function Player({ item }: { item: Playable }) {
       instance.on(Hls.Events.AUDIO_TRACKS_UPDATED, syncTracks);
       instance.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, syncTracks);
       let retries = 0;
+      let retryTimer: ReturnType<typeof setTimeout> | undefined;
+      // A fragment arriving means the stream is healthy again, so the budget starts over.
+      instance.on(Hls.Events.FRAG_LOADED, () => {
+        retries = 0;
+      });
       instance.on(Hls.Events.ERROR, (_, data) => {
         if (!data.fatal) return;
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && ++retries <= 3) instance.startLoad();
-        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && retries++ < 3)
-          instance.recoverMediaError();
-        else setError(`This stream could not be played (${data.details}).`);
+        const wait = Math.min(4000, 500 * 2 ** retries);
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && retries++ < 3) {
+          clearTimeout(retryTimer);
+          retryTimer = setTimeout(() => instance.startLoad(), wait);
+        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && retries++ < 3) {
+          clearTimeout(retryTimer);
+          retryTimer = setTimeout(() => instance.recoverMediaError(), wait);
+        } else setError(`This stream could not be played (${data.details}).`);
       });
+      instance.on(Hls.Events.DESTROYING, () => clearTimeout(retryTimer));
       instance.loadSource(item.url);
       instance.attachMedia(el);
     } else {
@@ -200,9 +211,14 @@ export default function Player({ item }: { item: Playable }) {
   // Remember where a movie or episode was left, so it appears under Continue Watching.
   useEffect(() => {
     if (item.live) return;
+    lastSeen.current = { at: 0, of: 0 };
+    // The stream effect tears the element down first, so the last good reading comes from a ref.
     const save = () => {
       const el = video.current;
-      if (el && Number.isFinite(el.duration)) saveProgress(item, el.currentTime, el.duration);
+      if (el && Number.isFinite(el.duration))
+        lastSeen.current = { at: el.currentTime, of: el.duration };
+      const { at, of } = lastSeen.current;
+      if (of > 0) saveProgress(item, at, of);
     };
     const timer = setInterval(save, 5000);
     return () => {
@@ -260,8 +276,21 @@ export default function Player({ item }: { item: Playable }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).matches("input, select, textarea")) return;
+      const target = e.target as HTMLElement;
+      if (target.matches("input, select, textarea")) return;
       wake();
+      // On a TV remote, OK steps into the controls and the arrows then move between them.
+      const tv = document.documentElement.dataset.tv === "true";
+      const inControls = !!target.closest("button, [role=slider]");
+      if (tv && inControls && e.key.startsWith("Arrow")) return;
+      if (tv && !inControls && e.key === "Enter") {
+        document
+          .querySelector<HTMLElement>(
+            '[data-player] button[aria-label="Pause"], [data-player] button[aria-label="Play"]',
+          )
+          ?.focus();
+        return;
+      }
       switch (e.key) {
         case "Escape":
           if (menu) setMenu(null);
@@ -269,6 +298,8 @@ export default function Player({ item }: { item: Playable }) {
           break;
         case " ":
         case "k":
+          // Space on a focused button must press that button, not toggle playback.
+          if ((e.target as HTMLElement).closest("button, [role=slider]")) break;
           e.preventDefault();
           togglePlay();
           break;
@@ -418,7 +449,7 @@ export default function Player({ item }: { item: Playable }) {
       )}
 
       {item.next && !upNextDismissed && time.total > 60 && time.total - time.now < 20 && (
-        <div className="glass absolute bottom-32 right-6 w-72 rounded-2xl border border-line p-4 shadow-xl">
+        <div className="glass absolute bottom-32 right-6 z-10 w-72 rounded-2xl border border-line p-4 shadow-xl">
           <p className="truncate font-semibold">{item.next.title}</p>
           <p className="mt-0.5 text-sm tabular-nums text-muted">
             Starts in {Math.max(0, Math.ceil(time.total - time.now))}s
@@ -449,7 +480,7 @@ export default function Player({ item }: { item: Playable }) {
       )}
 
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 text-center">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/80 text-center">
           <p className="text-lg font-semibold">{error}</p>
           <p className="max-w-md text-sm text-muted">
             The channel may be offline, or your provider limits how many streams can play at once.
@@ -482,11 +513,14 @@ export default function Player({ item }: { item: Playable }) {
         </div>
       )}
 
+      {/* The layer itself never takes clicks, so the video, the error card and up-next stay usable;
+          only the two bars do. While hidden it is inert, which also drops it from the tab order. */}
       <div
-        className={`absolute inset-0 flex flex-col justify-between transition-opacity duration-200 ${shown ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        inert={!shown}
+        className={`pointer-events-none absolute inset-0 flex flex-col justify-between transition-opacity duration-200 ${shown ? "opacity-100" : "opacity-0"}`}
       >
         {/* top bar */}
-        <div className="flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent px-5 pb-10 pt-4">
+        <div className="pointer-events-auto flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent px-5 pb-10 pt-4">
           <IconButton
             icon={XIcon}
             label="Close player"
@@ -518,7 +552,7 @@ export default function Player({ item }: { item: Playable }) {
         </div>
 
         {/* bottom controls */}
-        <div className="relative bg-gradient-to-t from-black/90 via-black/60 to-transparent px-6 pb-5 pt-16">
+        <div className="pointer-events-auto relative bg-gradient-to-t from-black/90 via-black/60 to-transparent px-6 pb-5 pt-16">
           {menu === "settings" && (
             <Panel title="Playback">
               {levels.length > 1 && (

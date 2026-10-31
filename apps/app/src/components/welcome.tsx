@@ -5,8 +5,8 @@ import { LogoMark } from "./logo";
 import { addDemoSource, SourceForm } from "./source-form";
 import { Button } from "./ui";
 
-type Step = "hello" | "choose" | "form" | "done";
-const ORDER: Step[] = ["hello", "choose", "form", "done"];
+type Step = "hello" | "choose" | "form";
+const ORDER: Step[] = ["hello", "choose", "form"];
 
 const CHOICES: { kind: Provider["kind"] | "demo"; title: string; hint: string }[] = [
   {
@@ -20,13 +20,10 @@ const CHOICES: { kind: Provider["kind"] | "demo"; title: string; hint: string }[
 
 /**
  * First run. A full-screen two-part layout, nothing like the app itself: a calm brand side and
- * a short guided path on the other. It ends the moment a source loads.
+ * a short guided path on the other. It ends the moment a source is added.
  */
 export function Welcome() {
   const finish = useStore((s) => s.finishOnboarding);
-  const channels = useStore((s) => s.channels.length);
-  const movies = useStore((s) => s.movies.length);
-  const shows = useStore((s) => s.shows.length);
   const [step, setStep] = useState<Step>("hello");
   const [kind, setKind] = useState<Provider["kind"]>("xtream");
   const [busy, setBusy] = useState(false);
@@ -37,7 +34,6 @@ export function Welcome() {
       setBusy(true);
       await addDemoSource();
       setBusy(false);
-      setStep("done");
       return;
     }
     setKind(choice);
@@ -120,22 +116,9 @@ export function Welcome() {
             <p className="mb-8 mt-2 text-sm text-muted">
               Stored on this device only. Vesper ships no channels.
             </p>
-            <SourceForm kind={kind} submitLabel="Connect" onAdded={() => setStep("done")} />
+            <SourceForm kind={kind} submitLabel="Connect" onAdded={() => undefined} />
             <Button variant="ghost" className="mt-6" onClick={() => setStep("choose")}>
               Back
-            </Button>
-          </section>
-        )}
-
-        {step === "done" && (
-          <section className="max-w-md">
-            <h2 className="text-4xl font-bold">You're set.</h2>
-            <p className="mt-4 text-muted">
-              {channels.toLocaleString()} channels · {movies.toLocaleString()} movies ·{" "}
-              {shows.toLocaleString()} series
-            </p>
-            <Button variant="primary" className="mt-10 px-7 py-3" onClick={finish}>
-              Start watching
             </Button>
           </section>
         )}

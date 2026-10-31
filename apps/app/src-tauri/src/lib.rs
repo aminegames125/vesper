@@ -237,13 +237,22 @@ mod local_server {
     }
 
     /// Starts the Vesper server that ships with the app, so other devices can connect to this PC.
-    #[tauri::command]
+    /// `lan` opens the server to other devices on the network; otherwise only this PC can reach it.
+    /// `async` here only moves the up-to-10-second wait off the main thread.
+    #[tauri::command(async)]
     pub fn server_start(
         app: AppHandle,
         server: State<'_, LocalServer>,
         port: u16,
         mode: String,
+        lan: bool,
     ) -> Result<(), String> {
+        if port < 1024 {
+            return Err("Choose a port between 1024 and 65535.".into());
+        }
+        if mode != "lite" && mode != "full" {
+            return Err("Unknown server mode.".into());
+        }
         let mut slot = server.0.lock().map_err(|e| e.to_string())?;
         if reap(&mut slot) {
             return Ok(());
@@ -261,7 +270,7 @@ mod local_server {
                 "--mode",
                 &mode,
                 "--bind",
-                &format!("0.0.0.0:{port}"),
+                &format!("{}:{port}", if lan { "0.0.0.0" } else { "127.0.0.1" }),
                 "--data-dir",
             ])
             .arg(&data);
@@ -295,6 +304,15 @@ mod local_server {
             if std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(100))
                 .is_ok()
             {
+                // Something else may already own the port while our child is exiting.
+                std::thread::sleep(std::time::Duration::from_millis(300));
+                if let Ok(Some(status)) = child.try_wait() {
+                    let log = fs::read_to_string(&log_path).unwrap_or_default();
+                    let last = log.lines().last().unwrap_or("");
+                    return Err(format!(
+                        "The server stopped right away ({status}). Is port {port} already in use? {last}"
+                    ));
+                }
                 *slot = Some(child);
                 return Ok(());
             }

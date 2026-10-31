@@ -153,6 +153,10 @@ export interface ClientOptions {
   token?: string | null;
   /** Lets the desktop app route requests through its native HTTP client. */
   fetch?: typeof fetch;
+  /** Called when the server rejects a token that was sent, so the app can sign the user out. */
+  onUnauthorized?: () => void;
+  /** Milliseconds before a request is given up on. Defaults to 15 seconds. */
+  timeoutMs?: number;
 }
 
 export const normalizeBase = (input: string) => {
@@ -165,8 +169,12 @@ export class CloudClient {
   readonly baseUrl: string;
   token: string | null;
   private readonly doFetch: typeof fetch;
+  private readonly onUnauthorized?: () => void;
+  private readonly timeoutMs: number;
 
   constructor(options: ClientOptions = {}) {
+    this.onUnauthorized = options.onUnauthorized;
+    this.timeoutMs = options.timeoutMs ?? 15_000;
     this.baseUrl = normalizeBase(options.baseUrl ?? "");
     this.token = options.token ?? null;
     this.doFetch = options.fetch ?? ((...args) => fetch(...args));
@@ -182,10 +190,19 @@ export class CloudClient {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch (e) {
-      const why = e instanceof Error && e.message ? ` (${e.message})` : "";
-      throw new CloudError(`Could not reach the server${why}. Check the address and your network.`, 0);
+      const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+      const why = timedOut
+        ? " (no answer in time)"
+        : e instanceof Error && e.message
+          ? ` (${e.message})`
+          : "";
+      throw new CloudError(
+        `Could not reach the server${why}. Check the address and your network.`,
+        0,
+      );
     }
     const text = await response.text();
     let data: unknown = null;
@@ -197,6 +214,7 @@ export class CloudClient {
     if (!response.ok) {
       const message =
         (data as { error?: string } | null)?.error ?? `Server answered ${response.status}`;
+      if (response.status === 401 && this.token) this.onUnauthorized?.();
       throw new CloudError(message, response.status);
     }
     return data as T;

@@ -124,7 +124,7 @@ pub async fn create_user(
             body.role,
             concurrent,
             hours,
-            storage_gb * GB,
+            storage_gb.saturating_mul(GB),
             body.keep_hours.filter(|h| *h > 0),
             body.note,
             now()
@@ -206,6 +206,15 @@ pub async fn update_user(
         conn.execute("UPDATE users SET status = ?1 WHERE id = ?2", params![v, id])?;
         if v == "suspended" {
             conn.execute("DELETE FROM sessions WHERE user_id = ?1", [&id])?;
+            // Signing them out is not enough: whatever they are recording must stop too.
+            let mut live = conn
+                .prepare("SELECT id FROM recordings WHERE user_id = ?1 AND status = 'recording'")?;
+            let ids: Vec<String> = live
+                .query_map([&id], |r| r.get(0))?
+                .collect::<Result<_, _>>()?;
+            for recording in ids {
+                crate::jobs::stop(&state, &recording);
+            }
         }
     }
     if let Some(v) = patch.max_concurrent {
@@ -223,7 +232,7 @@ pub async fn update_user(
     if let Some(v) = patch.storage_gb {
         conn.execute(
             "UPDATE users SET storage_bytes = ?1 WHERE id = ?2",
-            params![v.max(0) * GB, id],
+            params![v.max(0).saturating_mul(GB), id],
         )?;
     }
     if let Some(v) = patch.keep_hours {
@@ -370,7 +379,7 @@ pub async fn create_invite(
             body.expires_days.filter(|d| *d > 0).map(|d| now() + d * 86_400),
             concurrent,
             hours,
-            storage_gb * GB,
+            storage_gb.saturating_mul(GB),
             body.keep_hours.filter(|h| *h > 0),
             body.note,
             now()

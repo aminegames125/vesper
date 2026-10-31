@@ -20,7 +20,8 @@ const call = <T>(auth: XtreamAuth, action?: string, extra: Record<string, string
 // ---- stream links -----------------------------------------------------------
 
 const base = (a: XtreamAuth) => `${normalizeHost(a.host)}`;
-const creds = (a: XtreamAuth) => `${a.username}/${a.password}`;
+const creds = (a: XtreamAuth) =>
+  `${encodeURIComponent(a.username)}/${encodeURIComponent(a.password)}`;
 
 export const liveUrl = (a: XtreamAuth, streamId: number) =>
   `${base(a)}/live/${creds(a)}/${streamId}.m3u8`;

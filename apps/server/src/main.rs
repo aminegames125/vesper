@@ -19,11 +19,37 @@ use axum::Router;
 use clap::Parser;
 use tower_http::{
     compression::CompressionLayer,
-    cors::{Any, CorsLayer},
+    cors::{AllowHeaders, AllowOrigin, Any, CorsLayer},
 };
 use tracing::info;
 
 use crate::{config::Config, db::Db, state::AppState};
+
+/// Full mode signs requests with bearer tokens, so any origin may call it. Lite mode has no
+/// logins, so a web page the user happens to visit must not be able to; only the desktop app's
+/// own origins and localhost are allowed (native clients send no Origin and are unaffected).
+fn cors(lite: bool) -> CorsLayer {
+    let origin = if lite {
+        AllowOrigin::predicate(|origin, _| {
+            let Ok(origin) = origin.to_str() else {
+                return false;
+            };
+            let host = origin.split("://").nth(1).unwrap_or("");
+            let host = host.split(':').next().unwrap_or("");
+            matches!(host, "localhost" | "127.0.0.1" | "tauri.localhost")
+                || origin.starts_with("tauri://")
+        })
+    } else {
+        AllowOrigin::any()
+    };
+    CorsLayer::new()
+        .allow_origin(origin)
+        .allow_methods(Any)
+        // `*` does not cover Authorization in browsers, so echo what the preflight asks for.
+        .allow_headers(AllowHeaders::mirror_request())
+        .expose_headers([axum::http::header::CONTENT_RANGE])
+        .max_age(Duration::from_secs(3600))
+}
 
 #[tokio::main]
 async fn main() {
@@ -62,15 +88,7 @@ async fn main() {
     let app = Router::new()
         .nest("/api/v1", api::router())
         .fallback(web::serve)
-        // Clients on other origins (the app, a browser) are allowed; access is controlled by tokens.
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods(Any)
-                .allow_headers(Any)
-                .expose_headers([axum::http::header::CONTENT_RANGE])
-                .max_age(Duration::from_secs(3600)),
-        )
+        .layer(cors(state.config.is_lite()))
         .layer(CompressionLayer::new())
         .with_state(state.clone());
 

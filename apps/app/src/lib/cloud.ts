@@ -13,7 +13,18 @@ const nativeFetch: typeof fetch = async (input, init) => {
 };
 
 export const makeClient = (url: string, token: string | null) =>
-  new CloudClient({ baseUrl: url, token, fetch: nativeFetch });
+  new CloudClient({
+    baseUrl: url,
+    token,
+    fetch: nativeFetch,
+    // An expired or revoked session: forget it so the app asks to sign in again.
+    onUnauthorized: () => {
+      const { cloud, setCloud, notify } = useStore.getState();
+      if (cloud.token !== token) return;
+      setCloud({ token: null, user: null });
+      notify("Your session ended. Sign in again to keep syncing.");
+    },
+  });
 
 /** The signed-in cloud client, or null when no server is connected. */
 export function useCloud(): CloudClient | null {
@@ -28,7 +39,11 @@ export function useCloud(): CloudClient | null {
 
 type SyncKey = "favorites" | "history" | "sources";
 
-const stampKey = (key: SyncKey) => `vesper.sync.${key}`;
+/** Stamps belong to one server and account, so switching either starts from a clean slate. */
+const stampKey = (key: SyncKey) => {
+  const { cloud } = useStore.getState();
+  return `vesper.sync.${cloud.url}|${cloud.user?.id ?? "lite"}.${key}`;
+};
 const readStamp = (key: SyncKey) => {
   try {
     return Number(localStorage.getItem(stampKey(key))) || 0;
@@ -60,6 +75,8 @@ export function useCloudSync() {
     };
     // The last value known to match the server, so applying a pull is never echoed back as a push.
     const synced = new Map<SyncKey, string>();
+    // Keys whose first pull succeeded; until then a push could overwrite the server with an empty copy.
+    const pulled = new Set<SyncKey>();
     const timers = new Map<SyncKey, ReturnType<typeof setTimeout>>();
     let alive = true;
 
@@ -68,6 +85,7 @@ export function useCloudSync() {
         try {
           const remote = await client.getSync<unknown>(key);
           if (!alive) return;
+          pulled.add(key);
           if (remote.value !== null && remote.updatedAt > readStamp(key)) {
             synced.set(key, JSON.stringify(remote.value));
             useStore.getState().applyRemote(key, remote.value);
@@ -98,6 +116,7 @@ export function useCloudSync() {
 
     const unsubscribe = useStore.subscribe(() => {
       for (const key of keys) {
+        if (!pulled.has(key)) continue;
         if (synced.has(key) && synced.get(key) === JSON.stringify(local(key))) continue;
         clearTimeout(timers.get(key));
         timers.set(

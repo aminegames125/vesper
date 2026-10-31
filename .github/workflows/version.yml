@@ -17,8 +17,25 @@ permissions:
   actions: write
 
 jobs:
+  # A release only starts when the code passes the same checks as CI.
+  check:
+    name: Lint, typecheck and test
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release)') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec biome check .
+      - run: pnpm turbo run typecheck test
+
   version:
     name: Bump version, tag and release
+    needs: check
     # The commit made below starts with "chore(release)"; skipping it prevents a loop.
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(release)') }}
     runs-on: ubuntu-latest

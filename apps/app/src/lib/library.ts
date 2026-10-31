@@ -32,7 +32,9 @@ async function loadProvider(provider: Provider): Promise<Library> {
   if (live.status === "fulfilled") library.channels = live.value;
   else library.errors.push(`${provider.name}: ${message(live.reason)}`);
   if (movies.status === "fulfilled") library.movies = movies.value;
+  else library.errors.push(`${provider.name}: movies did not load (${message(movies.reason)})`);
   if (shows.status === "fulfilled") library.shows = shows.value;
+  else library.errors.push(`${provider.name}: series did not load (${message(shows.reason)})`);
   return library;
 }
 

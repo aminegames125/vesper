@@ -70,15 +70,17 @@ function LibraryMenu() {
   const setView = useStore((s) => s.setView);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const active = LIBRARY.some((l) => l.view === view);
 
   useEffect(() => {
     if (!open) return;
     const close = (e: Event) => {
-      if (
-        e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)
-      )
+      if (e instanceof KeyboardEvent) {
+        if (e.key !== "Escape") return;
         setOpen(false);
+        trigger.current?.focus();
+      } else if (!ref.current?.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("pointerdown", close);
     document.addEventListener("keydown", close);
@@ -91,6 +93,7 @@ function LibraryMenu() {
   return (
     <div ref={ref} className="relative">
       <button
+        ref={trigger}
         type="button"
         aria-expanded={open}
         aria-current={active ? "page" : undefined}
@@ -232,9 +235,9 @@ export function Nav({ solid }: { solid: boolean }) {
         {TABS.map((t) => (
           <BottomItem key={t.view} {...t} />
         ))}
-        <BottomItem view="favorites" label="Favourites" icon={HeartIcon} />
-        <BottomItem view="recordings" label="Recordings" icon={CircleDotIcon} />
-        <BottomItem view="sources" label="Sources" icon={ServerIcon} />
+        {LIBRARY.map((l) => (
+          <BottomItem key={l.view} {...l} />
+        ))}
       </nav>
     </>
   );

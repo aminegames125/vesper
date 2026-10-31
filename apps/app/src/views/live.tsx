@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChannelLogo, cleanName } from "../components/cards";
 import { HeartIcon, IconButton, PlayIcon } from "../components/icons";
 import { Paged } from "../components/paged";
@@ -14,7 +14,7 @@ const FAVOURITES = "\u0000favourites";
 
 /**
  * Live TV as three panes: categories, the channel list, and a preview of the channel you are on.
- * Clicking selects, double-clicking (or the Watch button) plays.
+ * Hovering or focusing a row previews it; clicking or pressing Enter plays it.
  */
 export function Live() {
   const channels = useStore((s) => s.channels);
@@ -39,6 +39,12 @@ export function Live() {
     if (query) list = list.filter((c) => c.name.toLowerCase().includes(query));
     return list;
   }, [channels, group, favorites, query]);
+
+  // Un-hearting the last favourite while viewing Favourites would leave no category selected.
+  const emptyFavourites = group === FAVOURITES && favorites.length === 0;
+  useEffect(() => {
+    if (emptyFavourites) setGroup("");
+  }, [emptyFavourites, setGroup]);
 
   if (channels.length === 0) return <NoSources />;
 
@@ -88,12 +94,28 @@ export function Live() {
       </aside>
 
       <section className="flex min-h-0 min-w-0 flex-col">
-        <h1 className="mb-4 flex items-baseline gap-3 text-3xl font-bold">
-          {title}
-          <span className="text-sm font-medium text-muted tabular-nums">
-            {visible.length.toLocaleString()}
-          </span>
-        </h1>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h1 className="flex min-w-0 items-baseline gap-3 text-3xl font-bold">
+            <span className="truncate">{title}</span>
+            <span className="text-sm font-medium text-muted tabular-nums">
+              {visible.length.toLocaleString()}
+            </span>
+          </h1>
+          <select
+            aria-label="Category"
+            value={group}
+            onChange={(e) => setGroup(e.target.value)}
+            className="max-w-[45%] rounded-full bg-raised px-3.5 py-2 text-sm lg:hidden"
+          >
+            <option value="">All channels</option>
+            {favorites.length > 0 && <option value={FAVOURITES}>Favourites</option>}
+            {groups.map(([name]) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto pr-2">
           {visible.length === 0 ? (
             <p className="py-10 text-muted">
@@ -167,8 +189,9 @@ function LiveRow({
     <button
       ref={ref}
       type="button"
-      onClick={onSelect}
-      onDoubleClick={() => play(channelPlayable(channel), list)}
+      onClick={() => play(channelPlayable(channel), list)}
+      onMouseEnter={onSelect}
+      onFocus={onSelect}
       aria-current={active ? "true" : undefined}
       className="fade flex w-full items-center gap-4 rounded-xl px-3 py-2.5 text-left hover:bg-raised aria-[current=true]:bg-raised aria-[current=true]:ring-1 aria-[current=true]:ring-line"
     >

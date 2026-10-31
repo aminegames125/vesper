@@ -104,9 +104,11 @@ function SourcePane({ provider, onRemoved }: { provider: Provider; onRemoved: ()
           ["Movies", movies],
           ["Series", shows],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-2xl bg-raised px-4 py-3">
-            <dd className="text-2xl font-bold tabular-nums">{Number(value).toLocaleString()}</dd>
-            <dt className="text-xs text-muted">{label}</dt>
+          <div key={label} className="flex flex-col rounded-2xl bg-raised px-4 py-3">
+            <dt className="order-2 text-xs text-muted">{label}</dt>
+            <dd className="order-1 text-2xl font-bold tabular-nums">
+              {Number(value).toLocaleString()}
+            </dd>
           </div>
         ))}
       </dl>

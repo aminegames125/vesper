@@ -3,6 +3,7 @@ package dev.aminegames125.vesper.ui
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,8 +46,10 @@ import dev.aminegames125.vesper.data.repo.SourceRepository
 import dev.aminegames125.vesper.ui.common.FormFactor
 import dev.aminegames125.vesper.ui.common.tvFocus
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -67,9 +72,21 @@ class OnboardingViewModel @Inject constructor(
         viewModelScope.launch { settings.put(ONBOARDED, "1") }
     }
 
+    private val _busy = MutableStateFlow(false)
+    val busy: StateFlow<Boolean> = _busy.asStateFlow()
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    /** Adds the public list once; further taps while it loads do nothing, and a failure says so. */
     fun demo() {
+        if (_busy.value) return
         viewModelScope.launch {
-            sources.addM3u("Free public channels", DEMO_URL).onSuccess { settings.put(ONBOARDED, "1") }
+            _busy.value = true
+            _error.value = null
+            sources.addM3u("Free public channels", DEMO_URL)
+                .onSuccess { settings.put(ONBOARDED, "1") }
+                .onFailure { _error.value = "Could not load the public channels. Check your connection and try again." }
+            _busy.value = false
         }
     }
 }
@@ -86,8 +103,9 @@ private val Slides = listOf(
  * First run. A full-screen story with a brand side and a short, paged message, deliberately
  * unlike the app behind it. On a TV or tablet the two sides sit next to each other.
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
-fun OnboardingScreen(form: FormFactor, onAddSource: () -> Unit, onDemo: () -> Unit, onSkip: () -> Unit) {
+fun OnboardingScreen(form: FormFactor, busy: Boolean, error: String?, onAddSource: () -> Unit, onDemo: () -> Unit, onSkip: () -> Unit) {
     var page by remember { mutableIntStateOf(0) }
     val last = page == Slides.lastIndex
     val wide = form != FormFactor.Phone
@@ -122,7 +140,12 @@ fun OnboardingScreen(form: FormFactor, onAddSource: () -> Unit, onDemo: () -> Un
             if (last) {
                 Button(onClick = onAddSource, modifier = Modifier.focusRequester(focus).tvFocus(RoundedCornerShape(50))) { Text("Add my source") }
                 Spacer(Modifier.height(10.dp))
-                FilledTonalButton(onClick = onDemo, modifier = Modifier.tvFocus(RoundedCornerShape(50))) { Text("Try free public channels") }
+                FilledTonalButton(onClick = onDemo, enabled = !busy, modifier = Modifier.tvFocus(RoundedCornerShape(50))) {
+                    Text(if (busy) "Loading…" else "Try free public channels")
+                }
+                if (error != null) {
+                    Text(error, style = MaterialTheme.typography.bodyMedium, color = colors.error, modifier = Modifier.padding(top = 8.dp))
+                }
             } else {
                 Button(onClick = { page += 1 }, modifier = Modifier.focusRequester(focus).tvFocus(RoundedCornerShape(50))) { Text("Next") }
             }
@@ -130,7 +153,11 @@ fun OnboardingScreen(form: FormFactor, onAddSource: () -> Unit, onDemo: () -> Un
         }
     }
 
-    Box(Modifier.fillMaxSize().background(colors.background).clickable(enabled = false) {}.systemBarsPadding()) {
+    // The welcome covers the app, so the D-pad must not be able to walk out to the screen behind it.
+    Box(
+        Modifier.fillMaxSize().background(colors.background).clickable(enabled = false) {}
+            .focusProperties { exit = { FocusRequester.Cancel } }.focusGroup().systemBarsPadding(),
+    ) {
         if (wide) {
             Row(Modifier.fillMaxSize()) {
                 brand(Modifier.weight(5f).fillMaxHeight())

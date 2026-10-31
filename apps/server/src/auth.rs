@@ -129,7 +129,16 @@ pub fn bearer(parts: &Parts) -> Option<String> {
             return Some(token.trim().to_string());
         }
     }
-    // Video elements cannot set headers, so media routes also accept ?token=.
+    // Video elements cannot set headers, so media routes also accept ?token=. Other routes do not:
+    // a token in a URL ends up in logs and history.
+    let path = parts.uri.path();
+    let media = path.ends_with("/index.m3u8")
+        || path.contains("/seg/")
+        || path.ends_with("/download")
+        || path.ends_with("/proxy");
+    if !media {
+        return None;
+    }
     parts
         .uri
         .query()?
