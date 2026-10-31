@@ -137,7 +137,8 @@ jobs:
         run: |
           $out = "Vesper-$env:TAG-windows-x64.msix"
           ./scripts/make-msix.ps1 -Version $env:TAG -Out $out
-          gh release upload $env:TAG $out ([IO.Path]::ChangeExtension($out, ".cer")) --clobber
+          # The installer trusts the certificate and installs the package in one double-click.
+          gh release upload $env:TAG $out ([IO.Path]::ChangeExtension($out, ".cer")) scripts/windows/Install-Vesper.cmd scripts/windows/Install-Vesper.ps1 --clobber
 
   android:
     name: App (Android and Android TV)

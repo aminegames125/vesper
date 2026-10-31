@@ -68,6 +68,7 @@ Download the installer for your device from the [latest release](https://github.
 | Device | File |
 | --- | --- |
 | Windows | `Vesper_…_x64-setup.exe` or `.msi` |
+| Windows (MSIX) | download the `.msix`, the `.cer` and `Install-Vesper.cmd` into one folder and double-click `Install-Vesper.cmd`; it trusts the certificate and installs (fixes error 0x800B010A) |
 | Linux | `.AppImage`, `.deb` or `.rpm` |
 | Android phone or tablet | `Vesper-…-android.apk` (allow installing from your browser or file manager) |
 | Android TV / Google TV / Fire TV | the same APK; sideload it with *Downloader* or `adb install` |
