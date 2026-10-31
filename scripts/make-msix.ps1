@@ -1,7 +1,7 @@
 # Packs the built Windows app into an MSIX, the format the Microsoft Store and "App Installer" use.
 # The package is signed with a self-signed certificate (so it can be sideloaded) unless you pass your own.
 #
-#   pwsh scripts/make-msix.ps1 -Version 0.9.0 -Out Vesper-0.9.0-windows-x64.msix
+#   pwsh scripts/make-msix.ps1 -Version 0.10.0 -Out Vesper-0.10.0-windows-x64.msix
 #
 # To install a self-signed build, trust the .cer that is written next to the package (Local Machine > Trusted People).
 param(

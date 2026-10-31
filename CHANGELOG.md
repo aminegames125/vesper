@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.0] - 2026-10-31 <!-- release: minor; push: 12; changes: 2 -->
+
+### Added
+- Designed changelog with release type and push counts, banner for releases
+
+### Fixed
+- Player controls, Live TV playback, local-only server, sync and onboarding bugs
+
 ## [0.9.0] - 2026-10-31
 
 ### Added
