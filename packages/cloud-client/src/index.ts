@@ -50,6 +50,8 @@ export interface CloudRecording {
   error: string | null;
   createdAt: number;
   finishedAt: number | null;
+  /** The repeating schedule this recording came from, if any. */
+  scheduleId: string | null;
 }
 
 export interface NewRecording {
@@ -61,6 +63,74 @@ export interface NewRecording {
   start_at?: number;
   /** 0 keeps it forever; leave out for the account default. */
   keep_hours?: number;
+}
+
+/** Bit 0 is Monday and bit 6 is Sunday; 0 records once, on the start date. */
+export const WEEKDAYS = 0b0011111;
+export const WEEKEND = 0b1100000;
+export const EVERY_DAY = 0b1111111;
+
+export interface Schedule {
+  id: string;
+  title: string;
+  channelName: string;
+  url: string;
+  /** IANA time zone, for example `Europe/Paris`. */
+  tz: string;
+  /** `HH:MM` on the wall clock of `tz`. */
+  startTime: string;
+  /** Length of the programme in seconds, without padding. */
+  seconds: number;
+  days: number;
+  /** `YYYY-MM-DD`. */
+  startDate: string;
+  endDate: string | null;
+  padBefore: number;
+  padAfter: number;
+  keepHours: number | null;
+  enabled: boolean;
+  createdAt: number;
+  /** Epoch seconds of the next occurrence that has not started, or null. */
+  nextStart: number | null;
+}
+
+export interface NewSchedule {
+  title: string;
+  channel_name?: string;
+  url: string;
+  tz: string;
+  start_time: string;
+  seconds: number;
+  days?: number;
+  start_date: string;
+  end_date?: string | null;
+  pad_before?: number;
+  pad_after?: number;
+  keep_hours?: number;
+  enabled?: boolean;
+}
+
+export interface Source {
+  id: string;
+  name: string;
+  kind: "m3u" | "xtream";
+  url: string;
+  username: string;
+}
+
+export interface NewSource {
+  name: string;
+  kind: "m3u" | "xtream";
+  url: string;
+  username?: string;
+  password?: string;
+}
+
+export interface Channel {
+  name: string;
+  url: string;
+  group: string;
+  logo: string;
 }
 
 export interface AdminUser {
@@ -246,6 +316,31 @@ export class CloudClient {
   deleteRecording = (id: string) => this.request<{ ok: boolean }>("DELETE", `/recordings/${id}`);
   keepRecording = (id: string, hours: number) =>
     this.post<{ ok: boolean }>(`/recordings/${id}/keep`, { hours });
+
+  // ---- schedules, sources and channels ----
+  listSchedules = () => this.get<{ schedules: Schedule[] }>("/schedules");
+  /** Saved even when `warnings` is not empty; show them so the user can adjust. */
+  createSchedule = (body: NewSchedule) =>
+    this.post<{ id: string; warnings: string[] }>("/schedules", body);
+  updateSchedule = (id: string, body: NewSchedule) =>
+    this.request<{ ok: boolean; warnings: string[] }>("PUT", `/schedules/${id}`, body);
+  setScheduleEnabled = (id: string, enabled: boolean) =>
+    this.request<{ ok: boolean }>("PATCH", `/schedules/${id}`, { enabled });
+  deleteSchedule = (id: string) => this.request<{ ok: boolean }>("DELETE", `/schedules/${id}`);
+
+  listSources = () => this.get<{ sources: Source[] }>("/sources");
+  createSource = (body: NewSource) => this.post<{ id: string }>("/sources", body);
+  deleteSource = (id: string) => this.request<{ ok: boolean }>("DELETE", `/sources/${id}`);
+  channels = (
+    source: string,
+    options: { q?: string; group?: string; offset?: number; limit?: number } = {},
+  ) => {
+    const query = new URLSearchParams({ source });
+    for (const [key, value] of Object.entries(options)) {
+      if (value !== undefined && value !== "") query.set(key, String(value));
+    }
+    return this.get<{ channels: Channel[]; total: number; groups: string[] }>(`/channels?${query}`);
+  };
 
   /** Address of the HLS playlist; any HLS player can open it, even while recording. */
   playlistUrl = (id: string) =>

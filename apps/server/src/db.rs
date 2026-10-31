@@ -74,6 +74,35 @@ CREATE TABLE IF NOT EXISTS recordings (
 );
 CREATE INDEX IF NOT EXISTS idx_recordings_user ON recordings(user_id);
 CREATE INDEX IF NOT EXISTS idx_recordings_status ON recordings(status, start_at);
+CREATE TABLE IF NOT EXISTS schedules (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  channel_name TEXT NOT NULL DEFAULT '',
+  source_url TEXT NOT NULL,
+  tz TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  duration_s INTEGER NOT NULL,
+  days_mask INTEGER NOT NULL DEFAULT 0,
+  start_date TEXT NOT NULL,
+  end_date TEXT,
+  pad_before_s INTEGER NOT NULL DEFAULT 0,
+  pad_after_s INTEGER NOT NULL DEFAULT 0,
+  keep_hours INTEGER,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_schedules_user ON schedules(user_id);
+CREATE TABLE IF NOT EXISTS sources (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  url TEXT NOT NULL,
+  username TEXT NOT NULL DEFAULT '',
+  password TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sync (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   key TEXT NOT NULL,
@@ -91,12 +120,30 @@ CREATE TABLE IF NOT EXISTS audit (
 );
 ";
 
+/// Changes to tables that already exist in a database made by an earlier version.
+fn migrate(conn: &Connection) -> rusqlite::Result<()> {
+    let has_schedule_id = conn
+        .prepare("PRAGMA table_info(recordings)")?
+        .query_map([], |r| r.get::<_, String>(1))?
+        .flatten()
+        .any(|name| name == "schedule_id");
+    if !has_schedule_id {
+        conn.execute("ALTER TABLE recordings ADD COLUMN schedule_id TEXT", [])?;
+    }
+    // One row per occurrence of a schedule, so the materialiser can run as often as it likes.
+    conn.execute_batch(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_recordings_occurrence
+           ON recordings(schedule_id, start_at) WHERE schedule_id IS NOT NULL;",
+    )
+}
+
 impl Db {
     pub fn open(path: &Path) -> rusqlite::Result<Self> {
         let conn = Connection::open(path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.execute_batch(SCHEMA)?;
+        migrate(&conn)?;
         Ok(Self(Arc::new(Mutex::new(conn))))
     }
 

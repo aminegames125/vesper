@@ -3,7 +3,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc, Mutex},
 };
 
-use crate::{config::Config, db::Db};
+use crate::{api::Channel, config::Config, db::Db};
 
 /// Stop flags of recordings that are running right now, keyed by recording id.
 pub type Jobs = Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>;
@@ -16,7 +16,11 @@ pub struct AppState {
     /// Failed logins per address: (count, window start). Slows down password guessing.
     pub attempts: Arc<Mutex<HashMap<String, (u32, i64)>>>,
     pub http: reqwest::Client,
+    /// Channel lists read from users' playlists, with the time they were read, keyed by source id.
+    pub playlists: Playlists,
 }
+
+pub type Playlists = Arc<Mutex<HashMap<String, (i64, Arc<Vec<Channel>>)>>>;
 
 impl AppState {
     pub fn allow_private(&self) -> bool {

@@ -2,12 +2,16 @@ mod account;
 mod admin;
 mod proxy;
 mod recordings;
+mod schedules;
+mod sources;
 mod sync;
 
 use axum::{
     routing::{delete, get, post},
     Router,
 };
+
+pub use sources::Channel;
 
 use crate::state::AppState;
 
@@ -44,6 +48,16 @@ pub fn router() -> Router<AppState> {
         .route("/recordings/{id}/index.m3u8", get(recordings::playlist))
         .route("/recordings/{id}/seg/{name}", get(recordings::segment))
         .route("/recordings/{id}/download", get(recordings::download))
+        .route("/schedules", get(schedules::list).post(schedules::create))
+        .route(
+            "/schedules/{id}",
+            axum::routing::put(schedules::update)
+                .patch(schedules::set_enabled)
+                .delete(schedules::remove),
+        )
+        .route("/sources", get(sources::list).post(sources::create))
+        .route("/sources/{id}", delete(sources::remove))
+        .route("/channels", get(sources::channels))
         .route("/sync", get(sync::all))
         .route("/sync/{key}", get(sync::get_one).put(sync::put_one))
         .route("/proxy", get(proxy::fetch))

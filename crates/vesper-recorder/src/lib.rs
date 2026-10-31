@@ -61,6 +61,9 @@ pub struct Options {
     pub user_agent: String,
     /// When set, every address the recorder fetches must pass it.
     pub guard: Option<UrlGuard>,
+    /// Continue the segment folder that is already there instead of starting it over. A server
+    /// uses this to reconnect after the stream drops and keep one playable recording.
+    pub append: bool,
 }
 
 impl Options {
@@ -71,6 +74,7 @@ impl Options {
             output,
             user_agent: "Vesper/0.2".into(),
             guard: None,
+            append: false,
         }
     }
 }
@@ -181,7 +185,7 @@ pub fn record(
 
     let mut sink: Box<dyn Sink> = match &options.output {
         Output::File(path) => Box::new(FileSink::create(path)?),
-        Output::Segments(dir) => Box::new(SegmentSink::create(dir)?),
+        Output::Segments(dir) => Box::new(SegmentSink::open(dir, options.append)?),
     };
     let mut run = Run {
         stop,

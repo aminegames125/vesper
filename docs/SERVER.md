@@ -87,6 +87,36 @@ Per-account limits (0 means no limit): recordings at once, longest recording in 
 - **Retention:** `keep_hours` deletes the recording that long after it finishes. `0` keeps it forever. When omitted, the account default applies. "Stay for less" simply means a short value, for example 6 hours.
 - If the server restarts during a recording, that recording is marked failed and what was captured is kept.
 
+## Schedules
+
+A schedule says "record this channel at 11:00 for 30 minutes on these days". Create one with `POST /api/v1/schedules`:
+
+```json
+{
+  "title": "Morning news",
+  "url": "http://provider.example/live/news.ts",
+  "tz": "Europe/Paris",
+  "start_time": "11:00",
+  "seconds": 1800,
+  "days": 31,
+  "start_date": "2026-11-02",
+  "end_date": null,
+  "pad_before": 60,
+  "pad_after": 120
+}
+```
+
+- `days` is a bit mask, Monday is 1 and Sunday is 64: `31` is weekdays, `127` every day, `0` records once on `start_date`.
+- `start_time` is on the wall clock of `tz`, so 11:00 stays 11:00 across daylight-saving changes.
+- `pad_before` and `pad_after` start early and stop late, in seconds (up to an hour each).
+- The server keeps the next two weeks of occurrences as ordinary `scheduled` recordings, so they show up in `GET /recordings` with a `scheduleId` and can be cancelled one by one.
+- The reply carries `warnings` (for example an overlap with another recording on an account that records one at a time). The schedule is saved either way.
+- If the stream drops, the server joins it again (up to 8 times, with growing pauses) and keeps one continuous recording. A recording is refused when the disk has less than 512 MB free.
+
+## Playlists and channels
+
+`POST /api/v1/sources` saves an M3U link (`"kind": "m3u"`) or an Xtream login (`"kind": "xtream"`, with `username` and `password`) and checks it right away. `GET /api/v1/channels?source=ID&q=news&group=News&offset=0&limit=100` returns the channels with their stream addresses, group and logo, so an app can offer a channel picker. Lists are cached for ten minutes.
+
 ## HTTP API
 
 Base path `/api/v1`. Send `Authorization: Bearer <token>`; media routes also accept `?token=`. In lite mode no token is needed. Errors are `{ "error": "message" }`.
@@ -102,6 +132,8 @@ Base path `/api/v1`. Send `Authorization: Bearer <token>`; media routes also acc
 | `POST /recordings/{id}/stop`, `/keep` | Stop or cancel; change retention. |
 | `GET /recordings/{id}/index.m3u8` | Playlist for any HLS player. |
 | `GET /recordings/{id}/download` | The whole recording as one `.ts` file. |
+| `GET/POST /schedules`, `PUT/PATCH/DELETE /schedules/{id}` | Repeating or one-off schedules. `PATCH` pauses or resumes. |
+| `GET/POST /sources`, `DELETE /sources/{id}`, `GET /channels` | Playlists and their channels. |
 | `GET /sync`, `GET/PUT /sync/{key}` | Small JSON documents shared by your devices. |
 | `GET /proxy?url=` | Fetch an address on your behalf; playlists are rewritten to stay behind the proxy. |
 | `GET/POST /admin/users`, `PATCH/DELETE /admin/users/{id}` | Manage accounts. |

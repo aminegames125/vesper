@@ -68,12 +68,43 @@ pub(crate) struct SegmentSink {
     entries: Vec<SegmentEntry>,
 }
 
+/// Reads back the segments listed in a playlist this sink wrote earlier.
+fn parse_entries(text: &str) -> Vec<SegmentEntry> {
+    let mut entries = Vec::new();
+    let mut lines = text.lines();
+    while let Some(line) = lines.next() {
+        let Some(rest) = line.strip_prefix("#EXTINF:") else {
+            continue;
+        };
+        let seconds = rest
+            .split(',')
+            .next()
+            .and_then(|s| s.trim().parse::<f32>().ok());
+        let name = lines.next().map(str::trim).filter(|n| n.ends_with(".ts"));
+        if let (Some(seconds), Some(name)) = (seconds, name) {
+            entries.push(SegmentEntry {
+                name: name.to_string(),
+                seconds,
+            });
+        }
+    }
+    entries
+}
+
 impl SegmentSink {
-    pub fn create(dir: &Path) -> io::Result<Self> {
+    /// Starts an empty folder, or with `append` picks up where the playlist already there ends.
+    pub fn open(dir: &Path, append: bool) -> io::Result<Self> {
         fs::create_dir_all(dir)?;
+        let entries = if append {
+            fs::read_to_string(dir.join("index.m3u8"))
+                .map(|text| parse_entries(&text))
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
         Ok(Self {
             dir: dir.to_path_buf(),
-            entries: Vec::new(),
+            entries,
         })
     }
 
@@ -104,6 +135,26 @@ impl Sink for SegmentSink {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn appending_continues_the_numbering() {
+        let dir = std::env::temp_dir().join(format!("vesper-sink-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let mut first = SegmentSink::open(&dir, false).unwrap();
+        first.segment(b"a", 6.0).unwrap();
+        first.segment(b"b", 4.0).unwrap();
+        first.finish().unwrap();
+
+        let mut second = SegmentSink::open(&dir, true).unwrap();
+        second.segment(b"c", 5.0).unwrap();
+        second.finish().unwrap();
+
+        let text = fs::read_to_string(dir.join("index.m3u8")).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        assert!(text.contains("seg00000.ts"));
+        assert!(text.contains("seg00002.ts"));
+        assert_eq!(text.matches("#EXTINF").count(), 3);
+    }
 
     #[test]
     fn playlist_lists_segments_and_ends() {

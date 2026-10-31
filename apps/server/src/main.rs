@@ -5,6 +5,7 @@ mod db;
 mod error;
 mod jobs;
 mod net;
+mod schedule;
 mod state;
 mod web;
 
@@ -75,6 +76,7 @@ async fn main() {
         db,
         config: Arc::new(config),
         jobs: Default::default(),
+        playlists: Default::default(),
         attempts: Arc::new(Mutex::new(HashMap::new())),
         http: reqwest::Client::builder()
             .user_agent("Vesper/0.2")

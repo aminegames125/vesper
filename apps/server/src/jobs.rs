@@ -6,7 +6,7 @@ use std::{
         Arc,
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use rusqlite::params;
@@ -18,6 +18,12 @@ use crate::{
     error::{ApiError, ApiResult},
     state::AppState,
 };
+
+/// How many times a dropped stream is joined again before the recording gives up.
+const MAX_RECONNECTS: u32 = 8;
+
+/// A recording is refused when the disk it would be written to has less room than this.
+const MIN_FREE_BYTES: u64 = 512 * 1024 * 1024;
 
 pub fn recording_dir(state: &AppState, user_id: &str, id: &str) -> PathBuf {
     state.config.recordings_dir().join(user_id).join(id)
@@ -60,6 +66,13 @@ pub fn check_quota(state: &AppState, user: &User, seconds: i64) -> ApiResult<()>
     Ok(())
 }
 
+/// Free bytes on the disk the recordings are written to, when the system can say.
+pub fn free_disk(state: &AppState) -> Option<u64> {
+    let dir = state.config.recordings_dir();
+    fs::create_dir_all(&dir).ok()?;
+    fs4::available_space(&dir).ok()
+}
+
 pub fn remove_files(state: &AppState, user_id: &str, id: &str) {
     let _ = fs::remove_dir_all(recording_dir(state, user_id, id));
 }
@@ -97,6 +110,9 @@ pub fn start(state: &AppState, id: &str) {
     if storage > 0 && storage_used(state, &user_id) >= storage {
         return fail("Cloud storage is full.");
     }
+    if free_disk(state).is_some_and(|free| free < MIN_FREE_BYTES) {
+        return fail("The server's disk is almost full.");
+    }
 
     let stop = Arc::new(AtomicBool::new(false));
     state
@@ -115,16 +131,76 @@ pub fn start(state: &AppState, id: &str) {
     let id = id.to_string();
     let dir = recording_dir(&state, &user_id, &id);
     thread::spawn(move || {
-        let mut options = Options::new(url, max_seconds.max(1) as u64, Output::Segments(dir));
-        options.guard = guard;
-        let progress_state = state.clone();
-        let progress_id = id.clone();
-        let outcome = vesper_recorder::record(&options, &stop, move |p| {
-            let _ = progress_state.db.conn().execute(
-                "UPDATE recordings SET bytes = ?1, seconds = ?2 WHERE id = ?3",
-                params![p.bytes as i64, p.seconds as i64, progress_id],
+        let started = Instant::now();
+        let mut bytes_before = 0u64;
+        let mut reconnects = 0u32;
+        let mut last_problem: Option<String> = None;
+        let mut fatal: Option<String>;
+
+        loop {
+            let remaining = (max_seconds.max(1) as u64).saturating_sub(started.elapsed().as_secs());
+            let mut options =
+                Options::new(url.clone(), remaining.max(1), Output::Segments(dir.clone()));
+            options.guard = guard.clone();
+            options.append = reconnects > 0;
+
+            let progress_state = state.clone();
+            let progress_id = id.clone();
+            let base = bytes_before;
+            let outcome = vesper_recorder::record(&options, &stop, move |p| {
+                let _ = progress_state.db.conn().execute(
+                    "UPDATE recordings SET bytes = ?1, seconds = ?2 WHERE id = ?3",
+                    params![
+                        (base + p.bytes) as i64,
+                        started.elapsed().as_secs() as i64,
+                        progress_id
+                    ],
+                );
+            });
+            let permanent = matches!(
+                outcome,
+                Err(vesper_recorder::Error::BadUrl
+                    | vesper_recorder::Error::Encrypted
+                    | vesper_recorder::Error::Blocked)
             );
-        });
+            match outcome {
+                Ok(summary) => {
+                    bytes_before += summary.bytes;
+                    last_problem = summary.warning;
+                    fatal = None;
+                }
+                Err(error) => fatal = Some(error.to_string()),
+            }
+
+            // A live channel should not end before the programme does. If the stream dropped,
+            // wait a little and join it again; the new part is appended to the same recording.
+            let finished_on_time = started.elapsed().as_secs() + 3 >= max_seconds.max(1) as u64;
+            if permanent
+                || stop.load(Ordering::Relaxed)
+                || finished_on_time
+                || reconnects >= MAX_RECONNECTS
+            {
+                break;
+            }
+            reconnects += 1;
+            // Wait longer after each drop, but never past the end of the programme.
+            let left = (max_seconds.max(1) as u64).saturating_sub(started.elapsed().as_secs());
+            let pause = (5 * u64::from(reconnects))
+                .min(30)
+                .min(left.saturating_sub(3));
+            for _ in 0..pause {
+                if stop.load(Ordering::Relaxed) {
+                    break;
+                }
+                thread::sleep(Duration::from_secs(1));
+            }
+            // The programme may have ended while waiting; do not start a new attempt after it.
+            if stop.load(Ordering::Relaxed)
+                || started.elapsed().as_secs() + 3 >= max_seconds.max(1) as u64
+            {
+                break;
+            }
+        }
         state
             .jobs
             .lock()
@@ -133,16 +209,26 @@ pub fn start(state: &AppState, id: &str) {
 
         let finished = now();
         let keep_until = keep_hours.filter(|h| *h > 0).map(|h| finished + h * 3600);
+        let seconds = started.elapsed().as_secs() as i64;
         let conn = state.db.conn();
-        let _ = match outcome {
-            Ok(summary) => conn.execute(
+        let _ = if bytes_before > 0 {
+            let note = match (reconnects, &last_problem) {
+                (0, problem) => problem.clone(),
+                (n, Some(problem)) => Some(format!("Reconnected {n} time(s). {problem}")),
+                (n, None) => Some(format!("Reconnected {n} time(s) after the stream dropped.")),
+            };
+            conn.execute(
                 "UPDATE recordings SET status = 'done', bytes = ?1, seconds = ?2, error = ?3, finished_at = ?4, keep_until = ?5 WHERE id = ?6",
-                params![summary.bytes as i64, summary.seconds as i64, summary.warning, finished, keep_until, id],
-            ),
-            Err(error) => conn.execute(
+                params![bytes_before as i64, seconds, note, finished, keep_until, id],
+            )
+        } else {
+            let message = fatal
+                .or(last_problem)
+                .unwrap_or_else(|| "Nothing was captured.".into());
+            conn.execute(
                 "UPDATE recordings SET status = 'failed', error = ?1, finished_at = ?2, keep_until = ?3 WHERE id = ?4",
-                params![error.to_string(), finished, keep_until, id],
-            ),
+                params![message, finished, keep_until, id],
+            )
         };
     });
 }
@@ -156,11 +242,17 @@ pub fn spawn_background(state: AppState) {
         [now()],
     );
 
+    crate::schedule::materialise(&state);
     tokio::spawn(async move {
         let mut tick = 0u64;
         loop {
             tokio::time::sleep(Duration::from_secs(5)).await;
             tick += 1;
+
+            // Keep the next two weeks of every repeating schedule created.
+            if tick.is_multiple_of(12) {
+                crate::schedule::materialise(&state);
+            }
 
             let due: Vec<String> = {
                 let conn = state.db.conn();

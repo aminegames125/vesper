@@ -19,7 +19,7 @@ use crate::{
     state::AppState,
 };
 
-const COLUMNS: &str = "id, user_id, title, channel_name, status, start_at, max_seconds, seconds, bytes, keep_hours, keep_until, error, created_at, finished_at";
+const COLUMNS: &str = "id, user_id, title, channel_name, status, start_at, max_seconds, seconds, bytes, keep_hours, keep_until, error, created_at, finished_at, schedule_id";
 
 fn row_json(r: &rusqlite::Row) -> rusqlite::Result<Value> {
     Ok(json!({
@@ -36,6 +36,7 @@ fn row_json(r: &rusqlite::Row) -> rusqlite::Result<Value> {
         "error": r.get::<_, Option<String>>(11)?,
         "createdAt": r.get::<_, i64>(12)?,
         "finishedAt": r.get::<_, Option<i64>>(13)?,
+        "scheduleId": r.get::<_, Option<String>>(14)?,
     }))
 }
 
