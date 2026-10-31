@@ -20,6 +20,16 @@ From then on Kodi checks for new versions on its own. The repository is rebuilt 
 
 Building the zip yourself: `python apps/kodi/build.py` (writes `apps/kodi/dist/`).
 
+## Add your IPTV provider from Kodi
+
+You do not need the phone app or the admin panel. On first start the home screen leads with **Add your IPTV provider**; later it lives under **IPTV providers**. Pick one of:
+
+- **Playlist link (M3U)**: paste the link your provider gave you.
+- **Xtream login**: server address, username and password.
+- **Use the one from Kodi's Live TV**: if you already set a playlist up in *PVR IPTV Simple Client*, Vesper finds its link and offers it, so you do not type it twice. (Playlists that are files on the device are skipped, because the server cannot read them.)
+
+The server checks the provider and loads its channels. They show up under Live TV, Movies and Series, and each one has **Record now** in its context menu. The provider is saved on the server, so the Android app sees it too. Remove one from **IPTV providers**; recordings already made stay.
+
 ## What it does
 
 | Screen | What you can do |
@@ -42,4 +52,5 @@ Where you stop is saved on the server, so the Android app and any other Kodi pic
 
 - Live channels play straight from your provider, from the Kodi device, so they use one of your provider connections while you watch. Recording happens on the server.
 - Kodi has no cast sender, so casting stays in the Android app.
-- Tested here: the add-on's logic against a real Vesper server (lite and full mode), and network discovery. It has **not** been run inside a real Kodi yet, so how the menus look and feel on your TV, and the context menu on your remote, is untested. Please open an issue if something is off.
+- Vesper does not add channels to Kodi's own Live TV window; it has its own Live TV list. Recording is done by the server, not by Kodi.
+- Tested here: the add-on's logic against a real Vesper server (lite and full mode), adding and removing a provider, and network discovery. The "use the one from Kodi's Live TV" import is tested against sample settings files only, not a real PVR IPTV Simple install. It has **not** been run inside a real Kodi yet, so how the menus look and feel on your TV, and the context menu on your remote, is untested. Please open an issue if something is off.

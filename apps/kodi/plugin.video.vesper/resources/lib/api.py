@@ -34,7 +34,7 @@ class Vesper:
 
     # -- plumbing ---------------------------------------------------------------------------
 
-    def _call(self, method, path, body=None, query=None, auth=True):
+    def _call(self, method, path, body=None, query=None, auth=True, timeout=TIMEOUT):
         if not self.base:
             raise VesperError("Set the server address in the add-on settings.")
         url = self.base + "/api/v1" + path
@@ -49,7 +49,7 @@ class Vesper:
         if auth and self.token:
             request.add_header("Authorization", "Bearer " + self.token)
         try:
-            with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
                 raw = response.read()
         except urllib.error.HTTPError as e:
             message = ""
@@ -107,6 +107,15 @@ class Vesper:
 
     def sources(self):
         return self._call("GET", "/sources").get("sources", [])
+
+    def add_source(self, name, kind, url, username="", password=""):
+        """Saves a provider on the server. The server downloads the list once to check it, which
+        can take a while for a big provider."""
+        body = {"name": name, "kind": kind, "url": url, "username": username, "password": password}
+        return self._call("POST", "/sources", body, timeout=90)
+
+    def remove_source(self, source_id):
+        return self._call("DELETE", "/sources/" + source_id)
 
     def channels(self, source="all", group="", kind="", q="", offset=0, limit=200):
         return self._call(

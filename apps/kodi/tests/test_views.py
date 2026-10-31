@@ -26,6 +26,7 @@ class Fake:
         self.items, self.resolved, self.notes, self.builtins = [], [], [], []
         self.ended = None
         self.answers = {}
+        self.typed = []
         self.content = None
 
     def install(self, settings):
@@ -71,6 +72,8 @@ class Fake:
                 return fake.answers.get("yesno", True)
 
             def input(self, *a, **k):
+                if fake.typed:
+                    return fake.typed.pop(0)
                 return fake.answers.get("input", "")
 
         class Addon:
@@ -87,7 +90,16 @@ class Fake:
         xbmc.executebuiltin = lambda cmd: fake.builtins.append(cmd)
         xbmcgui = types.ModuleType("xbmcgui")
         xbmcgui.ListItem, xbmcgui.Dialog = ListItem, Dialog
-        xbmcgui.NOTIFICATION_ERROR = xbmcgui.NOTIFICATION_INFO = 0
+        xbmcgui.NOTIFICATION_ERROR = xbmcgui.NOTIFICATION_INFO = xbmcgui.ALPHANUM_HIDE_INPUT = 0
+
+        class DialogProgress:
+            def create(self, *a):
+                pass
+
+            def close(self):
+                pass
+
+        xbmcgui.DialogProgress = DialogProgress
         xbmcplugin = types.ModuleType("xbmcplugin")
         xbmcplugin.addDirectoryItem = lambda h, u, li, isFolder=False: fake.items.append((u, li, isFolder))
         xbmcplugin.setContent = lambda h, c: setattr(fake, "content", c)
@@ -133,6 +145,85 @@ class Setup(unittest.TestCase):
         views.route("")
         self.assertIn("Open settings", labels())
         self.assertTrue(any("Cannot reach" in n for n in fake.notes), fake.notes)
+
+
+class StubClient:
+    """Stands in for the server so the provider screens run without one."""
+
+    def __init__(self, sources=()):
+        self.saved, self.removed = list(sources), []
+
+    def recordings(self, **_):
+        return {"recordings": []}
+
+    def sources(self):
+        return self.saved
+
+    def add_source(self, name, kind, url, username="", password=""):
+        self.saved.append({"id": "s%d" % len(self.saved), "name": name, "kind": kind, "url": url, "username": username})
+
+    def remove_source(self, sid):
+        self.removed.append(sid)
+
+
+class Providers(unittest.TestCase):
+    def setUp(self):
+        fake.reset()
+        settings.clear()
+        settings["server"] = "http://127.0.0.1:8484"
+        self.stub = StubClient()
+        real = views.common.client
+        self.addCleanup(setattr, views.common, "client", real)
+        views.common.client = lambda: self.stub
+
+    def test_with_no_provider_the_home_screen_leads_with_adding_one(self):
+        views.route("")
+        self.assertEqual(labels()[0], "Add your IPTV provider")
+        self.assertNotIn("IPTV providers", labels())
+
+    def test_a_playlist_link_is_saved_on_the_server(self):
+        fake.answers["select"] = 0
+        fake.typed = ["http://iptv.example/list.m3u", "Home TV"]
+        views.route("?action=add_provider")
+        self.assertEqual(self.stub.saved[0]["kind"], "m3u")
+        self.assertEqual(self.stub.saved[0]["url"], "http://iptv.example/list.m3u")
+        self.assertEqual(self.stub.saved[0]["name"], "Home TV")
+
+    def test_an_xtream_login_needs_all_three_parts(self):
+        fake.answers["select"] = 1
+        fake.typed = ["http://host:8080", "me", "", ]
+        views.route("?action=add_provider")
+        self.assertEqual(self.stub.saved, [])
+        fake.typed = ["http://host:8080", "me", "secret", "Cable"]
+        views.route("?action=add_provider")
+        self.assertEqual((self.stub.saved[0]["kind"], self.stub.saved[0]["username"]), ("xtream", "me"))
+
+    def test_nothing_is_saved_when_the_dialog_is_cancelled(self):
+        fake.answers["select"] = -1
+        views.route("?action=add_provider")
+        self.assertEqual(self.stub.saved, [])
+
+    def test_the_provider_in_kodi_live_tv_is_offered_and_used(self):
+        folder = os.path.join(views.xbmcvfs.translatePath(""), "addon_data", "pvr.iptvsimple")
+        os.makedirs(folder)
+        with open(os.path.join(folder, "instance-settings-1.xml"), "w", encoding="utf-8") as f:
+            f.write(
+                '<settings version="2"><setting id="kodi_addon_instance_name">Sky</setting>'
+                '<setting id="m3uPathType">1</setting><setting id="m3uUrl">http://p.example/get.php?u=1</setting></settings>'
+            )
+        fake.answers["select"] = 2
+        views.route("?action=add_provider")
+        self.assertEqual((self.stub.saved[0]["name"], self.stub.saved[0]["url"]), ("Sky", "http://p.example/get.php?u=1"))
+
+    def test_providers_are_listed_and_can_be_removed(self):
+        self.stub.saved = [{"id": "s0", "name": "Home TV", "kind": "m3u", "url": "x", "username": ""}]
+        views.route("")
+        self.assertIn("IPTV providers", labels())
+        fake.reset()
+        views.route("?action=providers")
+        self.assertEqual(labels(), ["Add a provider", "Home TV"])
+        views.route("?action=provider_menu&id=s0&name=Home+TV")
+        self.assertEqual(self.stub.removed, ["s0"])
 
 
 @unittest.skipUnless(LIVE, "set VESPER_URL to a lite-mode server")

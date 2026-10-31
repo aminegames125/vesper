@@ -7,8 +7,9 @@ import urllib.parse
 import xbmc
 import xbmcgui
 import xbmcplugin
+import xbmcvfs
 
-from . import api, common, discovery
+from . import api, common, discovery, pvr
 
 HANDLE = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else -1
 BASE = "plugin://plugin.video.vesper/"
@@ -102,11 +103,18 @@ def root():
     try:
         c = get_client()
         rows = c.recordings().get("recordings", [])
+        providers = c.sources()
     except api.VesperError as e:
         add(url(action="discover"), item("Find Vesper on this network"), False)
         add(url(action="settings"), item("Open settings"), False)
         say(str(e), error=True)
         return finish()
+    if not providers:
+        add(
+            url(action="add_provider"),
+            item("Add your IPTV provider", plot="Paste your playlist link or Xtream login, or use the one already in Kodi's Live TV. Then you can record any channel."),
+            False,
+        )
     live = sum(1 for r in rows if r["status"] == "recording")
     soon = sum(1 for r in rows if r["status"] in ("scheduled", "queued"))
     resumable = sum(1 for r in rows if r["status"] == "done" and not r["watched"] and r["positionS"] > 20)
@@ -123,6 +131,8 @@ def root():
     add(url(action="channels", kind="series"), item("Series"), True)
     add(url(action="schedules"), item("Schedules", plot="What records on its own."), True)
     add(url(action="search"), item("Search channels"), True)
+    if providers:
+        add(url(action="providers"), item("IPTV providers", plot=", ".join(p["name"] for p in providers)), True)
     finish()
 
 
@@ -151,6 +161,59 @@ def discover():
     common.set_setting("server", chosen["address"])
     say("Connected to " + chosen["name"])
     refresh()
+
+
+# -- IPTV providers -------------------------------------------------------------------------
+
+
+def providers():
+    try:
+        rows = get_client().sources()
+    except api.VesperError as e:
+        return failed(e)
+    add(url(action="add_provider"), item("Add a provider", plot="A playlist link, an Xtream login, or the one already in Kodi's Live TV."), False)
+    for p in rows:
+        kind = "Xtream" if p["kind"] == "xtream" else "Playlist link"
+        add(url(action="provider_menu", id=p["id"], name=p["name"]), item(p["name"], plot=kind), False)
+    finish()
+
+
+def add_provider():
+    dialog = xbmcgui.Dialog()
+    already = pvr.find(xbmcvfs.translatePath("special://profile/"))
+    options = ["Playlist link (M3U)", "Xtream login (server, username, password)"]
+    options += ["Use \"%s\" from Kodi's Live TV" % p["name"] for p in already]
+    pick = dialog.select("Add your IPTV provider", options)
+    if pick < 0:
+        return
+    username = password = ""
+    if pick >= 2:
+        name, link, kind = already[pick - 2]["name"], already[pick - 2]["url"], "m3u"
+    elif pick == 0:
+        link = dialog.input("Playlist link (http://...)")
+        name, kind = dialog.input("Name", defaultt="My IPTV") if link else "", "m3u"
+    else:
+        link = dialog.input("Server (http://host:port)")
+        username = dialog.input("Username") if link else ""
+        password = dialog.input("Password", option=xbmcgui.ALPHANUM_HIDE_INPUT) if username else ""
+        name, kind = dialog.input("Name", defaultt="My IPTV") if password else "", "xtream"
+    if not (link and name) or (kind == "xtream" and not (username and password)):
+        return
+    progress = xbmcgui.DialogProgress()
+    progress.create("Vesper", "Checking your provider and loading its channels...")
+    try:
+        get_client().add_source(name, kind, link.strip(), username, password)
+    except api.VesperError as e:
+        progress.close()
+        return say(str(e), error=True)
+    progress.close()
+    say("%s added. You can record any of its channels now." % name)
+    refresh()
+
+
+def provider_menu(sid, name):
+    if xbmcgui.Dialog().yesno(name, "Remove this provider from the server? Recordings already made stay.", yeslabel="Remove", nolabel="Keep it"):
+        act(lambda c: c.remove_source(sid), "Removed")
 
 
 # -- recordings -----------------------------------------------------------------------------
@@ -440,6 +503,12 @@ def route(query):
         act(lambda c: c.patch(q["id"], watched=on, position_s=0), "Done")
     elif action == "delete":
         confirm_delete(q["id"], q.get("title", "this recording"))
+    elif action == "providers":
+        providers()
+    elif action == "add_provider":
+        add_provider()
+    elif action == "provider_menu":
+        provider_menu(q["id"], q.get("name", "this provider"))
     elif action == "discover":
         discover()
     elif action == "type_address":
