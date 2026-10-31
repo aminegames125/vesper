@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.14.0] - 2026-10-31 <!-- release: minor; push: 19; changes: 1 -->
+
+### Added
+- Webhook, keep newest N, run now, duplicate, pause all, rename, favourites and server status, plus fixes from a bug hunt
+
 ## [0.13.1] - 2026-10-31 <!-- release: patch; push: 18; changes: 1 -->
 
 ### Fixed

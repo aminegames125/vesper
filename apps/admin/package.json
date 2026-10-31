@@ -1,7 +1,7 @@
 {
   "name": "@vesper/admin",
   "private": true,
-  "version": "0.13.1",
+  "version": "0.14.0",
   "type": "module",
   "description": "The Vesper Cloud admin panel. Built into the server binary.",
   "license": "MIT",
