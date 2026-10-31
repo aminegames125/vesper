@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Tips, WhatsNew } from "./components/onboarding";
 import { Nav, Toast, TopBar } from "./components/shell";
+import { TvHome, TvShell } from "./components/tv";
 import { isTvMode, useCloudSync } from "./lib/cloud";
 import { useRecordingEvents, useScheduler } from "./lib/recorder";
 import { useSpatialNav } from "./lib/spatial-nav";
@@ -50,9 +51,32 @@ export function App() {
   useRecordingEvents();
   useScheduler();
   useCloudSync();
-  useSpatialNav(isTvMode());
+  const tv = isTvMode();
+  useSpatialNav(tv);
 
-  const View = VIEWS[view];
+  const View = tv && view === "home" ? TvHome : VIEWS[view];
+
+  const overlays = (
+    <>
+      <WhatsNew />
+      <Tips />
+      <Toast />
+      {playing && (
+        <Suspense fallback={null}>
+          <Player key={playing.id} item={playing} />
+        </Suspense>
+      )}
+    </>
+  );
+
+  if (tv) {
+    return (
+      <>
+        <TvShell>{detail ? <Detail /> : <View />}</TvShell>
+        {overlays}
+      </>
+    );
+  }
 
   return (
     <div className="flex h-full">
@@ -65,14 +89,7 @@ export function App() {
           {detail ? <Detail /> : <View />}
         </main>
       </div>
-      <WhatsNew />
-      <Tips />
-      <Toast />
-      {playing && (
-        <Suspense fallback={null}>
-          <Player key={playing.id} item={playing} />
-        </Suspense>
-      )}
+      {overlays}
     </div>
   );
 }

@@ -27,6 +27,8 @@ export {
   MinimizeIcon,
   MonitorIcon,
   MoonIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
   PauseIcon,
   PictureInPictureIcon,
   PlayIcon,

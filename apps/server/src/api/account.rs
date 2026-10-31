@@ -98,10 +98,12 @@ pub async fn setup(
     check_username(&body.username)?;
     check_new_password(&body.password)?;
     let id = uuid::Uuid::new_v4().to_string();
+    // Hashing is slow; do it before taking the database lock so other requests are not stalled.
+    let hash = hash_password(&body.password)?;
     state.db.conn().execute(
         "INSERT INTO users (id, username, pass_hash, role, max_concurrent, max_hours, storage_bytes, created_at)
          VALUES (?1, ?2, ?3, 'admin', 0, 0, 0, ?4)",
-        params![id, body.username.trim(), hash_password(&body.password)?, now()],
+        params![id, body.username.trim(), hash, now()],
     )?;
     state
         .db
@@ -220,10 +222,11 @@ pub async fn register(
     }
 
     let id = uuid::Uuid::new_v4().to_string();
+    let hash = hash_password(&body.password)?;
     state.db.conn().execute(
         "INSERT INTO users (id, username, pass_hash, role, max_concurrent, max_hours, storage_bytes, keep_hours, note, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-        params![id, body.username.trim(), hash_password(&body.password)?, role, max_concurrent, max_hours, storage, keep, note, now()],
+        params![id, body.username.trim(), hash, role, max_concurrent, max_hours, storage, keep, note, now()],
     )?;
     state.db.audit(&body.username, "register", &ip);
     let token = create_session(&state, &id, &agent(&headers), &ip)?;
@@ -271,9 +274,10 @@ pub async fn change_password(
     if !verify_password(&body.current, &hash) {
         return Err(ApiError::forbidden("The current password is not right."));
     }
+    let new_hash = hash_password(&body.new)?;
     state.db.conn().execute(
         "UPDATE users SET pass_hash = ?1 WHERE id = ?2",
-        params![hash_password(&body.new)?, user.id],
+        params![new_hash, user.id],
     )?;
     state.db.audit(&user.username, "password.change", "");
     Ok(Json(json!({ "ok": true })))

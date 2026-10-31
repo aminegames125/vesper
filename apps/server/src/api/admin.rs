@@ -188,6 +188,16 @@ pub async fn update_user(
         return Err(ApiError::bad("You cannot suspend your own account."));
     }
 
+    // Check and hash the new password first: a bad one must not leave the other changes half applied,
+    // and the slow hash must not run while the database lock is held.
+    let new_hash = match &patch.password {
+        Some(v) => {
+            check_new_password(v)?;
+            Some(hash_password(v)?)
+        }
+        None => None,
+    };
+
     let conn = state.db.conn();
     if let Some(v) = &patch.role {
         conn.execute("UPDATE users SET role = ?1 WHERE id = ?2", params![v, id])?;
@@ -225,11 +235,10 @@ pub async fn update_user(
     if let Some(v) = &patch.note {
         conn.execute("UPDATE users SET note = ?1 WHERE id = ?2", params![v, id])?;
     }
-    if let Some(v) = &patch.password {
-        check_new_password(v)?;
+    if let Some(hash) = &new_hash {
         conn.execute(
             "UPDATE users SET pass_hash = ?1 WHERE id = ?2",
-            params![hash_password(v)?, id],
+            params![hash, id],
         )?;
         conn.execute("DELETE FROM sessions WHERE user_id = ?1", [&id])?;
     }

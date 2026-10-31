@@ -31,6 +31,7 @@ function Backdrop({ image, children }: { image?: string; children: React.ReactNo
     <div className="scope-dark relative min-h-full bg-ink">
       {image && (
         <img
+          decoding="async"
           src={image}
           alt=""
           className="absolute inset-x-0 top-0 h-[60vh] w-full object-cover opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent)]"
@@ -106,6 +107,7 @@ function MovieDetailPage({ movie }: { movie: Movie }) {
       <div className="flex gap-10">
         {movie.poster && (
           <img
+            decoding="async"
             src={movie.poster}
             alt=""
             className="hidden h-96 w-64 flex-none rounded-2xl object-cover shadow-2xl md:block"
@@ -184,6 +186,7 @@ function ShowDetailPage({ show }: { show: Show }) {
       <div className="flex gap-10">
         {show.cover && (
           <img
+            decoding="async"
             src={show.cover}
             alt=""
             className="hidden h-96 w-64 flex-none rounded-2xl object-cover shadow-2xl md:block"
@@ -245,6 +248,7 @@ function ShowDetailPage({ show }: { show: Show }) {
                       <span className="relative block h-20 w-36 flex-none overflow-hidden rounded-lg bg-raised">
                         {e.image && (
                           <img
+                            decoding="async"
                             src={e.image}
                             alt=""
                             loading="lazy"

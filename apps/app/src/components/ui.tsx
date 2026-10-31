@@ -4,6 +4,7 @@ import {
   type ReactNode,
   useEffect,
   useRef,
+  useState,
 } from "react";
 import { type AnimIcon, IconButton, SearchIcon, useIconHover, XIcon } from "./icons";
 
@@ -99,6 +100,17 @@ export function SearchBox({
   autoFocus?: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const [text, setText] = useState(value);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Follow outside changes (clearing the query elsewhere) but never fight the typist.
+  useEffect(() => setText(value), [value]);
+  // Filtering thousands of items per keystroke is what makes typing lag, so wait for a pause.
+  const type = (v: string) => {
+    setText(v);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => onChange(v), v ? 140 : 0);
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
   useEffect(() => {
     if (autoFocus) ref.current?.focus();
   }, [autoFocus]);
@@ -110,8 +122,8 @@ export function SearchBox({
       <input
         ref={ref}
         type="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={text}
+        onChange={(e) => type(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
         className="w-full rounded-full border border-line bg-panel py-2 pl-10 pr-9 text-sm placeholder:text-muted focus:border-accent focus:outline-none [&::-webkit-search-cancel-button]:hidden"
@@ -123,7 +135,11 @@ export function SearchBox({
             label="Clear search"
             size={14}
             className="size-7"
-            onClick={() => onChange("")}
+            onClick={() => {
+              // A pending keystroke must not bring the old query back after it is cleared.
+              clearTimeout(timer.current);
+              onChange("");
+            }}
           />
         </span>
       )}

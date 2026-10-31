@@ -119,13 +119,28 @@ export function useCloudSync() {
 }
 
 /** True on Android TV and when TV mode is switched on, so the interface uses remote-friendly focus. */
-export const isTvMode = () => {
-  try {
-    if (localStorage.getItem("vesper.tv") === "1") return true;
-  } catch {
-    /* ignore */
-  }
-  return (
-    /Android.*(TV|AFT|BRAVIA)|\bTV\b/i.test(navigator.userAgent) || location.search.includes("tv=1")
-  );
-};
+export const isTvMode = (() => {
+  let cached: boolean | undefined;
+  return () => {
+    if (cached !== undefined) return cached;
+    let forced: string | null = null;
+    try {
+      forced = localStorage.getItem("vesper.tv");
+    } catch {
+      /* ignore */
+    }
+    const ua = navigator.userAgent;
+    cached =
+      forced === "1"
+        ? true
+        : forced === "0"
+          ? false
+          : location.search.includes("tv=1") ||
+            // The Android build tags its WebView when the system says it is a television.
+            ua.includes("VesperTV") ||
+            /Android.*(TV|AFT|BRAVIA|Chromecast|SHIELD)|\bTV\b/i.test(ua) ||
+            // A big Android screen with no touch hardware is a TV box in practice.
+            (/Android/i.test(ua) && navigator.maxTouchPoints === 0 && screen.width >= 960);
+    return cached;
+  };
+})();

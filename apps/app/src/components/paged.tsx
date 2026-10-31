@@ -42,7 +42,9 @@ export function Paged<T extends { id: string }>({
         }
       >
         {items.slice(0, shown).map((item) => (
-          <div key={item.id}>{render(item)}</div>
+          <div key={item.id} className={list ? undefined : "cv-auto"}>
+            {render(item)}
+          </div>
         ))}
       </div>
       {shown < items.length && <div ref={sentinel} className="h-10" />}

@@ -29,6 +29,18 @@ fn is_private(ip: IpAddr) -> bool {
     }
 }
 
+/// For the recorder, which runs on its own thread: true when every address the host resolves to is public.
+pub fn resolves_public(url: &Url) -> bool {
+    use std::net::ToSocketAddrs;
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    let port = url.port_or_known_default().unwrap_or(80);
+    (host, port)
+        .to_socket_addrs()
+        .is_ok_and(|mut addrs| addrs.all(|a| !is_private(a.ip())))
+}
+
 /// Parses an address and, unless private networks are allowed, refuses hosts that resolve to one.
 /// This keeps a public server from being used to probe the network it runs in.
 pub async fn check_target(state: &AppState, raw: &str) -> ApiResult<Url> {

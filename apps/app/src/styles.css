@@ -114,6 +114,10 @@ html[data-theme="light"] {
     transform: translateY(-2px);
     border-color: color-mix(in oklab, var(--accent) 55%, var(--line));
   }
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 18rem;
+  }
   .rail-scroll {
     scrollbar-width: none;
   }
@@ -150,4 +154,65 @@ html[data-theme="light"] {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Television: bigger type, overscan-safe margins and a focus state readable from the sofa. */
+html[data-tv] {
+  font-size: clamp(16px, 1.3vw, 26px);
+}
+html[data-tv] body {
+  cursor: none;
+}
+html[data-tv] .tv-pad {
+  padding-inline: 5vw;
+}
+html[data-tv] :focus-visible {
+  outline: 3px solid var(--paper);
+  outline-offset: 3px;
+}
+.tv-tab {
+  border-radius: 999px;
+  padding: 0.55rem 1.1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+.tv-tab[aria-current="page"] {
+  color: var(--paper);
+  background: var(--raised);
+}
+.tv-tab:focus-visible {
+  color: var(--ink);
+  background: var(--paper);
+  outline: none;
+  transform: scale(1.06);
+}
+.tv-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 999px;
+  padding: 0.8rem 1.8rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  transition: transform 140ms ease;
+}
+.tv-tile,
+html[data-tv] .lift {
+  transition: transform 160ms ease;
+}
+.tv-tile:focus-visible,
+html[data-tv] .lift:focus-visible,
+html[data-tv] .tv-cta:focus-visible {
+  transform: scale(1.07);
+  position: relative;
+  z-index: 2;
+}
+html[data-tv] .tv-cta:focus-visible {
+  outline: 3px solid var(--accent);
 }

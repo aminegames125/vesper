@@ -31,6 +31,12 @@ export function Catalog({ kind }: { kind: "movie" | "show" }) {
     return sorted;
   }, [items, group, query, sort]);
 
+  const ranks = useMemo(() => {
+    const m = new Map<string, number>();
+    if (sort === "popular") visible.slice(0, 9).forEach((item, i) => m.set(item.id, i + 1));
+    return m;
+  }, [visible, sort]);
+
   const label = kind === "movie" ? "Movies" : "Series";
   if (items.length === 0) return <NoSources what={label.toLowerCase()} />;
 
@@ -72,17 +78,7 @@ export function Catalog({ kind }: { kind: "movie" | "show" }) {
         <Paged
           items={visible}
           minWidth="11rem"
-          render={(item) => (
-            <PosterCard
-              kind={kind}
-              item={item}
-              rank={
-                sort === "popular" && visible.indexOf(item) < 9
-                  ? visible.indexOf(item) + 1
-                  : undefined
-              }
-            />
-          )}
+          render={(item) => <PosterCard kind={kind} item={item} rank={ranks.get(item.id)} />}
         />
       )}
     </div>

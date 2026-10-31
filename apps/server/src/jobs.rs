@@ -10,7 +10,7 @@ use std::{
 };
 
 use rusqlite::params;
-use vesper_recorder::{Options, Output};
+use vesper_recorder::{Options, Output, UrlGuard};
 
 use crate::{
     auth::User,
@@ -109,11 +109,14 @@ pub fn start(state: &AppState, id: &str) {
         [id],
     );
 
+    // Playlists and redirects can name any address, so the recorder re-checks each one it fetches.
+    let guard = (!state.allow_private()).then(|| UrlGuard::new(crate::net::resolves_public));
     let state = state.clone();
     let id = id.to_string();
     let dir = recording_dir(&state, &user_id, &id);
     thread::spawn(move || {
-        let options = Options::new(url, max_seconds.max(1) as u64, Output::Segments(dir));
+        let mut options = Options::new(url, max_seconds.max(1) as u64, Output::Segments(dir));
+        options.guard = guard;
         let progress_state = state.clone();
         let progress_id = id.clone();
         let outcome = vesper_recorder::record(&options, &stop, move |p| {

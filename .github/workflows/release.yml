@@ -129,11 +129,23 @@ jobs:
           releaseName: Vesper ${{ env.TAG }}
           releaseDraft: true
           prerelease: false
+      - name: Package as MSIX (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $out = "Vesper-$env:TAG-windows-x64.msix"
+          ./scripts/make-msix.ps1 -Version $env:TAG -Out $out
+          gh release upload $env:TAG $out ([IO.Path]::ChangeExtension($out, ".cer")) --clobber
 
   android:
     name: App (Android and Android TV)
     needs: draft
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android
     steps:
       - uses: actions/checkout@v4
         with:
@@ -142,58 +154,29 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - name: Install the NDK
-        run: |
-          SDKM=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -n 1)
-          yes | "$SDKM" --licenses > /dev/null || true
-          "$SDKM" "ndk;27.2.12479018"
-          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
-      - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Generate the Android project and enable Android TV
-        working-directory: apps/app
-        run: pnpm android:init
+      - uses: gradle/actions/setup-gradle@v4
       - name: Set up signing (when a keystore secret exists)
-        id: sign
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           if [ -n "$KEYSTORE" ]; then
             echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
-            cat > apps/app/src-tauri/gen/android/keystore.properties <<EOF
-          password=$STORE_PASSWORD
-          keyAlias=$KEY_ALIAS
-          storeFile=$RUNNER_TEMP/release.jks
-          EOF
-            echo "mode=release" >> "$GITHUB_OUTPUT"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
           else
-            echo "No keystore secret: building a debug-signed APK that can be sideloaded."
-            echo "mode=debug" >> "$GITHUB_OUTPUT"
+            echo "No keystore secret: the APK is debug-signed, which is fine for sideloading."
           fi
       - name: Build the APK
-        working-directory: apps/app
         run: |
-          if [ "${{ steps.sign.outputs.mode }}" = "release" ]; then
-            pnpm tauri android build --apk --target aarch64 armv7
-          else
-            pnpm tauri android build --apk --debug --target aarch64 armv7
-          fi
+          VERSION="${TAG#v}"
+          IFS=. read -r MAJOR MINOR PATCH <<< "${VERSION%%-*}"
+          ./gradlew :app:testDebugUnitTest :app:assembleRelease             -PversionName="$VERSION" -PversionCode=$((MAJOR * 10000 + MINOR * 100 + PATCH))
       - name: Upload to the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          APK=$(find apps/app/src-tauri/gen/android -name "*.apk" | head -n 1)
-          cp "$APK" "Vesper-${TAG}-android.apk"
+          cp app/build/outputs/apk/release/app-release.apk "Vesper-${TAG}-android.apk"
           sha256sum "Vesper-${TAG}-android.apk" > "Vesper-${TAG}-android.apk.sha256"
           gh release upload "$TAG" "Vesper-${TAG}-android.apk" "Vesper-${TAG}-android.apk.sha256" --clobber
 

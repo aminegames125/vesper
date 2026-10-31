@@ -1,6 +1,6 @@
 # Android and Android TV
 
-Vesper uses [Tauri 2 mobile](https://tauri.app/distribute/), so the same React UI and the same Rust recorder run on phones, tablets and TVs. One APK serves all of them: it has both a normal launcher entry and a leanback (TV) launcher entry.
+The Android app is a **native Kotlin app**, separate from the desktop app. It lives in [`apps/android`](../apps/android) and is built with Jetpack Compose and Material 3. One APK serves phones, tablets and TVs: it has a normal launcher entry and a leanback (TV) entry, and the layout follows the device.
 
 ## Install
 
@@ -16,29 +16,45 @@ Download `Vesper-…-android.apk` from the release.
 
 Releases built without a signing key are **debug-signed**. They install fine but cannot update over a differently signed build. Maintainers can add the secrets listed below to publish release-signed APKs.
 
-## On a TV
+## What it does
 
-TV mode switches on by itself for TV devices (or in Settings → Appearance → TV mode). Arrow keys move focus between controls, Enter selects, and the player uses up and down to change channel. Recording on a TV saves into the app's own `Vesper` folder; for long-term storage prefer **cloud recording**, which keeps files on your server and lets every device watch them.
+- Xtream and M3U sources, cached in a local database so the app opens instantly
+- Live TV, movies, series with seasons, favourites, search, continue watching
+- Playback with Media3 (ExoPlayer), including HLS
+- **Recording on the device**: a foreground service that downloads HLS segments into a `.ts` file, no ffmpeg needed
+- **Vesper Cloud**: sign in to your server, record and schedule in the cloud, and play cloud recordings from any device
+- Dark and light themes using the Vesper palette
+
+## Layout by device
+
+| Device | Navigation |
+| --- | --- |
+| Phone | bottom bar, a Library tab for favourites, recordings, sources and settings |
+| Tablet (600 dp and wider) | navigation rail |
+| Android TV | a top row of tabs like the streaming apps, a large billboard on Home, focus rings and enlarged tiles for the remote |
+
+The app detects a television by itself (`UiModeManager` and the leanback feature). Launcher banners for the TV home screen are in `app/src/main/res/drawable-*/vesper_banner.png`; the source script is [`brand/tv/generate.py`](../brand/tv/generate.py).
+
+## Architecture
+
+Composable → ViewModel → Repository, with `StateFlow` and sealed `UiState`. Hilt provides dependencies, Room stores sources, library, favourites, history and recordings, and Retrofit with kotlinx.serialization talks to providers and to Vesper Cloud.
+
+```
+ui/        screens, ViewModels, theme, shared components
+data/      db (Room), remote (Retrofit), parser (M3U, Xtream), repo (repositories)
+recording/ HLS playlist parser, recorder, foreground service
+player/    PlayerSession and the Media3 player screen
+```
 
 ## Build it yourself
 
-Requirements: Android SDK and NDK 27, JDK 17, Rust with the Android targets, Node 22 and pnpm.
+Requirements: Android SDK 35 and JDK 17 or newer.
 
 ```bash
-rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-pnpm install
-pnpm --filter @vesper/app android:init      # generates the Android project and enables Android TV
-pnpm --filter @vesper/app android:dev       # run on a connected device or emulator
-pnpm --filter @vesper/app android:build     # APK
+cd apps/android
+./gradlew :app:assembleDebug
+./gradlew :app:testDebugUnitTest
 ```
-
-`android:init` runs `tauri android init` and then [`scripts/android-tv.mjs`](../scripts/android-tv.mjs), which:
-
-- adds the `LEANBACK_LAUNCHER` category so the app shows on the TV home screen,
-- marks touchscreen and leanback as optional features,
-- allows plain `http` so servers on your home network work.
-
-The generated project (`apps/app/src-tauri/gen`) is not committed; CI regenerates it.
 
 ## Signing in CI
 

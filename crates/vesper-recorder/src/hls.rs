@@ -91,8 +91,15 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
     let mut url = start;
     let mut seen: HashSet<String> = HashSet::new();
     let mut first = true;
+    let mut hops = 0;
 
     loop {
+        if run.done() {
+            return Ok(());
+        }
+        if !run.allows(&url) {
+            return Err(Error::Blocked);
+        }
         let body = client
             .get(url.clone())
             .send()
@@ -102,6 +109,11 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
 
         let media = match parse(&body, &url)? {
             Playlist::Master(variant) => {
+                // A master that points back at a master would otherwise loop forever.
+                hops += 1;
+                if hops > 5 {
+                    return Err(Error::NoStreams);
+                }
                 url = variant;
                 continue;
             }
@@ -126,6 +138,9 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
             }
             if !seen.insert(segment.to_string()) {
                 continue;
+            }
+            if !run.allows(segment) {
+                return Err(Error::Blocked);
             }
             // One bad segment should not end a recording that is otherwise healthy.
             let Ok(mut response) = client

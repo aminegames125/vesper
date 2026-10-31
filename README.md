@@ -109,7 +109,7 @@ Then open `http://<server>:8484/admin/`. In every Vesper app, go to **Settings �
 <td width="50%" valign="top">
 
 ### Recording, everywhere
-- **On this device**: built-in recorder in Rust, **no ffmpeg needed**. Windows, Linux, Android and Android TV
+- **On this device**: built-in recorder, **no ffmpeg needed** (Rust on Windows and Linux, Kotlin on Android and Android TV)
 - **In the cloud**: the server records even when your devices are off
 - **Scheduled**: pick a future programme and the cloud starts it for you, with a minute of padding either side
 - **Stay for less**: cloud recordings can delete themselves after 6 hours, a day, a week, or never
@@ -219,7 +219,7 @@ The recorder is a single Rust crate, [`vesper-recorder`](crates/vesper-recorder)
 ```text
 vesper/
 ├── apps/
-│   ├── app/            Tauri 2 + React 19 app (desktop and Android)
+│   ├── app/            Tauri 2 + React 19 desktop app (Windows, Linux)
 │   │   └── src-tauri/  Rust shell: local recording, bundled server control
 │   ├── admin/          React admin panel, built into the server binary
 │   └── server/         vesper-server: axum + SQLite
@@ -252,7 +252,7 @@ pnpm test                       # turbo + cargo test
 pnpm lint                       # biome + clippy
 ```
 
-You need Node 22+, pnpm 10+ and a recent stable Rust. On Windows install the *Visual Studio C++ Build Tools*; on Linux the [Tauri prerequisites](https://tauri.app/start/prerequisites/). Android builds additionally need the Android SDK and NDK, see [docs/ANDROID.md](docs/ANDROID.md).
+You need Node 22+, pnpm 10+ and a recent stable Rust. On Windows install the *Visual Studio C++ Build Tools*; on Linux the [Tauri prerequisites](https://tauri.app/start/prerequisites/). The Android app is a separate native Kotlin project in `apps/android`; see [docs/ANDROID.md](docs/ANDROID.md).
 
 ### Releases
 

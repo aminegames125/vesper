@@ -53,6 +53,26 @@ function nearest(
   return best;
 }
 
+const TEXT_TYPES = ["text", "search", "password", "url", "email", "tel", "number"];
+
+/**
+ * True when the focused control needs this arrow key for itself. A text field keeps left and right
+ * for the caret but must let up and down leave, or a remote can never get out of the search box.
+ */
+export function ownsArrow(tag: string, type: string, direction: Direction) {
+  const horizontal = direction === "left" || direction === "right";
+  switch (tag.toLowerCase()) {
+    case "textarea":
+      return true;
+    case "select":
+      return !horizontal;
+    case "input":
+      return horizontal && (type === "range" || TEXT_TYPES.includes(type));
+    default:
+      return false;
+  }
+}
+
 /** Arrow keys move focus between controls. Enabled for Android TV and anywhere TV mode is on. */
 export function useSpatialNav(enabled: boolean) {
   useEffect(() => {
@@ -65,11 +85,7 @@ export function useSpatialNav(enabled: boolean) {
       // The player and text fields use the arrow keys themselves.
       if (document.querySelector("[data-player]")) return;
       const active = document.activeElement as HTMLElement | null;
-      if (
-        active?.matches(
-          'input[type="text"], input[type="search"], input[type="password"], input[type="url"], input[type="range"], textarea, select',
-        )
-      )
+      if (active && ownsArrow(active.tagName, (active as HTMLInputElement).type ?? "", direction))
         return;
 
       const all = [...document.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(visible);

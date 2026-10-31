@@ -52,7 +52,12 @@ export function Home() {
       {resume ? (
         <section className="surface mb-9 flex items-center gap-6 overflow-hidden p-5">
           {resume.item.poster && (
-            <img src={resume.item.poster} alt="" className="h-28 w-20 rounded-lg object-cover" />
+            <img
+              decoding="async"
+              src={resume.item.poster}
+              alt=""
+              className="h-28 w-20 rounded-lg object-cover"
+            />
           )}
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold uppercase tracking-wider text-accent">
@@ -78,6 +83,7 @@ export function Home() {
           <section className="relative mb-9 overflow-hidden rounded-3xl bg-raised">
             {hero.poster && (
               <img
+                decoding="async"
                 src={hero.poster}
                 alt=""
                 className="absolute inset-0 size-full scale-110 object-cover opacity-30 blur-2xl"
@@ -86,6 +92,7 @@ export function Home() {
             <div className="relative flex items-center gap-8 p-8">
               {hero.poster && (
                 <img
+                  decoding="async"
                   src={hero.poster}
                   alt=""
                   className="h-56 w-40 rounded-xl object-cover shadow-2xl"
@@ -128,6 +135,7 @@ export function Home() {
               <span className="relative flex aspect-video items-center justify-center bg-raised">
                 {h.item.poster && (
                   <img
+                    decoding="async"
                     src={h.item.poster}
                     alt=""
                     loading="lazy"

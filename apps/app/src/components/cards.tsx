@@ -25,6 +25,7 @@ export function ChannelLogo({ channel, size = 40 }: { channel: Channel; size?: n
     >
       {channel.logo && !failed ? (
         <img
+          decoding="async"
           src={channel.logo}
           alt=""
           loading="lazy"
@@ -77,6 +78,7 @@ export function ChannelCard({ channel, list }: { channel: Channel; list: Channel
         <span className="relative flex aspect-video items-center justify-center bg-raised">
           {channel.logo ? (
             <img
+              decoding="async"
               src={channel.logo}
               alt=""
               loading="lazy"
@@ -185,6 +187,7 @@ export function PosterCard({
         <span className="relative block aspect-[2/3] bg-raised">
           {image && !failed ? (
             <img
+              decoding="async"
               src={image}
               alt=""
               loading="lazy"

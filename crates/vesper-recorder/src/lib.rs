@@ -10,7 +10,10 @@ mod sink;
 use std::{
     io::Read,
     path::PathBuf,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 
@@ -28,6 +31,27 @@ pub enum Output {
     Segments(PathBuf),
 }
 
+/// Decides whether the recorder may fetch an address. A server uses it to keep a stream's playlist,
+/// segments and redirects from reaching its private network.
+#[derive(Clone)]
+pub struct UrlGuard(Arc<dyn Fn(&Url) -> bool + Send + Sync>);
+
+impl UrlGuard {
+    pub fn new(allow: impl Fn(&Url) -> bool + Send + Sync + 'static) -> Self {
+        Self(Arc::new(allow))
+    }
+
+    pub(crate) fn allows(&self, url: &Url) -> bool {
+        (self.0)(url)
+    }
+}
+
+impl std::fmt::Debug for UrlGuard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("UrlGuard")
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Options {
     pub url: String,
@@ -35,6 +59,8 @@ pub struct Options {
     pub max_seconds: u64,
     pub output: Output,
     pub user_agent: String,
+    /// When set, every address the recorder fetches must pass it.
+    pub guard: Option<UrlGuard>,
 }
 
 impl Options {
@@ -44,6 +70,7 @@ impl Options {
             max_seconds,
             output,
             user_agent: "Vesper/0.2".into(),
+            guard: None,
         }
     }
 }
@@ -77,6 +104,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("Nothing was captured: {0}")]
     Empty(String),
+    #[error("This server does not reach private network addresses.")]
+    Blocked,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -90,10 +119,16 @@ pub(crate) struct Run<'a, F: FnMut(Progress)> {
     /// Seconds of video captured so far, as the stream counts them.
     pub captured: f32,
     pub on_progress: F,
+    pub guard: Option<UrlGuard>,
     last_report: Instant,
 }
 
 impl<F: FnMut(Progress)> Run<'_, F> {
+    /// False when a guard is set and refuses this address.
+    pub fn allows(&self, url: &Url) -> bool {
+        self.guard.as_ref().is_none_or(|g| g.allows(url))
+    }
+
     pub fn done(&self) -> bool {
         self.stop.load(Ordering::Relaxed)
             || self.started.elapsed() >= self.limit
@@ -122,13 +157,27 @@ pub fn record(
     if !matches!(url.scheme(), "http" | "https") {
         return Err(Error::BadUrl);
     }
+    if options.guard.as_ref().is_some_and(|g| !g.allows(&url)) {
+        return Err(Error::Blocked);
+    }
     let limit = Duration::from_secs(options.max_seconds.max(1));
-    let client = Client::builder()
+    let mut builder = Client::builder()
         .user_agent(options.user_agent.clone())
         .connect_timeout(Duration::from_secs(15))
-        .timeout(limit + Duration::from_secs(45))
-        .build()
-        .map_err(|e| Error::Http(e.to_string()))?;
+        .timeout(limit + Duration::from_secs(45));
+    if let Some(guard) = options.guard.clone() {
+        // Redirects are a way around the first check, so every hop goes through the guard too.
+        builder = builder.redirect(reqwest::redirect::Policy::custom(move |attempt| {
+            if attempt.previous().len() >= 10 {
+                attempt.error("too many redirects")
+            } else if guard.allows(attempt.url()) {
+                attempt.follow()
+            } else {
+                attempt.error("blocked address")
+            }
+        }));
+    }
+    let client = builder.build().map_err(|e| Error::Http(e.to_string()))?;
 
     let mut sink: Box<dyn Sink> = match &options.output {
         Output::File(path) => Box::new(FileSink::create(path)?),
@@ -142,6 +191,7 @@ pub fn record(
         segments: 0,
         captured: 0.0,
         on_progress,
+        guard: options.guard.clone(),
         last_report: Instant::now(),
     };
 
@@ -226,4 +276,52 @@ fn flush<F: FnMut(Progress)>(
         pending.clear();
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{io::Write as _, net::TcpListener, thread};
+
+    /// Serves `body` to every request on a random local port.
+    fn serve(body: &'static str) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut stream = stream;
+                let mut buf = [0u8; 2048];
+                let _ = stream.read(&mut buf);
+                let reply = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = stream.write_all(reply.as_bytes());
+            }
+        });
+        format!("http://127.0.0.1:{port}/master.m3u8")
+    }
+
+    #[test]
+    fn a_master_playlist_that_points_at_itself_ends() {
+        let url = serve("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nmaster.m3u8\n");
+        let dir = std::env::temp_dir().join(format!("vesper-rec-{}", std::process::id()));
+        let options = Options::new(url, 30, Output::Segments(dir.clone()));
+        let started = Instant::now();
+        let result = record(&options, &AtomicBool::new(false), |_| {});
+        let _ = std::fs::remove_dir_all(dir);
+        assert!(result.is_err());
+        assert!(started.elapsed() < Duration::from_secs(10));
+    }
+
+    #[test]
+    fn a_guard_can_refuse_the_address() {
+        let url = serve("#EXTM3U\n");
+        let dir = std::env::temp_dir().join(format!("vesper-rec-guard-{}", std::process::id()));
+        let mut options = Options::new(url, 30, Output::Segments(dir.clone()));
+        options.guard = Some(UrlGuard::new(|_| false));
+        let result = record(&options, &AtomicBool::new(false), |_| {});
+        let _ = std::fs::remove_dir_all(dir);
+        assert!(matches!(result, Err(Error::Blocked)));
+    }
 }
