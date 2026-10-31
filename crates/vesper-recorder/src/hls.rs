@@ -34,10 +34,18 @@ pub(crate) fn parse_with(body: &str, base: &Url, lowest: bool) -> Result<Playlis
 
     if lines.iter().any(|l| l.starts_with("#EXT-X-STREAM-INF")) {
         let mut best: Option<(u64, &str)> = None;
+        // A variant that names an AUDIO group keeps its sound in a separate playlist, which this
+        // recorder does not fetch: the recording would be silent. Prefer variants with sound built in.
+        let any_muxed = lines
+            .iter()
+            .any(|l| l.starts_with("#EXT-X-STREAM-INF") && !l.contains("AUDIO="));
         for (i, line) in lines.iter().enumerate() {
             let Some(attrs) = line.strip_prefix("#EXT-X-STREAM-INF:") else {
                 continue;
             };
+            if any_muxed && attrs.contains("AUDIO=") {
+                continue;
+            }
             let bandwidth = attrs
                 .split(',')
                 .find_map(|a| a.trim().strip_prefix("BANDWIDTH="))
@@ -232,6 +240,16 @@ mod tests {
             Playlist::Master(url) => assert_eq!(url.as_str(), "https://example.com/live/low.m3u8"),
             Playlist::Media(_) => panic!("expected a master playlist"),
         }
+    }
+
+    #[test]
+    fn master_prefers_a_variant_with_its_own_sound() {
+        let body = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=9000000,AUDIO=\"aud\"\nsilent.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=2000000\nmuxed.m3u8\n";
+        let base = Url::parse("http://h/master.m3u8").unwrap();
+        let Playlist::Master(url) = parse(body, &base).unwrap() else {
+            panic!("expected a master");
+        };
+        assert_eq!(url.as_str(), "http://h/muxed.m3u8");
     }
 
     #[test]
