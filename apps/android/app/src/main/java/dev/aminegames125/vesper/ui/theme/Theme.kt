@@ -2,11 +2,13 @@ package dev.aminegames125.vesper.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -88,5 +90,9 @@ fun VesperTheme(mode: ThemeMode, content: @Composable () -> Unit) {
         ThemeMode.System -> isSystemInDarkTheme()
     }
     val scheme: ColorScheme = if (dark) DarkScheme else LightScheme
-    MaterialTheme(colorScheme = scheme, typography = VesperTypography, content = content)
+    // Most screens draw Text straight onto the window with no Surface, and Compose then falls back
+    // to black text. Setting the content colour here keeps every screen readable in both themes.
+    MaterialTheme(colorScheme = scheme, typography = VesperTypography) {
+        CompositionLocalProvider(LocalContentColor provides scheme.onBackground, content = content)
+    }
 }
