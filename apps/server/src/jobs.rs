@@ -2,7 +2,7 @@ use std::{
     fs,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU8, Ordering},
         Arc,
     },
     thread,
@@ -174,6 +174,9 @@ pub fn start(state: &AppState, id: &str) {
         let started = Instant::now();
         let mut bytes_before = 0u64;
         let mut reconnects = 0u32;
+        // Drops in a row: a long healthy stretch between two drops starts the count again.
+        let mut streak = 0u32;
+        let limit_hit = Arc::new(AtomicU8::new(0));
         let mut last_problem: Option<String> = None;
         let mut fatal: Option<String>;
 
@@ -182,11 +185,19 @@ pub fn start(state: &AppState, id: &str) {
             let mut options =
                 Options::new(url.clone(), remaining.max(1), Output::Segments(dir.clone()));
             options.guard = guard.clone();
+            options.public_only = guard.is_some();
             options.append = reconnects > 0;
+            // The playlist stays open between attempts and is closed once the recording is over.
+            options.more_to_come = true;
+            let attempt_started = Instant::now();
 
             let progress_state = state.clone();
             let progress_id = id.clone();
             let base = bytes_before;
+            let progress_stop = stop.clone();
+            let hit = limit_hit.clone();
+            let progress_user = user_id.clone();
+            let mut beats = 0u32;
             let outcome = vesper_recorder::record(&options, &stop, move |p| {
                 let _ = progress_state.db.conn().execute(
                     "UPDATE recordings SET bytes = ?1, seconds = ?2 WHERE id = ?3",
@@ -196,6 +207,17 @@ pub fn start(state: &AppState, id: &str) {
                         progress_id
                     ],
                 );
+                // The account's storage and the disk are checked while recording, not only at the start.
+                beats += 1;
+                if storage > 0 && storage_used(&progress_state, &progress_user) >= storage {
+                    hit.store(1, Ordering::Relaxed);
+                    progress_stop.store(true, Ordering::Relaxed);
+                } else if beats.is_multiple_of(30)
+                    && free_disk(&progress_state).is_some_and(|free| free < MIN_FREE_BYTES / 2)
+                {
+                    hit.store(2, Ordering::Relaxed);
+                    progress_stop.store(true, Ordering::Relaxed);
+                }
             });
             let permanent = matches!(
                 outcome,
@@ -206,6 +228,9 @@ pub fn start(state: &AppState, id: &str) {
             match outcome {
                 Ok(summary) => {
                     bytes_before += summary.bytes;
+                    if summary.bytes > 1_000_000 && attempt_started.elapsed().as_secs() >= 60 {
+                        streak = 0;
+                    }
                     last_problem = summary.warning;
                     fatal = None;
                 }
@@ -218,11 +243,12 @@ pub fn start(state: &AppState, id: &str) {
             if permanent
                 || stop.load(Ordering::Relaxed)
                 || finished_on_time
-                || reconnects >= MAX_RECONNECTS
+                || streak >= MAX_RECONNECTS
             {
                 break;
             }
             reconnects += 1;
+            streak += 1;
             // Wait longer after each drop, but never past the end of the programme.
             let left = (max_seconds.max(1) as u64).saturating_sub(started.elapsed().as_secs());
             let pause = (5 * u64::from(reconnects))
@@ -240,6 +266,12 @@ pub fn start(state: &AppState, id: &str) {
             {
                 break;
             }
+        }
+        let _ = vesper_recorder::end_playlist(&dir);
+        match limit_hit.load(Ordering::Relaxed) {
+            1 => last_problem = Some("Stopped early: the account's storage is full.".into()),
+            2 => last_problem = Some("Stopped early: the server's disk is almost full.".into()),
+            _ => {}
         }
         state
             .jobs

@@ -23,6 +23,14 @@ impl Mode {
 #[derive(Parser, Debug, Clone)]
 #[command(name = "vesper-server", version, about)]
 pub struct Config {
+    /// Extra host names a lite server accepts (comma separated), for example one behind a reverse proxy.
+    #[arg(
+        long = "allowed-host",
+        env = "VESPER_ALLOWED_HOSTS",
+        value_delimiter = ','
+    )]
+    pub allowed_hosts: Vec<String>,
+
     /// `lite` has no logins; `full` has users, roles and quotas.
     #[arg(long, env = "VESPER_MODE", value_enum, default_value = "lite")]
     pub mode: Mode,

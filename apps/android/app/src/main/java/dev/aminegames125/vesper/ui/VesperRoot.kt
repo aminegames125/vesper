@@ -141,6 +141,7 @@ private fun MainScaffold(vm: VesperViewModel, gate: Gate.Ready, isTv: Boolean) {
                     ScheduleScreen(
                         vm,
                         onNew = {
+                            vm.returningToEditor = false
                             vm.editing = null
                             vm.draftChannel = null
                             nav.navigate("channels")
@@ -155,7 +156,10 @@ private fun MainScaffold(vm: VesperViewModel, gate: Gate.Ready, isTv: Boolean) {
                 composable(Tab.Recordings.route) {
                     RecordingsScreen(
                         vm,
-                        onRecordNow = { nav.navigate("channels") },
+                        onRecordNow = {
+                            vm.returningToEditor = false
+                            nav.navigate("channels")
+                        },
                         onPlay = { nav.navigate("player/${it.id}") },
                     )
                 }
@@ -163,11 +167,20 @@ private fun MainScaffold(vm: VesperViewModel, gate: Gate.Ready, isTv: Boolean) {
                 composable("channels") {
                     ChannelsScreen(
                         vm,
-                        onBack = { nav.popBackStack() },
+                        onBack = {
+                            vm.returningToEditor = false
+                            nav.popBackStack()
+                        },
                         onSchedule = {
-                            vm.editing = null
-                            vm.draftChannel = it
-                            nav.navigate("editor") { popUpTo("channels") { inclusive = true } }
+                            if (vm.returningToEditor) {
+                                vm.returningToEditor = false
+                                vm.picked = it
+                                nav.popBackStack()
+                            } else {
+                                vm.editing = null
+                                vm.draftChannel = it
+                                nav.navigate("editor") { popUpTo("channels") { inclusive = true } }
+                            }
                         },
                     )
                 }

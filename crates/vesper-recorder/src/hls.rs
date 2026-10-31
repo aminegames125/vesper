@@ -92,6 +92,8 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
     let mut seen: HashSet<String> = HashSet::new();
     let mut first = true;
     let mut hops = 0;
+    let mut failures = 0u32;
+    let resume_after = sink.last_mark();
 
     loop {
         if run.done() {
@@ -100,12 +102,30 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
         if !run.allows(&url) {
             return Err(Error::Blocked);
         }
-        let body = client
+        let fetched = client
             .get(url.clone())
+            .timeout(Duration::from_secs(20))
             .send()
             .and_then(|r| r.error_for_status())
-            .and_then(|r| r.text())
-            .map_err(|e| Error::Http(e.to_string()))?;
+            .and_then(|r| r.text());
+        let body = match fetched {
+            Ok(body) => {
+                failures = 0;
+                body
+            }
+            Err(e) => {
+                // A single failed fetch is normal on a live stream; give up only after several in a row.
+                failures += 1;
+                if failures >= 5 {
+                    return Err(Error::Http(e.to_string()));
+                }
+                let until = Instant::now() + Duration::from_secs(2);
+                while Instant::now() < until && !run.done() {
+                    thread::sleep(Duration::from_millis(200));
+                }
+                continue;
+            }
+        };
 
         let media = match parse(&body, &url)? {
             Playlist::Master(variant) => {
@@ -125,7 +145,15 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
 
         // A live playlist lists the last minute or so; start from the live edge, not that backlog.
         if first && !media.ended {
-            let skip = media.segments.len().saturating_sub(2);
+            // After a reconnect, carry on right after the last segment we kept; otherwise start near the edge.
+            let after = resume_after
+                .as_deref()
+                .and_then(|key| media.segments.iter().position(|(s, _)| s.path() == key));
+            let skip = match after {
+                Some(i) => i + 1,
+                None if resume_after.is_some() => media.segments.len().saturating_sub(1),
+                None => media.segments.len().saturating_sub(2),
+            };
             for (segment, _) in &media.segments[..skip] {
                 seen.insert(segment.to_string());
             }
@@ -145,6 +173,7 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
             // One bad segment should not end a recording that is otherwise healthy.
             let Ok(mut response) = client
                 .get(segment.clone())
+                .timeout(Duration::from_secs(40))
                 .send()
                 .and_then(|r| r.error_for_status())
             else {
@@ -153,6 +182,7 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
             let mut data = Vec::new();
             if response.read_to_end(&mut data).is_ok() && !data.is_empty() {
                 sink.segment(&data, *seconds)?;
+                sink.mark(segment.path());
                 run.segments += 1;
                 run.captured += *seconds;
                 run.wrote(data.len());

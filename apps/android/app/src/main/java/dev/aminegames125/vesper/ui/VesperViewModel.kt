@@ -1,6 +1,9 @@
 package dev.aminegames125.vesper.ui
 
 import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.aminegames125.vesper.VesperApp
@@ -85,6 +88,10 @@ class VesperViewModel(app: Application) : AndroidViewModel(app) {
     /** The channel picked for a new schedule, and the schedule being edited, if any. */
     var draftChannel: Channel? = null
     var editing: Schedule? = null
+
+    /** Set while the channel list is open on behalf of the schedule form, which wants the choice back. */
+    var returningToEditor = false
+    var picked by mutableStateOf<Channel?>(null)
 
     val serverAddress: String get() = api.base
     fun playlistUrl(id: String) = api.playlistUrl(id)

@@ -124,13 +124,9 @@ async fn download(state: &AppState, start: Url) -> ApiResult<String> {
         {
             return Err(ApiError::bad("That playlist is too large."));
         }
-        let bytes = reply
-            .bytes()
+        let bytes = crate::net::read_capped(reply, MAX_PLAYLIST_BYTES)
             .await
-            .map_err(|e| ApiError::bad(format!("Could not read the playlist: {e}")))?;
-        if bytes.len() > MAX_PLAYLIST_BYTES {
-            return Err(ApiError::bad("That playlist is too large."));
-        }
+            .map_err(|_| ApiError::bad("That playlist is too large or could not be read."))?;
         return Ok(String::from_utf8_lossy(&bytes).into_owned());
     }
     Err(ApiError::bad("Too many redirects."))

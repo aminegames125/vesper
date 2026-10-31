@@ -7,7 +7,14 @@ use std::{
 /// Receives captured data one segment at a time.
 pub(crate) trait Sink {
     fn segment(&mut self, data: &[u8], seconds: f32) -> io::Result<()>;
-    fn finish(&mut self) -> io::Result<()>;
+    /// Ends the recording. `last` marks the final attempt: only then does the playlist say it is over.
+    fn finish(&mut self, last: bool) -> io::Result<()>;
+    /// Remembers which source segment was written last, so a reconnect can carry on after it.
+    fn mark(&mut self, _key: &str) {}
+    /// The key passed to `mark` before the previous attempt ended.
+    fn last_mark(&self) -> Option<String> {
+        None
+    }
 }
 
 /// One growing file.
@@ -31,7 +38,7 @@ impl Sink for FileSink {
         self.file.write_all(data)
     }
 
-    fn finish(&mut self) -> io::Result<()> {
+    fn finish(&mut self, _last: bool) -> io::Result<()> {
         self.file.flush()
     }
 }
@@ -66,6 +73,16 @@ pub fn playlist_text(entries: &[SegmentEntry], ended: bool) -> String {
 pub(crate) struct SegmentSink {
     dir: PathBuf,
     entries: Vec<SegmentEntry>,
+    previous_mark: Option<String>,
+}
+
+/// Marks a segment folder as complete: the playlist gains `#EXT-X-ENDLIST`.
+pub fn end_playlist(dir: &Path) -> io::Result<()> {
+    let text = fs::read_to_string(dir.join("index.m3u8"))?;
+    let entries = parse_entries(&text);
+    let tmp = dir.join("index.m3u8.tmp");
+    fs::write(&tmp, playlist_text(&entries, true))?;
+    fs::rename(tmp, dir.join("index.m3u8"))
 }
 
 /// Reads back the segments listed in a playlist this sink wrote earlier.
@@ -102,9 +119,15 @@ impl SegmentSink {
         } else {
             Vec::new()
         };
+        let previous_mark = if append {
+            fs::read_to_string(dir.join(".last")).ok()
+        } else {
+            None
+        };
         Ok(Self {
             dir: dir.to_path_buf(),
             entries,
+            previous_mark,
         })
     }
 
@@ -127,8 +150,16 @@ impl Sink for SegmentSink {
         self.write_playlist(false)
     }
 
-    fn finish(&mut self) -> io::Result<()> {
-        self.write_playlist(true)
+    fn finish(&mut self, last: bool) -> io::Result<()> {
+        self.write_playlist(last)
+    }
+
+    fn mark(&mut self, key: &str) {
+        let _ = fs::write(self.dir.join(".last"), key);
+    }
+
+    fn last_mark(&self) -> Option<String> {
+        self.previous_mark.clone()
     }
 }
 
@@ -143,17 +174,42 @@ mod tests {
         let mut first = SegmentSink::open(&dir, false).unwrap();
         first.segment(b"a", 6.0).unwrap();
         first.segment(b"b", 4.0).unwrap();
-        first.finish().unwrap();
+        first.finish(false).unwrap();
 
         let mut second = SegmentSink::open(&dir, true).unwrap();
         second.segment(b"c", 5.0).unwrap();
-        second.finish().unwrap();
+        second.finish(true).unwrap();
 
         let text = fs::read_to_string(dir.join("index.m3u8")).unwrap();
         let _ = fs::remove_dir_all(&dir);
         assert!(text.contains("seg00000.ts"));
         assert!(text.contains("seg00002.ts"));
         assert_eq!(text.matches("#EXTINF").count(), 3);
+        assert!(text.contains("ENDLIST"));
+    }
+
+    #[test]
+    fn a_playlist_stays_open_between_attempts_and_closes_at_the_end() {
+        let dir = std::env::temp_dir().join(format!("vesper-sink-open-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let mut sink = SegmentSink::open(&dir, false).unwrap();
+        sink.segment(b"a", 6.0).unwrap();
+        sink.mark("/live/a.ts");
+        sink.finish(false).unwrap();
+        assert!(!fs::read_to_string(dir.join("index.m3u8"))
+            .unwrap()
+            .contains("ENDLIST"));
+        assert_eq!(
+            SegmentSink::open(&dir, true)
+                .unwrap()
+                .last_mark()
+                .as_deref(),
+            Some("/live/a.ts")
+        );
+        end_playlist(&dir).unwrap();
+        let text = fs::read_to_string(dir.join("index.m3u8")).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        assert!(text.contains("ENDLIST"));
     }
 
     #[test]

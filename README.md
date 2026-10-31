@@ -121,6 +121,7 @@ vesper-server --mode full --bind 127.0.0.1:8484    # accounts, quotas, admin pan
 | `--admin-user` / `--admin-password` | `VESPER_ADMIN_USER` / `VESPER_ADMIN_PASSWORD` | – | Create the first administrator on start (full mode). |
 | `--allow-private` | `VESPER_ALLOW_PRIVATE` | off | Let the server reach private network addresses. Always on in lite mode. |
 | `--trust-proxy` | `VESPER_TRUST_PROXY` | off | Read the client address from a reverse proxy's `X-Forwarded-For`. |
+| `--allowed-host` | `VESPER_ALLOWED_HOSTS` | – | Lite mode only answers to home-network names (an address, `localhost`, `nas`, `*.local`). List other names here, comma separated. |
 
 In **full** mode each account has limits: recordings at once, the longest recording, storage, and how long recordings are kept. The admin panel at `/admin/` shows users, invites, every recording and schedule, an activity log and settings.
 

@@ -4,20 +4,24 @@
 //! recording behaves identically on every device. HLS streams are followed segment by segment;
 //! plain continuous streams (for example a `.ts` URL) are copied as they arrive.
 
+mod dns;
 mod hls;
 mod sink;
 
 use std::{
     io::Read,
     path::PathBuf,
+    sync::mpsc,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    thread,
     time::{Duration, Instant},
 };
 
-pub use sink::{playlist_text, SegmentEntry};
+pub use dns::is_private_ip;
+pub use sink::{end_playlist, playlist_text, SegmentEntry};
 
 use reqwest::{blocking::Client, Url};
 use sink::{FileSink, SegmentSink, Sink};
@@ -64,6 +68,12 @@ pub struct Options {
     /// Continue the segment folder that is already there instead of starting it over. A server
     /// uses this to reconnect after the stream drops and keep one playable recording.
     pub append: bool,
+    /// Leave the playlist open when this attempt ends, because another one will carry on. Call
+    /// [`end_playlist`] once the whole recording is over.
+    pub more_to_come: bool,
+    /// Refuse to connect to private network addresses, checking the address actually connected to
+    /// (which closes the gap between checking a name and connecting to it).
+    pub public_only: bool,
 }
 
 impl Options {
@@ -75,6 +85,8 @@ impl Options {
             user_agent: "Vesper/0.2".into(),
             guard: None,
             append: false,
+            more_to_come: false,
+            public_only: false,
         }
     }
 }
@@ -169,6 +181,9 @@ pub fn record(
         .user_agent(options.user_agent.clone())
         .connect_timeout(Duration::from_secs(15))
         .timeout(limit + Duration::from_secs(45));
+    if options.public_only {
+        builder = builder.dns_resolver(Arc::new(dns::PublicOnly));
+    }
     if let Some(guard) = options.guard.clone() {
         // Redirects are a way around the first check, so every hop goes through the guard too.
         builder = builder.redirect(reqwest::redirect::Policy::custom(move |attempt| {
@@ -205,7 +220,7 @@ pub fn record(
     } else {
         record_raw(&client, url, sink.as_mut(), &mut run)
     };
-    sink.finish()?;
+    sink.finish(!options.more_to_come)?;
 
     let seconds = run.started.elapsed().as_secs();
     match outcome {
@@ -235,20 +250,54 @@ fn record_raw<F: FnMut(Progress)>(
     const PACKET: usize = 188;
     const CHUNK: Duration = Duration::from_secs(10);
 
+    /// A stream that sends nothing for this long has stalled; the caller may join it again.
+    const SILENCE: Duration = Duration::from_secs(20);
+
     let mut response = client
         .get(url)
         .send()
         .and_then(|r| r.error_for_status())
         .map_err(|e| Error::Http(e.to_string()))?;
-    let mut buffer = [0u8; 64 * 1024];
+    // Reads happen on their own thread so a silent connection cannot block Stop or the silence check.
+    let (tx, rx) = mpsc::sync_channel::<std::io::Result<Vec<u8>>>(16);
+    thread::spawn(move || {
+        let mut buffer = [0u8; 64 * 1024];
+        loop {
+            match response.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(n) => {
+                    if tx.send(Ok(buffer[..n].to_vec())).is_err() {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e));
+                    break;
+                }
+            }
+        }
+    });
     let mut pending: Vec<u8> = Vec::new();
     let mut chunk_start = Instant::now();
+    let mut last_data = Instant::now();
 
     while !run.done() {
-        match response.read(&mut buffer) {
-            Ok(0) => break,
-            Ok(n) => {
-                pending.extend_from_slice(&buffer[..n]);
+        let received = match rx.recv_timeout(Duration::from_millis(500)) {
+            Ok(received) => received,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                if last_data.elapsed() >= SILENCE {
+                    flush(sink, &mut pending, chunk_start, run)?;
+                    return Err(Error::Http("The stream went silent.".into()));
+                }
+                continue;
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        };
+        last_data = Instant::now();
+        match received {
+            Ok(data) => {
+                let n = data.len();
+                pending.extend_from_slice(&data);
                 run.wrote(n);
                 if chunk_start.elapsed() >= CHUNK && pending.len() >= PACKET {
                     let cut = pending.len() / PACKET * PACKET;

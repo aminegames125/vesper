@@ -3,6 +3,7 @@ mod auth;
 mod config;
 mod db;
 mod error;
+mod guard;
 mod jobs;
 mod net;
 mod schedule;
@@ -72,9 +73,10 @@ async fn main() {
         bootstrap_admin(&db, user, password);
     }
 
+    let config = Arc::new(config);
     let state = AppState {
-        db,
-        config: Arc::new(config),
+        db: db.clone(),
+        config: config.clone(),
         jobs: Default::default(),
         playlists: Default::default(),
         attempts: Arc::new(Mutex::new(HashMap::new())),
@@ -82,6 +84,10 @@ async fn main() {
             .user_agent("Vesper/0.2")
             .connect_timeout(Duration::from_secs(15))
             .redirect(reqwest::redirect::Policy::none())
+            .dns_resolver(Arc::new(net::PublicOnly {
+                db: db.clone(),
+                config: config.clone(),
+            }))
             .build()
             .expect("http client"),
     };
@@ -91,6 +97,10 @@ async fn main() {
         .nest("/api/v1", api::router())
         .fallback(web::serve)
         .layer(cors(state.config.is_lite()))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            guard::lite,
+        ))
         .layer(CompressionLayer::new())
         .with_state(state.clone());
 

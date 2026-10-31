@@ -36,7 +36,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -60,6 +63,9 @@ import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.launch
+
+private val DateSaver = Saver<LocalDate, String>(save = { it.toString() }, restore = { LocalDate.parse(it) })
+private val TimeSaver = Saver<LocalTime, String>(save = { it.toString() }, restore = { LocalTime.parse(it) })
 
 private val REPEATS = listOf(0 to "Once", EVERY_DAY to "Every day", WEEKDAYS to "Weekdays", WEEKEND to "Weekends")
 private val DURATIONS = listOf(15, 30, 45, 60, 90, 120, 180)
@@ -86,27 +92,38 @@ fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel:
     val scope = rememberCoroutineScope()
     val busy by vm.busy.collectAsState()
 
-    var title by remember { mutableStateOf(editing?.title ?: draft?.name.orEmpty()) }
-    var channelName by remember { mutableStateOf(editing?.channelName ?: draft?.name.orEmpty()) }
-    var url by remember { mutableStateOf(editing?.url ?: draft?.url.orEmpty()) }
-    var date by remember {
+    var title by rememberSaveable { mutableStateOf(editing?.title ?: draft?.name.orEmpty()) }
+    var channelName by rememberSaveable { mutableStateOf(editing?.channelName ?: draft?.name.orEmpty()) }
+    var url by rememberSaveable { mutableStateOf(editing?.url ?: draft?.url.orEmpty()) }
+    var date by rememberSaveable(stateSaver = DateSaver) {
         mutableStateOf(
             editing?.let { LocalDate.parse(it.startDate) }
                 ?: LocalDate.now(zone).let { today -> if (LocalTime.now(zone).hour == 23) today.plusDays(1) else today },
         )
     }
-    var time by remember {
+    var time by rememberSaveable(stateSaver = TimeSaver) {
         mutableStateOf(editing?.let { LocalTime.parse(it.startTime) } ?: LocalTime.now(zone).plusHours(1).withMinute(0).withSecond(0).withNano(0))
     }
-    var minutes by remember { mutableIntStateOf(((editing?.seconds ?: 3600L) / 60).toInt()) }
-    var days by remember { mutableIntStateOf(editing?.days ?: 0) }
-    var custom by remember { mutableStateOf(editing != null && editing.days !in REPEATS.map { it.first }) }
-    var padBefore by remember { mutableIntStateOf(((editing?.padBefore ?: 60L) / 60).toInt()) }
-    var padAfter by remember { mutableIntStateOf(((editing?.padAfter ?: 120L) / 60).toInt()) }
-    var keep by remember { mutableStateOf(editing?.keepHours) }
-    var keepLast by remember { mutableStateOf(editing?.keepLast) }
+    var minutes by rememberSaveable { mutableIntStateOf(((editing?.seconds ?: 3600L) / 60).toInt()) }
+    var days by rememberSaveable { mutableIntStateOf(editing?.days ?: 0) }
+    var custom by rememberSaveable { mutableStateOf(editing != null && editing.days !in REPEATS.map { it.first }) }
+    var padBefore by rememberSaveable { mutableIntStateOf(((editing?.padBefore ?: 60L) / 60).toInt()) }
+    var padAfter by rememberSaveable { mutableIntStateOf(((editing?.padAfter ?: 120L) / 60).toInt()) }
+    var keep by rememberSaveable { mutableStateOf(editing?.keepHours) }
+    var keepLast by rememberSaveable { mutableStateOf(editing?.keepLast) }
     var error by remember { mutableStateOf<String?>(null) }
     var warnings by remember { mutableStateOf<List<String>?>(null) }
+
+    // Back from the channel list with a new choice: put it into this form, not into a new one.
+    val picked = vm.picked
+    LaunchedEffect(picked) {
+        picked?.let {
+            if (title.isBlank() || title == channelName) title = it.name
+            channelName = it.name
+            url = it.url
+            vm.picked = null
+        }
+    }
 
     fun save() {
         error = when {
@@ -160,7 +177,12 @@ fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel:
                     Text("Channel", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(channelName.ifBlank { "None picked" }, style = MaterialTheme.typography.bodyLarge)
                 }
-                OutlinedButton(onClick = onPickChannel) { Text("Change") }
+                OutlinedButton(
+                    onClick = {
+                        vm.returningToEditor = true
+                        onPickChannel()
+                    },
+                ) { Text("Change") }
             }
 
             Label(if (days == 0) "Date" else "Starting")

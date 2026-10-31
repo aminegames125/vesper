@@ -1,32 +1,60 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, net::SocketAddr, sync::Arc};
+
+use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 
 use reqwest::Url;
 
 use crate::{
+    config::Config,
+    db::Db,
     error::{ApiError, ApiResult},
     state::AppState,
 };
 
 fn is_private(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => {
-            v4.is_private()
-                || v4.is_loopback()
-                || v4.is_link_local()
-                || v4.is_unspecified()
-                || v4.is_broadcast()
-                // Carrier-grade NAT, 100.64.0.0/10.
-                || (v4.octets()[0] == 100 && (64..128).contains(&v4.octets()[1]))
-        }
-        IpAddr::V6(v6) => {
-            v6.is_loopback()
-                || v6.is_unspecified()
-                // Unique local (fc00::/7) and link-local (fe80::/10).
-                || (v6.segments()[0] & 0xfe00) == 0xfc00
-                || (v6.segments()[0] & 0xffc0) == 0xfe80
-                || v6.to_ipv4_mapped().is_some_and(|v4| is_private(IpAddr::V4(v4)))
-        }
+    vesper_recorder::is_private_ip(ip)
+}
+
+/// Looks hosts up for the server's own HTTP client and drops private addresses unless they are
+/// allowed, so the address that was checked is the address that is connected to.
+pub struct PublicOnly {
+    pub db: Db,
+    pub config: Arc<Config>,
+}
+
+impl Resolve for PublicOnly {
+    fn resolve(&self, name: Name) -> Resolving {
+        let allow = self.config.is_lite()
+            || self.config.allow_private
+            || self.db.setting("allow_private", "false") == "true";
+        Box::pin(async move {
+            let host = name.as_str().to_string();
+            let addrs: Vec<SocketAddr> = tokio::net::lookup_host((host.as_str(), 0))
+                .await?
+                .filter(|a| allow || !is_private(a.ip()))
+                .collect();
+            if addrs.is_empty() {
+                return Err("blocked address".into());
+            }
+            Ok(Box::new(addrs.into_iter()) as Addrs)
+        })
     }
+}
+
+/// Reads a response body but gives up once it passes `max` bytes, however it is sent.
+pub async fn read_capped(mut reply: reqwest::Response, max: usize) -> ApiResult<Vec<u8>> {
+    let mut body = Vec::new();
+    while let Some(chunk) = reply
+        .chunk()
+        .await
+        .map_err(|e| ApiError::bad(format!("Could not read the reply: {e}")))?
+    {
+        if body.len() + chunk.len() > max {
+            return Err(ApiError::bad("That reply is too large."));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
 }
 
 /// For the recorder, which runs on its own thread: true when every address the host resolves to is public.

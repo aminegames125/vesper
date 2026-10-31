@@ -74,10 +74,8 @@ pub async fn fetch(
 
     if is_playlist {
         let base = url.clone();
-        let text = reply
-            .text()
-            .await
-            .map_err(|e| ApiError::bad(e.to_string()))?;
+        let text = String::from_utf8_lossy(&crate::net::read_capped(reply, 4 * 1024 * 1024).await?)
+            .into_owned();
         let token = bearer(&parts);
         let body: String = text
             .lines()
