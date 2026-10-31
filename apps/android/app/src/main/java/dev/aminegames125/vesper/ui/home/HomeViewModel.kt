@@ -8,7 +8,9 @@ import dev.aminegames125.vesper.data.db.HistoryEntity
 import dev.aminegames125.vesper.data.db.MovieEntity
 import dev.aminegames125.vesper.data.db.ShowEntity
 import dev.aminegames125.vesper.data.repo.LibraryRepository
+import dev.aminegames125.vesper.data.repo.HomeOptions
 import dev.aminegames125.vesper.data.repo.PlayItem
+import dev.aminegames125.vesper.data.repo.SettingsRepository
 import dev.aminegames125.vesper.data.repo.UserDataRepository
 import dev.aminegames125.vesper.player.PlayerSession
 import dev.aminegames125.vesper.ui.common.UiState
@@ -44,7 +46,11 @@ class HomeViewModel @Inject constructor(
     private val library: LibraryRepository,
     private val userData: UserDataRepository,
     private val player: PlayerSession,
+    settings: SettingsRepository,
 ) : ViewModel() {
+
+    val options: StateFlow<HomeOptions> =
+        settings.homeOptions.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeOptions())
 
     val favoriteIds: StateFlow<List<String>> =
         userData.favoriteIds.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

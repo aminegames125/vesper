@@ -9,6 +9,17 @@ import type { ThemeMode } from "../lib/themes";
 import { CURRENT_VERSION } from "../lib/whats-new";
 import { CloudSettings } from "./cloud-settings";
 
+export const HOME_ROWS = [
+  { id: "billboard", label: "Featured banner" },
+  { id: "continue", label: "Continue watching" },
+  { id: "recent", label: "Recently watched" },
+  { id: "favourites", label: "Favourite channels" },
+  { id: "live", label: "Live now" },
+  { id: "top10", label: "Top 10" },
+  { id: "movies", label: "New movies" },
+  { id: "series", label: "Top series" },
+];
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mb-8">
@@ -31,6 +42,8 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 }
 
 export function Settings() {
+  const hidden = useStore((s) => s.hiddenRows);
+  const toggleRow = useStore((s) => s.toggleRow);
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
   const recordMinutes = useStore((s) => s.recordMinutes);
@@ -92,6 +105,18 @@ export function Settings() {
             }}
           />
         </Row>
+      </Section>
+
+      <Section title="Home screen">
+        {HOME_ROWS.map((r) => (
+          <Row key={r.id} label={r.label}>
+            <Toggle
+              label={r.label}
+              checked={!hidden.includes(r.id)}
+              onChange={() => toggleRow(r.id)}
+            />
+          </Row>
+        ))}
       </Section>
 
       <Section title="Recording">

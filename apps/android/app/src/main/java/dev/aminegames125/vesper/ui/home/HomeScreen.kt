@@ -81,6 +81,7 @@ private fun HomeContent(
     val posterWidth = if (tv) 170.dp else 128.dp
     val wide = if (tv) 300.dp else 230.dp
     val favourites by viewModel.favoriteIds.collectAsState()
+    val options by viewModel.options.collectAsState()
 
     LazyColumn(Modifier.fillMaxSize()) {
         item("billboard") { Billboard(home, tv, viewModel, onOpenDetail) }
@@ -97,7 +98,7 @@ private fun HomeContent(
             }
         }
 
-        railOf("live", "Live now", home.channels, wide, gutter, { it.id }) { c ->
+        railOf("live", "Live now", if (options.live) home.channels else emptyList(), wide, gutter, { it.id }) { c ->
             ChannelTile(
                 title = c.name,
                 subtitle = c.grp,
@@ -108,11 +109,11 @@ private fun HomeContent(
             )
         }
 
-        railOf("movies", "New movies", home.newest, posterWidth, gutter, { it.id }) { m ->
+        railOf("movies", "New movies", if (options.movies) home.newest else emptyList(), posterWidth, gutter, { it.id }) { m ->
             PosterCard(m.name, m.poster, onClick = { onOpenDetail("movie", m.id) })
         }
 
-        railOf("shows", "Top series", home.topShows, posterWidth, gutter, { it.id }) { s ->
+        railOf("shows", "Top series", if (options.shows) home.topShows else emptyList(), posterWidth, gutter, { it.id }) { s ->
             PosterCard(s.name, s.cover, onClick = { onOpenDetail("show", s.id) })
         }
     }
@@ -147,7 +148,7 @@ private fun Billboard(home: HomeData, tv: Boolean, viewModel: HomeViewModel, onO
     // On a TV the first thing a remote should land on is Play.
     LaunchedEffect(tv) { if (tv) runCatching { focus.requestFocus() } }
 
-    Box(Modifier.fillMaxWidth().height(if (tv) 360.dp else 300.dp)) {
+    Box(Modifier.fillMaxWidth().height(if (tv) 420.dp else 300.dp)) {
         RemoteImage(image, Modifier.fillMaxSize())
         val ink = MaterialTheme.colorScheme.background
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(ink, ink.copy(alpha = 0.75f), Color.Transparent))))

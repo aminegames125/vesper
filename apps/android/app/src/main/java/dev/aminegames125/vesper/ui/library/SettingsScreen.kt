@@ -1,5 +1,6 @@
 package dev.aminegames125.vesper.ui.library
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -19,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -29,6 +32,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.aminegames125.vesper.BuildConfig
 import dev.aminegames125.vesper.data.repo.CloudRepository
 import dev.aminegames125.vesper.data.repo.CloudSession
+import dev.aminegames125.vesper.data.repo.HomeKeys
+import dev.aminegames125.vesper.data.repo.HomeOptions
 import dev.aminegames125.vesper.data.repo.ServerInfo
 import dev.aminegames125.vesper.data.repo.SettingsRepository
 import dev.aminegames125.vesper.data.repo.ThemeMode
@@ -49,6 +54,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     val theme: StateFlow<ThemeMode> = settings.theme.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.Dark)
+    val homeOptions: StateFlow<HomeOptions> = settings.homeOptions.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeOptions())
     val session: StateFlow<CloudSession?> = cloud.session.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _info = MutableStateFlow<ServerInfo?>(null)
@@ -62,6 +68,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { settings.setTheme(mode) }
+    }
+
+    fun setHomeOption(key: String, on: Boolean) {
+        viewModelScope.launch { settings.setHomeOption(key, on) }
     }
 
     fun check(address: String) {
@@ -93,6 +103,7 @@ class SettingsViewModel @Inject constructor(
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val theme by viewModel.theme.collectAsState()
+    val home by viewModel.homeOptions.collectAsState()
     val session by viewModel.session.collectAsState()
     val info by viewModel.info.collectAsState()
     val message by viewModel.message.collectAsState()
@@ -112,6 +123,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     FilterChip(theme == mode, { viewModel.setTheme(mode) }, { Text(mode.name) }, modifier = Modifier.tvFocus())
                 }
             }
+
+            Text("Home screen", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+            ToggleRow("Live channels", home.live) { viewModel.setHomeOption(HomeKeys.LIVE, it) }
+            ToggleRow("New movies", home.movies) { viewModel.setHomeOption(HomeKeys.MOVIES, it) }
+            ToggleRow("Top series", home.shows) { viewModel.setHomeOption(HomeKeys.SHOWS, it) }
 
             Text("Vesper Cloud", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
             Text(
@@ -153,5 +169,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             Text("About", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
             Text("Vesper ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+@Composable
+private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().tvFocus().clickable { onChange(!checked) }.padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = null)
     }
 }

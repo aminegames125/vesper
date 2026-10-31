@@ -19,6 +19,8 @@ export function Home() {
   const history = useStore((s) => s.history);
   const play = useStore((s) => s.play);
   const setView = useStore((s) => s.setView);
+  const hidden = useStore((s) => s.hiddenRows);
+  const show = (id: string) => !hidden.includes(id);
 
   const recentChannels = useMemo(
     () => recents.map((id) => channels.find((c) => c.id === id)).filter((c) => !!c),
@@ -62,9 +64,9 @@ export function Home() {
 
   return (
     <div>
-      <Billboard items={featured} />
+      {show("billboard") && <Billboard items={featured} />}
 
-      {history.length > 0 && (
+      {history.length > 0 && show("continue") && (
         <Rail title="Continue watching">
           {history.slice(0, 12).map((h) => (
             <button
@@ -96,7 +98,7 @@ export function Home() {
         </Rail>
       )}
 
-      {recentChannels.length > 0 && (
+      {recentChannels.length > 0 && show("recent") && (
         <Rail title="Recently watched">
           {recentChannels.slice(0, 12).map((c) => (
             <div key={c.id} className="w-60 flex-none">
@@ -106,7 +108,7 @@ export function Home() {
         </Rail>
       )}
 
-      {favoriteChannels.length > 0 && (
+      {favoriteChannels.length > 0 && show("favourites") && (
         <Rail
           title="Favourite channels"
           action={
@@ -123,7 +125,7 @@ export function Home() {
         </Rail>
       )}
 
-      {channels.length > 0 && (
+      {channels.length > 0 && show("live") && (
         <Rail
           title="Live now"
           action={
@@ -140,7 +142,7 @@ export function Home() {
         </Rail>
       )}
 
-      {top10.length >= 5 && (
+      {top10.length >= 5 && show("top10") && (
         <Rail title="Top 10 on Vesper">
           {top10.map((x, i) => (
             <div key={x.id} className="w-44 flex-none">
@@ -150,7 +152,7 @@ export function Home() {
         </Rail>
       )}
 
-      {newest.length > 0 && (
+      {newest.length > 0 && show("movies") && (
         <Rail
           title="New movies"
           action={
@@ -167,7 +169,7 @@ export function Home() {
         </Rail>
       )}
 
-      {topShows.length > 0 && (
+      {topShows.length > 0 && show("series") && (
         <Rail
           title="Top series"
           action={

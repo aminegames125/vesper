@@ -1,6 +1,18 @@
 package dev.aminegames125.vesper.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -125,10 +137,10 @@ fun VesperRoot(session: PlayerSession) {
                 Box(Modifier.weight(1f).statusBarsPadding()) { Graph(nav, form) }
             }
 
-            // A television gets a top bar of tabs, like the streaming apps, and room around the edges.
-            FormFactor.Tv -> Column(Modifier.fillMaxSize()) {
-                if (!inDetail) TvTopBar(route, ::go)
-                Box(Modifier.weight(1f)) { Graph(nav, form) }
+            // A television gets a slim icon rail on the left that opens with labels when it takes focus.
+            FormFactor.Tv -> Box(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize().padding(start = if (inDetail) 0.dp else RailWidth)) { Graph(nav, form) }
+                if (!inDetail) TvRail(route, ::go, Modifier.align(Alignment.CenterStart))
             }
         }
 
@@ -136,26 +148,53 @@ fun VesperRoot(session: PlayerSession) {
     }
 }
 
+private val RailWidth = 72.dp
+
 @Composable
-private fun TvTopBar(route: String, onSelect: (Dest) -> Unit) {
-    LazyRow(
-        Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 14.dp),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun TvRail(route: String, onSelect: (Dest) -> Unit, modifier: Modifier = Modifier) {
+    var expanded by remember { mutableStateOf(false) }
+    val width by animateDpAsState(if (expanded) 232.dp else RailWidth, label = "rail-width")
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier
+            .fillMaxHeight()
+            .width(width)
+            .background(if (expanded) colors.surface else colors.background)
+            .onFocusChanged { expanded = it.hasFocus }
+            .focusGroup()
+            .padding(horizontal = 12.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
-        items(TvTabs, key = { it.route }) { d ->
+        TvTabs.forEach { d ->
+            var focused by remember { mutableStateOf(false) }
             val selected = route == d.route
-            val tint = if (selected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant
+            val fg = when {
+                focused -> colors.onPrimary
+                selected -> colors.onBackground
+                else -> colors.onSurfaceVariant
+            }
             Row(
                 Modifier
-                    .tvFocus(RoundedCornerShape(50))
-                    .clip(RoundedCornerShape(50))
-                    .then(if (selected) Modifier.background(MaterialTheme.colorScheme.surfaceVariant) else Modifier)
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        when {
+                            focused -> colors.primary
+                            selected -> colors.surfaceVariant
+                            else -> Color.Transparent
+                        },
+                    )
+                    .onFocusChanged { focused = it.isFocused }
                     .clickable { onSelect(d) }
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                    .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (d == Search) Icon(d.icon, d.label, tint = tint) else Text(d.label, color = tint, fontWeight = FontWeight.SemiBold)
+                Icon(d.icon, d.label, tint = fg)
+                if (expanded) {
+                    Spacer(Modifier.width(16.dp))
+                    Text(d.label, color = fg, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
             }
         }
     }

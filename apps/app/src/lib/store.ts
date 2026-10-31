@@ -55,6 +55,8 @@ interface State {
   seenVersion: string | null;
   tipsDismissed: boolean;
   recordMinutes: number;
+  /** Home rows the viewer switched off in Settings. */
+  hiddenRows: string[];
 
   // session
   channels: Channel[];
@@ -88,6 +90,7 @@ interface State {
   applyRemote: (key: "favorites" | "history" | "sources", value: unknown) => void;
   setTheme: (theme: ThemeMode) => void;
   setRecordMinutes: (minutes: number) => void;
+  toggleRow: (id: string) => void;
   markVersionSeen: () => void;
   dismissTips: () => void;
   addRecording: (recording: Recording) => void;
@@ -115,6 +118,7 @@ export const useStore = create<State>()(
       seenVersion: null,
       tipsDismissed: false,
       recordMinutes: 60,
+      hiddenRows: [],
 
       channels: [],
       movies: [],
@@ -201,6 +205,12 @@ export const useStore = create<State>()(
       },
       setTheme: (theme) => set({ theme }),
       setRecordMinutes: (recordMinutes) => set({ recordMinutes }),
+      toggleRow: (id) =>
+        set((s) => ({
+          hiddenRows: s.hiddenRows.includes(id)
+            ? s.hiddenRows.filter((r) => r !== id)
+            : [...s.hiddenRows, id],
+        })),
       markVersionSeen: () => set({ seenVersion: CURRENT_VERSION }),
       dismissTips: () => set({ tipsDismissed: true }),
 
@@ -245,6 +255,7 @@ export const useStore = create<State>()(
         seenVersion,
         tipsDismissed,
         recordMinutes,
+        hiddenRows,
       }) => ({
         cloud,
         syncOptions,
@@ -258,6 +269,7 @@ export const useStore = create<State>()(
         seenVersion,
         tipsDismissed,
         recordMinutes,
+        hiddenRows,
       }),
     },
   ),
