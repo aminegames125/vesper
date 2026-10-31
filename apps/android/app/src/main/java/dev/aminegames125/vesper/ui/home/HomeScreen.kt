@@ -90,6 +90,10 @@ private fun HomeContent(
     val gutter: Dp = if (tv) 48.dp else 16.dp
     val posterWidth = if (tv) 170.dp else 128.dp
     val wide = if (tv) 300.dp else 230.dp
+    if (tv) {
+        TvHome(home, viewModel, onOpenDetail)
+        return
+    }
     val favourites by viewModel.favoriteIds.collectAsState()
     val options by viewModel.options.collectAsState()
 

@@ -175,8 +175,8 @@ private fun TvTopBar(route: String, onSelect: (Dest) -> Unit) {
     val colors = MaterialTheme.colorScheme
     Box(Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 14.dp)) {
         Row(
-            Modifier.align(Alignment.Center),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.align(Alignment.Center).clip(RoundedCornerShape(50)).background(colors.surface.copy(alpha = 0.6f)).padding(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TvTabs.forEach { d ->
