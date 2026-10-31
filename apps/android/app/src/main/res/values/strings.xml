@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Vesper</string>
     <string name="notification_channel">Recordings</string>
+    <string name="tile_record">Record</string>
+    <string name="widget_next">Next recording</string>
 </resources>

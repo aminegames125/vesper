@@ -15,6 +15,7 @@
   <a href="#-the-server">Server</a> ·
   <a href="#-api">API</a> ·
   <a href="#-how-it-fits-together">Architecture</a> ·
+  <a href="docs/GUIDE.md">User guide</a> ·
   <a href="#-develop">Develop</a>
 </p>
 
@@ -26,7 +27,7 @@ Vesper is a **recorder, not a player**. It uses your own IPTV playlist (an M3U l
 
 - **Record now** or **schedule** it: once, daily, weekdays, weekends or on the days you pick.
 - **Native Android and Android TV app.** Material 3, the system's own colours, no webview. One APK for phone, tablet and TV.
-- **A server for Linux and Windows** (and Docker). One small binary, no ffmpeg, no database to install.
+- **A server for Linux and Windows** (and Docker). One small binary, no database to install, and ffmpeg only if you want thumbnails and MP4 export.
 
 ## ✨ What it does
 
@@ -38,14 +39,22 @@ Vesper is a **recorder, not a player**. It uses your own IPTV playlist (an M3U l
 | **Survives a bad stream** | If the stream drops, the server joins it again and keeps **one** recording you can play start to finish. |
 | **Warns before it fails** | A clash with another recording is flagged when you save, and a nearly full disk stops a recording with a clear reason instead of leaving an empty file. |
 | **Watch while it records** | Recordings are HLS, so you can open one on any device **while it is still being recorded**. |
-| **Keep or tidy up** | Keep recordings until you delete them, or for 1, 7 or 30 days. |
+| **Deletes itself, on your terms** | A default deletion timer (a week) keeps the disk from filling up. Change it for any recording later, keep one forever, or have watched ones go sooner. The app warns you the day before. |
 | **Your channels, on the server** | Add an M3U link or an Xtream login once. Your provider login stays on the server, not on every phone. |
 | **Notifications** | The app tells you when a recording finishes or fails, and a webhook (Discord, ntfy, Slack-style) can too. |
 | **Keep only the newest** | A schedule can keep just its last 1, 3, 5 or 10 episodes and tidy the rest. |
 | **Run now, duplicate, pause all** | Start a schedule's channel at once, copy a schedule, or pause every schedule for a holiday. |
 | **Rename, search, clear failed** | Tidy the recordings list from the app. |
 | **Favourite and test channels** | Star the channels you use and check that a stream answers before you schedule it. |
-| **Server status** | Settings shows the server's free disk and what records next. |
+| **Server status** | Settings shows the server's free disk, how many days of room are left, what records next, what is about to be deleted and any channel that stopped answering. |
+| **TV guide** | Add an XMLTV link and pick a programme by name instead of typing a time. Record it once or **every time it is on**, and let a programme that runs over keep recording until the guide says it ended. |
+| **Movies and series** | Save a movie or episode from your playlist onto the server, watch it later (with seeking), and copy it to the phone. |
+| **Chromecast** | If a stream will not play on your Android TV app, play it on the phone and cast it; the Chromecast fetches the stream itself. |
+| **Backup address and quality** | A channel's second address takes over when the first keeps failing, and you can record smaller files. |
+| **A real library** | Folders, a watched mark, *continue watching*, bookmarks, thumbnails, share links that work for a day, and (with ffmpeg) MP4 export and cutting. |
+| **Android TV home** | A TV screen with rows of cards for what is recording, what is next and what to carry on watching, made for a remote. |
+| **Phone extras** | A home-screen widget, a quick-settings tile, *share a link to Vesper to record it*, picture in picture, light/dark choice and quiet hours. |
+| **Move or back up** | Save all your schedules to a file and add them to another server. |
 | **Accounts, if you want them** | *Lite* mode is for one home. *Full* mode adds users, quotas, invites and an admin panel. |
 
 ## 🚀 Quick start

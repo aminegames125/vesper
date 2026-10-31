@@ -60,6 +60,46 @@ fun formatMoment(epochSeconds: Long, zone: ZoneId = ZoneId.systemDefault()): Str
         .withZone(zone)
         .format(Instant.ofEpochSecond(epochSeconds))
 
+/** "1:05:09" or "5:09" for a position in a recording. */
+fun formatClock(seconds: Long): String {
+    val s = seconds.coerceAtLeast(0)
+    val h = s / 3600
+    val m = (s % 3600) / 60
+    val rest = s % 60
+    return if (h > 0) "%d:%02d:%02d".format(Locale.US, h, m, rest) else "%d:%02d".format(Locale.US, m, rest)
+}
+
+/** "Deleted in 6 days", "Deleted in 5 h" or null when it stays until someone deletes it. */
+fun formatExpiry(keepUntil: Long?, nowSeconds: Long = System.currentTimeMillis() / 1000): String? {
+    keepUntil ?: return null
+    val left = keepUntil - nowSeconds
+    return when {
+        left <= 0 -> "Deleting soon"
+        left < 3600 -> "Deleted in ${(left / 60).coerceAtLeast(1)} min"
+        left < 86_400 -> "Deleted in ${left / 3600} h"
+        else -> "Deleted in ${left / 86_400} d"
+    }
+}
+
+/** True when [now] falls between [start] and [end] (`HH:MM`), which may run past midnight. Empty means never. */
+fun withinQuietHours(start: String, end: String, now: java.time.LocalTime): Boolean {
+    val from = runCatching { java.time.LocalTime.parse(start.trim().padStart(5, '0')) }.getOrNull() ?: return false
+    val to = runCatching { java.time.LocalTime.parse(end.trim().padStart(5, '0')) }.getOrNull() ?: return false
+    return when {
+        from == to -> false
+        from < to -> now >= from && now < to
+        else -> now >= from || now < to
+    }
+}
+
+/** The keep times offered for a recording or download, in hours; 0 keeps it until deleted. */
+val KEEP_CHOICES: List<Pair<Long, String>> = listOf(
+    24L to "1 day",
+    168L to "1 week",
+    720L to "1 month",
+    0L to "Keep forever",
+)
+
 /** "in 5 min", "in 2 h" or "now" for an upcoming start. */
 fun formatUntil(epochSeconds: Long, nowSeconds: Long = System.currentTimeMillis() / 1000): String {
     val left = epochSeconds - nowSeconds

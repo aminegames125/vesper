@@ -58,6 +58,12 @@ pub struct Config {
     /// limits count each real client instead of the proxy.
     #[arg(long, env = "VESPER_TRUST_PROXY")]
     pub trust_proxy: bool,
+
+    /// A command run whenever the time of the next scheduled recording changes, with the time in
+    /// the VESPER_NEXT_START environment variable (epoch seconds). Use it to set a wake timer
+    /// (rtcwake, schtasks). It can only be set here, never from the app or the admin panel.
+    #[arg(long, env = "VESPER_WAKE_COMMAND")]
+    pub wake_command: Option<String>,
 }
 
 impl Config {

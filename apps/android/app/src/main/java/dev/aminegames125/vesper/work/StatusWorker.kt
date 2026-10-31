@@ -21,7 +21,10 @@ import dev.aminegames125.vesper.VesperApp
 import dev.aminegames125.vesper.data.Api
 import dev.aminegames125.vesper.data.ApiException
 import dev.aminegames125.vesper.data.Recording
+import dev.aminegames125.vesper.data.withinQuietHours
+import java.time.LocalTime
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.first
 
 object Notifications {
     const val CHANNEL = "recordings"
@@ -37,6 +40,25 @@ object Notifications {
     fun canPost(context: Context): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+
+    /** The deletion timer is about to remove this; open the app to keep it. */
+    fun expiring(context: Context, id: String, title: String) {
+        if (!canPost(context)) return
+        val open = PendingIntent.getActivity(
+            context,
+            id.hashCode() xor 0x5a5a,
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_menu_delete)
+            .setContentTitle("Deleting soon: $title")
+            .setContentText("It will be removed from the server within a day. Open Vesper to keep it.")
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        context.getSystemService(NotificationManager::class.java).notify(id.hashCode() xor 0x5a5a, notification)
+    }
 
     fun finished(context: Context, recording: Recording) {
         if (!canPost(context)) return
@@ -79,11 +101,25 @@ class StatusWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         } catch (e: Exception) {
             return Result.retry()
         }
-        val finished = list.filter { it.isFinished }
+        // Quiet hours: say nothing now, and keep what is new for the next check.
+        val quiet = withinQuietHours(container.settings.quietStart.first(), container.settings.quietEnd.first(), LocalTime.now())
+        if (quiet) return Result.success()
+
+        // A cancelled or stopped item is not news.
+        val finished = list.filter { it.isFinished && it.error?.startsWith("Cancelled") != true && it.error?.startsWith("Stopped") != true }
         val seen = container.settings.announced()
         // The first run only learns what is already there, so old recordings do not all ping at once.
         if (seen != null) finished.filter { it.id !in seen }.forEach { Notifications.finished(applicationContext, it) }
-        container.settings.saveAnnounced(finished.map { it.id }.toSet())
+
+        // Warn once about anything the deletion timer is about to remove.
+        val warned = seen.orEmpty().filter { it.startsWith("exp:") }.toMutableSet()
+        if (seen != null) {
+            runCatching { api.status().expiring }.getOrNull().orEmpty().filter { "exp:${it.id}" !in warned }.forEach {
+                Notifications.expiring(applicationContext, it.id, it.title)
+                warned += "exp:${it.id}"
+            }
+        }
+        container.settings.saveAnnounced(finished.map { it.id }.toSet() + warned)
         return Result.success()
     }
 

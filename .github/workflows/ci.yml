@@ -45,6 +45,20 @@ jobs:
       - run: cargo clippy -p vesper-recorder -p vesper-server --all-targets -- -D warnings
       - run: cargo test -p vesper-recorder -p vesper-server
 
+  e2e:
+    name: End to end (a real server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cargo build -p vesper-server
+      - name: Downloads, deletion timer, guide, share links, guard
+        run: node scripts/e2e.mjs
+
   android:
     name: Android app
     runs-on: ubuntu-latest

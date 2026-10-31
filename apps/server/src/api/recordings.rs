@@ -1,15 +1,16 @@
 use axum::{
     body::Body,
-    extract::{Path, State},
-    http::{header, request::Parts, HeaderValue, StatusCode},
+    extract::{Path, Query, State},
+    http::{header, request::Parts, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
-use futures_util::stream;
+use futures_util::{stream, StreamExt};
 use rusqlite::params;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use super::files;
 use crate::{
     auth::{bearer, AuthUser, User},
     db::now,
@@ -19,7 +20,13 @@ use crate::{
     state::AppState,
 };
 
-const COLUMNS: &str = "id, user_id, title, channel_name, status, start_at, max_seconds, seconds, bytes, keep_hours, keep_until, error, created_at, finished_at, schedule_id";
+const COLUMNS: &str = "id, user_id, title, channel_name, status, start_at, max_seconds, seconds, bytes, keep_hours, keep_until, error, created_at, finished_at, schedule_id, kind, tag, watched, position_s, backup_url, thumb, file_name, series_rule_id, total_bytes";
+
+/// The longest a recording can be kept: ten years.
+const MAX_KEEP_HOURS: i64 = 24 * 365 * 10;
+
+/// How long a new recording is kept when nobody chose: a week. An admin can change or clear it.
+pub const DEFAULT_KEEP_HOURS: &str = "168";
 
 fn row_json(r: &rusqlite::Row) -> rusqlite::Result<Value> {
     Ok(json!({
@@ -37,11 +44,20 @@ fn row_json(r: &rusqlite::Row) -> rusqlite::Result<Value> {
         "createdAt": r.get::<_, i64>(12)?,
         "finishedAt": r.get::<_, Option<i64>>(13)?,
         "scheduleId": r.get::<_, Option<String>>(14)?,
+        "kind": r.get::<_, String>(15)?,
+        "tag": r.get::<_, String>(16)?,
+        "watched": r.get::<_, i64>(17)? != 0,
+        "positionS": r.get::<_, i64>(18)?,
+        "backupUrl": r.get::<_, Option<String>>(19)?,
+        "thumb": r.get::<_, i64>(20)? != 0,
+        "fileName": r.get::<_, Option<String>>(21)?,
+        "seriesRuleId": r.get::<_, Option<String>>(22)?,
+        "totalBytes": r.get::<_, Option<i64>>(23)?,
     }))
 }
 
 /// Loads a recording the user may see: their own, or any for an admin.
-fn owned(state: &AppState, user: &User, id: &str) -> ApiResult<(Value, String)> {
+pub fn owned(state: &AppState, user: &User, id: &str) -> ApiResult<(Value, String)> {
     let conn = state.db.conn();
     let (value, owner): (Value, String) = conn.query_row(
         &format!("SELECT {COLUMNS} FROM recordings WHERE id = ?1"),
@@ -54,21 +70,47 @@ fn owned(state: &AppState, user: &User, id: &str) -> ApiResult<(Value, String)> 
     Ok((value, owner))
 }
 
+#[derive(Deserialize, Default)]
+pub struct ListQuery {
+    #[serde(default)]
+    tag: String,
+    #[serde(default)]
+    q: String,
+    #[serde(default)]
+    kind: String,
+}
+
 pub async fn list(
     State(state): State<AppState>,
     AuthUser(user): AuthUser,
+    Query(filter): Query<ListQuery>,
 ) -> ApiResult<Json<Value>> {
     // Count storage first: the database lock is not re-entrant.
     let used = jobs::storage_used(&state, &user.id);
     let conn = state.db.conn();
     let mut stmt = conn.prepare(&format!(
-        "SELECT {COLUMNS} FROM recordings WHERE user_id = ?1 ORDER BY created_at DESC"
+        "SELECT {COLUMNS} FROM recordings
+         WHERE user_id = ?1
+           AND (?2 = '' OR tag = ?2)
+           AND (?3 = '' OR title LIKE '%' || ?3 || '%')
+           AND (?4 = '' OR kind = ?4)
+         ORDER BY created_at DESC"
     ))?;
     let rows = stmt
-        .query_map([&user.id], row_json)?
+        .query_map(
+            params![user.id, filter.tag, filter.q.trim(), filter.kind],
+            row_json,
+        )?
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut tags = conn.prepare(
+        "SELECT DISTINCT tag FROM recordings WHERE user_id = ?1 AND tag != '' ORDER BY tag",
+    )?;
+    let tags = tags
+        .query_map([&user.id], |r| r.get::<_, String>(0))?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Json(json!({
         "recordings": rows,
+        "tags": tags,
         "storageUsed": used,
         "storageLimit": user.storage_bytes,
     })))
@@ -87,6 +129,29 @@ pub struct NewRecording {
     /// How long to keep the recording after it finishes. 0 keeps it until deleted; omit for the account default.
     #[serde(default)]
     keep_hours: Option<i64>,
+    /// A second address for the same channel, tried when the first keeps failing.
+    #[serde(default)]
+    backup_url: Option<String>,
+    #[serde(default)]
+    tag: String,
+}
+
+/// The keep time for a new item: what was asked, else the account's, else the server's default.
+pub fn keep_for(state: &AppState, user: &User, asked: Option<i64>) -> Option<i64> {
+    let default_keep = user.keep_hours.or_else(|| {
+        state
+            .db
+            .setting("default_keep_hours", DEFAULT_KEEP_HOURS)
+            .parse()
+            .ok()
+    });
+    match asked {
+        Some(0) => None,
+        Some(h) if h > 0 => Some(h.min(MAX_KEEP_HOURS)),
+        _ => default_keep
+            .filter(|h| *h > 0)
+            .map(|h| h.min(MAX_KEEP_HOURS)),
+    }
 }
 
 pub async fn create(
@@ -102,32 +167,72 @@ pub async fn create(
     };
     check_quota(&state, &user, seconds)?;
     check_target(&state, &body.url).await?;
+    let backup = body.backup_url.as_deref().filter(|u| !u.is_empty());
+    if let Some(backup) = backup {
+        check_target(&state, backup).await?;
+    }
     let title: String = body.title.trim().chars().take(120).collect();
     if title.is_empty() {
         return Err(ApiError::bad("Give the recording a title."));
     }
 
-    let default_keep = user
-        .keep_hours
-        .or_else(|| state.db.setting("default_keep_hours", "").parse().ok());
-    let keep_hours = match body.keep_hours {
-        Some(0) => None,
-        Some(h) if h > 0 => Some(h.min(24 * 365 * 10)),
-        _ => default_keep.filter(|h| *h > 0),
-    };
+    let keep_hours = keep_for(&state, &user, body.keep_hours);
     let start_at = body.start_at.unwrap_or(0).max(0);
     let later = start_at > now() + 5;
     let id = uuid::Uuid::new_v4().to_string();
     state.db.conn().execute(
-        "INSERT INTO recordings (id, user_id, title, channel_name, source_url, status, start_at, max_seconds, keep_hours, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "INSERT INTO recordings (id, user_id, title, channel_name, source_url, status, start_at, max_seconds, keep_hours, created_at, backup_url, tag)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![id, user.id, title, body.channel_name.chars().take(120).collect::<String>(), body.url,
-                if later { "scheduled" } else { "queued" }, if later { start_at } else { now() }, seconds, keep_hours, now()],
+                if later { "scheduled" } else { "queued" }, if later { start_at } else { now() }, seconds, keep_hours, now(),
+                backup, body.tag.trim().chars().take(40).collect::<String>()],
     )?;
     if !later {
         jobs::start(&state, &id);
     }
     state.db.audit(&user.username, "recording.create", &title);
+    Ok(Json(json!({ "id": id })))
+}
+
+#[derive(Deserialize)]
+pub struct NewDownload {
+    title: String,
+    url: String,
+    #[serde(default)]
+    keep_hours: Option<i64>,
+    #[serde(default)]
+    tag: String,
+}
+
+/// Saves a movie or episode file from a source address to the server, so it can be watched later.
+pub async fn create_download(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Json(body): Json<NewDownload>,
+) -> ApiResult<Json<Value>> {
+    if user.role == "guest" {
+        return Err(ApiError::forbidden("Guest accounts cannot download."));
+    }
+    if user.storage_bytes > 0 && jobs::storage_used(&state, &user.id) >= user.storage_bytes {
+        return Err(ApiError::forbidden(
+            "Your cloud storage is full. Delete something first.",
+        ));
+    }
+    check_target(&state, &body.url).await?;
+    let title: String = body.title.trim().chars().take(120).collect();
+    if title.is_empty() {
+        return Err(ApiError::bad("Give the download a title."));
+    }
+    let keep_hours = keep_for(&state, &user, body.keep_hours);
+    let id = uuid::Uuid::new_v4().to_string();
+    state.db.conn().execute(
+        "INSERT INTO recordings (id, user_id, title, channel_name, source_url, status, start_at, max_seconds, keep_hours, created_at, kind, tag)
+         VALUES (?1, ?2, ?3, '', ?4, 'queued', ?5, 0, ?6, ?5, 'download', ?7)",
+        params![id, user.id, title, body.url, now(), keep_hours,
+                body.tag.trim().chars().take(40).collect::<String>()],
+    )?;
+    jobs::start(&state, &id);
+    state.db.audit(&user.username, "download.create", &title);
     Ok(Json(json!({ "id": id })))
 }
 
@@ -160,7 +265,9 @@ pub async fn remove(
 ) -> ApiResult<Json<Value>> {
     let (value, owner) = owned(&state, &user, &id)?;
     // An occurrence of a repeating schedule is kept as "cancelled" so it is not created again.
-    if value["status"] == "scheduled" && !value["scheduleId"].is_null() {
+    if value["status"] == "scheduled"
+        && (!value["scheduleId"].is_null() || !value["seriesRuleId"].is_null())
+    {
         state.db.conn().execute(
             "UPDATE recordings SET status = 'failed', error = 'Cancelled.', finished_at = ?1 WHERE id = ?2",
             params![now(), id],
@@ -176,6 +283,27 @@ pub async fn remove(
     Ok(Json(json!({ "ok": true })))
 }
 
+/// Sets how long a finished item stays. 0 keeps it until it is deleted.
+fn apply_keep(state: &AppState, id: &str, status: &str, hours: i64) -> rusqlite::Result<()> {
+    let hours = hours.clamp(0, MAX_KEEP_HOURS);
+    let keep = Some(hours).filter(|h| *h > 0);
+    // While it is still recording the time starts when it ends (the job sets keep_until then).
+    let finished = matches!(status, "done" | "failed");
+    let until = if finished {
+        keep.map(|h| now() + h * 3600)
+    } else {
+        None
+    };
+    state
+        .db
+        .conn()
+        .execute(
+            "UPDATE recordings SET keep_until = ?1, keep_hours = ?2 WHERE id = ?3",
+            params![until, keep, id],
+        )
+        .map(|_| ())
+}
+
 #[derive(Deserialize)]
 pub struct Keep {
     /// Hours from now. 0 keeps the recording until it is deleted.
@@ -189,37 +317,85 @@ pub async fn set_keep(
     Path(id): Path<String>,
     Json(body): Json<Keep>,
 ) -> ApiResult<Json<Value>> {
-    owned(&state, &user, &id)?;
-    let hours = body.hours.clamp(0, 24 * 365 * 10);
-    let until = (hours > 0).then(|| now() + hours * 3600);
-    state.db.conn().execute(
-        "UPDATE recordings SET keep_until = ?1, keep_hours = ?2 WHERE id = ?3",
-        params![until, Some(hours).filter(|h| *h > 0), id],
+    let (value, _) = owned(&state, &user, &id)?;
+    apply_keep(
+        &state,
+        &id,
+        value["status"].as_str().unwrap_or(""),
+        body.hours,
     )?;
     Ok(Json(json!({ "ok": true })))
 }
 
 #[derive(Deserialize)]
-pub struct Rename {
-    title: String,
+pub struct Patch {
+    #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    tag: Option<String>,
+    /// Hours from now; 0 keeps it until it is deleted.
+    #[serde(default)]
+    keep_hours: Option<i64>,
+    #[serde(default)]
+    watched: Option<bool>,
+    /// Where playback stopped, in seconds.
+    #[serde(default)]
+    position_s: Option<i64>,
 }
 
-/// Gives a recording a new title.
-pub async fn rename(
+/// Changes a recording's title, folder, keep time, or watch state.
+pub async fn patch(
     State(state): State<AppState>,
     AuthUser(user): AuthUser,
     Path(id): Path<String>,
-    Json(body): Json<Rename>,
+    Json(body): Json<Patch>,
 ) -> ApiResult<Json<Value>> {
-    owned(&state, &user, &id)?;
-    let title: String = body.title.trim().chars().take(120).collect();
-    if title.is_empty() {
-        return Err(ApiError::bad("Give the recording a title."));
+    let (value, _) = owned(&state, &user, &id)?;
+    let conn = || state.db.conn();
+    if let Some(title) = body.title {
+        let title: String = title.trim().chars().take(120).collect();
+        if title.is_empty() {
+            return Err(ApiError::bad("Give the recording a title."));
+        }
+        conn().execute(
+            "UPDATE recordings SET title = ?1 WHERE id = ?2",
+            params![title, id],
+        )?;
     }
-    state.db.conn().execute(
-        "UPDATE recordings SET title = ?1 WHERE id = ?2",
-        params![title, id],
-    )?;
+    if let Some(tag) = body.tag {
+        conn().execute(
+            "UPDATE recordings SET tag = ?1 WHERE id = ?2",
+            params![tag.trim().chars().take(40).collect::<String>(), id],
+        )?;
+    }
+    if let Some(hours) = body.keep_hours {
+        apply_keep(&state, &id, value["status"].as_str().unwrap_or(""), hours)?;
+    }
+    if let Some(position) = body.position_s {
+        conn().execute(
+            "UPDATE recordings SET position_s = ?1 WHERE id = ?2",
+            params![position.max(0), id],
+        )?;
+    }
+    if let Some(watched) = body.watched {
+        conn().execute(
+            "UPDATE recordings SET watched = ?1 WHERE id = ?2",
+            params![i64::from(watched), id],
+        )?;
+        // "Delete watched after N days": pull the expiry in, never push it out.
+        let days: i64 = state
+            .db
+            .setting("delete_watched_days", "0")
+            .parse()
+            .unwrap_or(0);
+        if watched && days > 0 && value["status"] == "done" {
+            conn().execute(
+                "UPDATE recordings SET keep_until = ?1
+                 WHERE id = ?2 AND keep_until > ?1",
+                params![now() + days.min(3650) * 86_400, id],
+            )?;
+        }
+    }
     Ok(Json(json!({ "ok": true })))
 }
 
@@ -231,7 +407,8 @@ pub async fn clear_failed(
     let ids: Vec<String> = {
         let conn = state.db.conn();
         let mut stmt =
-            conn.prepare("SELECT id FROM recordings WHERE user_id = ?1 AND status = 'failed'")?;
+            conn.prepare("SELECT id FROM recordings WHERE user_id = ?1 AND status = 'failed'
+               AND NOT (error LIKE 'Cancelled%' AND (schedule_id IS NOT NULL OR series_rule_id IS NOT NULL))")?;
         let rows = stmt
             .query_map([&user.id], |r| r.get(0))?
             .collect::<Result<_, _>>()?;
@@ -247,20 +424,16 @@ pub async fn clear_failed(
     Ok(Json(json!({ "removed": ids.len() })))
 }
 
-/// The recording as an HLS playlist, so any device can play it, even while it is still recording.
-pub async fn playlist(
-    State(state): State<AppState>,
-    AuthUser(user): AuthUser,
-    parts: Parts,
-    Path(id): Path<String>,
+/// The recording as an HLS playlist text, with segment links carrying `suffix` (a `?token=` or nothing).
+pub async fn playlist_text(
+    state: &AppState,
+    owner: &str,
+    id: &str,
+    suffix: &str,
 ) -> ApiResult<Response> {
-    let (_, owner) = owned(&state, &user, &id)?;
-    let text = tokio::fs::read_to_string(recording_dir(&state, &owner, &id).join("index.m3u8"))
+    let text = tokio::fs::read_to_string(recording_dir(state, owner, id).join("index.m3u8"))
         .await
         .map_err(|_| ApiError::not_found("Nothing has been recorded yet."))?;
-    let suffix = bearer(&parts)
-        .map(|t| format!("?token={t}"))
-        .unwrap_or_default();
     let rewritten: String = text
         .lines()
         .map(|line| {
@@ -281,43 +454,114 @@ pub async fn playlist(
         .into_response())
 }
 
-fn valid_segment(name: &str) -> bool {
-    name.len() == 11
+/// The recording as an HLS playlist, so any device can play it, even while it is still recording.
+pub async fn playlist(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    parts: Parts,
+    Path(id): Path<String>,
+) -> ApiResult<Response> {
+    let (_, owner) = owned(&state, &user, &id)?;
+    let suffix = bearer(&parts)
+        .map(|t| format!("?token={t}"))
+        .unwrap_or_default();
+    playlist_text(&state, &owner, &id, &suffix).await
+}
+
+pub fn valid_segment(name: &str) -> bool {
+    name.len() >= 11
         && name.starts_with("seg")
         && name.ends_with(".ts")
-        && name[3..8].chars().all(|c| c.is_ascii_digit())
+        && name.is_char_boundary(name.len() - 3)
+        && name[3..name.len() - 3].chars().all(|c| c.is_ascii_digit())
+}
+
+pub async fn segment_file(
+    state: &AppState,
+    owner: &str,
+    id: &str,
+    name: &str,
+    headers: &HeaderMap,
+) -> ApiResult<Response> {
+    if !valid_segment(name) {
+        return Err(ApiError::not_found("Segment not found."));
+    }
+    files::serve(
+        &recording_dir(state, owner, id).join(name),
+        "video/mp2t",
+        "private, max-age=3600",
+        headers,
+        None,
+    )
+    .await
 }
 
 pub async fn segment(
     State(state): State<AppState>,
     AuthUser(user): AuthUser,
+    headers: HeaderMap,
     Path((id, name)): Path<(String, String)>,
 ) -> ApiResult<Response> {
-    if !valid_segment(&name) {
-        return Err(ApiError::not_found("Segment not found."));
-    }
     let (_, owner) = owned(&state, &user, &id)?;
-    let data = tokio::fs::read(recording_dir(&state, &owner, &id).join(&name))
-        .await
-        .map_err(|_| ApiError::not_found("Segment not found."))?;
-    Ok((
-        [
-            (header::CONTENT_TYPE, "video/mp2t"),
-            (header::CACHE_CONTROL, "private, max-age=3600"),
-        ],
-        data,
-    )
-        .into_response())
+    segment_file(&state, &owner, &id, &name, &headers).await
 }
 
-/// Streams the whole recording as one .ts file.
-pub async fn download(
-    State(state): State<AppState>,
-    AuthUser(user): AuthUser,
-    Path(id): Path<String>,
+fn file_type(name: &str) -> &'static str {
+    match name
+        .rsplit('.')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "mp4" | "m4v" => "video/mp4",
+        "mkv" => "video/x-matroska",
+        "webm" => "video/webm",
+        "avi" => "video/x-msvideo",
+        "mov" => "video/quicktime",
+        "ts" => "video/mp2t",
+        _ => "application/octet-stream",
+    }
+}
+
+/// A file name that is safe in a header and on disk.
+pub fn clean_name(title: &str) -> String {
+    title.replace(
+        |c: char| !(c.is_alphanumeric() || c == ' ' || c == '-'),
+        "_",
+    )
+}
+
+/// The whole item as one file: a saved download as it is, a recording stitched from its segments.
+pub async fn download_file(
+    state: &AppState,
+    owner: &str,
+    id: &str,
+    headers: &HeaderMap,
 ) -> ApiResult<Response> {
-    let (value, owner) = owned(&state, &user, &id)?;
-    let dir = recording_dir(&state, &owner, &id);
+    let (title, kind, file): (String, String, Option<String>) = state.db.conn().query_row(
+        "SELECT title, kind, file_name FROM recordings WHERE id = ?1",
+        [id],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    )?;
+    let dir = recording_dir(state, owner, id);
+    let title = clean_name(&title);
+
+    if kind == "download" {
+        let name = file
+            .filter(|n| !n.contains(['/', '\\']))
+            .ok_or_else(|| ApiError::not_found("Nothing has been saved yet."))?;
+        let ext = name.rsplit('.').next().unwrap_or("mp4").to_string();
+        return files::serve(
+            &dir.join(&name),
+            file_type(&name),
+            "private, max-age=3600",
+            headers,
+            Some(format!("attachment; filename=\"{title}.{ext}\"")),
+        )
+        .await;
+    }
+
     let mut names: Vec<String> = std::fs::read_dir(&dir)
         .map_err(|_| ApiError::not_found("Nothing has been recorded yet."))?
         .flatten()
@@ -325,15 +569,11 @@ pub async fn download(
         .filter(|n| valid_segment(n))
         .collect();
     names.sort();
-    let files = stream::iter(names).then(move |name| {
+    let parts = stream::iter(names).then(move |name| {
         let path = dir.join(name);
         async move { tokio::fs::read(path).await }
     });
-    let title = value["title"].as_str().unwrap_or("recording").replace(
-        |c: char| !(c.is_alphanumeric() || c == ' ' || c == '-'),
-        "_",
-    );
-    let mut response = Response::new(Body::from_stream(files));
+    let mut response = Response::new(Body::from_stream(parts));
     response
         .headers_mut()
         .insert(header::CONTENT_TYPE, HeaderValue::from_static("video/mp2t"));
@@ -347,4 +587,31 @@ pub async fn download(
     Ok(response)
 }
 
-use futures_util::StreamExt;
+/// Streams the whole recording as one file.
+pub async fn download(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> ApiResult<Response> {
+    let (_, owner) = owned(&state, &user, &id)?;
+    download_file(&state, &owner, &id, &headers).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_numbered_segments_are_served() {
+        assert!(valid_segment("seg00001.ts"));
+        assert!(!valid_segment("../seg0001.ts"));
+        assert!(!valid_segment("seg0000a.ts"));
+        assert!(!valid_segment("index.m3u8"));
+    }
+
+    #[test]
+    fn titles_become_safe_file_names() {
+        assert_eq!(clean_name("News: 8/9 \"live\""), "News_ 8_9 _live_");
+    }
+}

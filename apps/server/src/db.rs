@@ -118,7 +118,77 @@ CREATE TABLE IF NOT EXISTS audit (
   action TEXT NOT NULL,
   detail TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS bookmarks (
+  id TEXT PRIMARY KEY,
+  recording_id TEXT NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+  at_s INTEGER NOT NULL,
+  label TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_recording ON bookmarks(recording_id);
+CREATE TABLE IF NOT EXISTS shares (
+  token TEXT PRIMARY KEY,
+  recording_id TEXT NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+  expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS epg_channels (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  norm TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_epg_channels_norm ON epg_channels(norm);
+CREATE TABLE IF NOT EXISTS epg_programmes (
+  channel_id TEXT NOT NULL,
+  start_at INTEGER NOT NULL,
+  stop_at INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_epg_programmes ON epg_programmes(channel_id, start_at);
+CREATE TABLE IF NOT EXISTS series_rules (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  epg_channel_id TEXT NOT NULL,
+  channel_name TEXT NOT NULL DEFAULT '',
+  source_url TEXT NOT NULL,
+  backup_url TEXT,
+  pad_before_s INTEGER NOT NULL DEFAULT 0,
+  pad_after_s INTEGER NOT NULL DEFAULT 0,
+  keep_hours INTEGER,
+  keep_last INTEGER,
+  tag TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS channel_health (
+  url TEXT PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT '',
+  ok INTEGER NOT NULL,
+  detail TEXT NOT NULL DEFAULT '',
+  checked_at INTEGER NOT NULL
+);
 ";
+
+/// Adds a column to a table made by an earlier version, once.
+fn add_column(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    declaration: &str,
+) -> rusqlite::Result<()> {
+    let present = conn
+        .prepare(&format!("PRAGMA table_info({table})"))?
+        .query_map([], |r| r.get::<_, String>(1))?
+        .flatten()
+        .any(|name| name == column);
+    if !present {
+        conn.execute(
+            &format!("ALTER TABLE {table} ADD COLUMN {column} {declaration}"),
+            [],
+        )?;
+    }
+    Ok(())
+}
 
 /// Changes to tables that already exist in a database made by an earlier version.
 fn migrate(conn: &Connection) -> rusqlite::Result<()> {
@@ -138,10 +208,56 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if !has_keep_last {
         conn.execute("ALTER TABLE schedules ADD COLUMN keep_last INTEGER", [])?;
     }
+    // Library: downloads, folders, watch state, a backup address and a thumbnail flag.
+    add_column(
+        conn,
+        "recordings",
+        "kind",
+        "TEXT NOT NULL DEFAULT 'recording'",
+    )?;
+    add_column(conn, "recordings", "tag", "TEXT NOT NULL DEFAULT ''")?;
+    add_column(conn, "recordings", "watched", "INTEGER NOT NULL DEFAULT 0")?;
+    add_column(
+        conn,
+        "recordings",
+        "position_s",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column(conn, "recordings", "backup_url", "TEXT")?;
+    add_column(conn, "recordings", "thumb", "INTEGER NOT NULL DEFAULT 0")?;
+    add_column(conn, "recordings", "file_name", "TEXT")?;
+    add_column(conn, "recordings", "series_rule_id", "TEXT")?;
+    add_column(conn, "recordings", "total_bytes", "INTEGER")?;
+    add_column(conn, "recordings", "retries", "INTEGER NOT NULL DEFAULT 0")?;
+    // Schedules made before the default timer existed keep their recordings, as they always did.
+    let first_run_of_timer = !conn
+        .prepare("PRAGMA table_info(schedules)")?
+        .query_map([], |r| r.get::<_, String>(1))?
+        .flatten()
+        .any(|name| name == "tag");
+    add_column(conn, "schedules", "backup_url", "TEXT")?;
+    add_column(conn, "schedules", "quality", "TEXT NOT NULL DEFAULT 'best'")?;
+    add_column(conn, "schedules", "webhook_url", "TEXT")?;
+    add_column(conn, "schedules", "tag", "TEXT NOT NULL DEFAULT ''")?;
+    add_column(conn, "schedules", "epg_id", "TEXT NOT NULL DEFAULT ''")?;
+    add_column(
+        conn,
+        "schedules",
+        "follow_guide",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    if first_run_of_timer {
+        conn.execute(
+            "UPDATE schedules SET keep_hours = 0 WHERE keep_hours IS NULL",
+            [],
+        )?;
+    }
     // One row per occurrence of a schedule, so the materialiser can run as often as it likes.
     conn.execute_batch(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_recordings_occurrence
-           ON recordings(schedule_id, start_at) WHERE schedule_id IS NOT NULL;",
+           ON recordings(schedule_id, start_at) WHERE schedule_id IS NOT NULL;
+         CREATE UNIQUE INDEX IF NOT EXISTS idx_recordings_series
+           ON recordings(series_rule_id, start_at) WHERE series_rule_id IS NOT NULL;",
     )
 }
 

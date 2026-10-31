@@ -17,7 +17,7 @@ use crate::{
     state::AppState,
 };
 
-const COLUMNS: &str = "id, user_id, title, channel_name, source_url, tz, start_time, duration_s, days_mask, start_date, end_date, pad_before_s, pad_after_s, keep_hours, enabled, created_at, keep_last";
+const COLUMNS: &str = "id, user_id, title, channel_name, source_url, tz, start_time, duration_s, days_mask, start_date, end_date, pad_before_s, pad_after_s, keep_hours, enabled, created_at, keep_last, backup_url, quality, webhook_url, tag, epg_id, follow_guide";
 
 fn row_json(r: &rusqlite::Row) -> rusqlite::Result<Value> {
     Ok(json!({
@@ -37,6 +37,12 @@ fn row_json(r: &rusqlite::Row) -> rusqlite::Result<Value> {
         "enabled": r.get::<_, i64>(14)? != 0,
         "createdAt": r.get::<_, i64>(15)?,
         "keepLast": r.get::<_, Option<i64>>(16)?,
+        "backupUrl": r.get::<_, Option<String>>(17)?,
+        "quality": r.get::<_, String>(18)?,
+        "webhookUrl": r.get::<_, Option<String>>(19)?,
+        "tag": r.get::<_, String>(20)?,
+        "epgId": r.get::<_, String>(21)?,
+        "followGuide": r.get::<_, i64>(22)? != 0,
     }))
 }
 
@@ -85,7 +91,7 @@ pub async fn list(
     Ok(Json(json!({ "schedules": rows })))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, serde::Serialize, Clone)]
 pub struct NewSchedule {
     title: String,
     #[serde(default)]
@@ -115,6 +121,28 @@ pub struct NewSchedule {
     keep_last: Option<i64>,
     #[serde(default = "yes")]
     enabled: bool,
+    /// A second address for the channel, tried when the first keeps failing.
+    #[serde(default)]
+    backup_url: Option<String>,
+    /// `best` or `lowest` (smaller files).
+    #[serde(default = "best")]
+    quality: String,
+    /// Told when a recording of this schedule ends; overrides the server-wide webhook.
+    #[serde(default)]
+    webhook_url: Option<String>,
+    /// Folder the recordings are put in.
+    #[serde(default)]
+    tag: String,
+    /// The channel's id in the TV guide, needed for `follow_guide`.
+    #[serde(default)]
+    epg_id: String,
+    /// Keep recording until the guide says the programme has ended.
+    #[serde(default)]
+    follow_guide: bool,
+}
+
+fn best() -> String {
+    "best".into()
 }
 
 fn yes() -> bool {
@@ -139,6 +167,20 @@ async fn validate(state: &AppState, user: &User, body: &NewSchedule) -> ApiResul
     .map_err(ApiError::bad)?;
     check_quota(state, user, body.seconds + body.pad_before + body.pad_after)?;
     check_target(state, &body.url).await?;
+    if let Some(backup) = body.backup_url.as_deref().filter(|u| !u.is_empty()) {
+        check_target(state, backup).await?;
+    }
+    if !matches!(body.quality.as_str(), "best" | "lowest") {
+        return Err(ApiError::bad("Quality is best or lowest."));
+    }
+    if let Some(hook) = body.webhook_url.as_deref().filter(|u| !u.is_empty()) {
+        if !hook.starts_with("http://") && !hook.starts_with("https://") {
+            return Err(ApiError::bad(
+                "The webhook must be an http or https address.",
+            ));
+        }
+        check_target(state, hook).await?;
+    }
     Ok(rule)
 }
 
@@ -177,10 +219,14 @@ fn warnings(
     notes
 }
 
+/// Ten years; anything longer is treated as the default timer.
+const MAX_KEEP_HOURS: i64 = 87_600;
+
 fn save_fields(body: &NewSchedule) -> (String, String, Option<i64>) {
     let title: String = body.title.trim().chars().take(120).collect();
     let channel: String = body.channel_name.chars().take(120).collect();
-    let keep = body.keep_hours.filter(|h| *h > 0);
+    // 0 is kept as 0: "forever". Empty means the server's default timer.
+    let keep = body.keep_hours.filter(|h| (0..=MAX_KEEP_HOURS).contains(h));
     (title, channel, keep)
 }
 
@@ -196,8 +242,10 @@ pub async fn create(
     state.db.conn().execute(
         "INSERT INTO schedules
            (id, user_id, title, channel_name, source_url, tz, start_time, duration_s, days_mask,
-            start_date, end_date, pad_before_s, pad_after_s, keep_hours, enabled, created_at, keep_last)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+            start_date, end_date, pad_before_s, pad_after_s, keep_hours, enabled, created_at, keep_last,
+            backup_url, quality, webhook_url, tag, epg_id, follow_guide)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17,
+                 ?18, ?19, ?20, ?21, ?22, ?23)",
         params![
             id,
             user.id,
@@ -216,6 +264,12 @@ pub async fn create(
             i64::from(body.enabled),
             now(),
             body.keep_last.filter(|n| *n > 0),
+            body.backup_url.as_deref().filter(|u| !u.is_empty()),
+            body.quality,
+            body.webhook_url.as_deref().filter(|u| !u.is_empty()),
+            body.tag.trim().chars().take(40).collect::<String>(),
+            body.epg_id.trim(),
+            i64::from(body.follow_guide),
         ],
     )?;
     materialise(&state);
@@ -244,7 +298,8 @@ pub async fn update(
     state.db.conn().execute(
         "UPDATE schedules SET title = ?1, channel_name = ?2, source_url = ?3, tz = ?4, start_time = ?5,
            duration_s = ?6, days_mask = ?7, start_date = ?8, end_date = ?9, pad_before_s = ?10,
-           pad_after_s = ?11, keep_hours = ?12, enabled = ?13, keep_last = ?15 WHERE id = ?14",
+           pad_after_s = ?11, keep_hours = ?12, enabled = ?13, keep_last = ?15, backup_url = ?16,
+           quality = ?17, webhook_url = ?18, tag = ?19, epg_id = ?20, follow_guide = ?21 WHERE id = ?14",
         params![
             title,
             channel,
@@ -261,6 +316,12 @@ pub async fn update(
             i64::from(body.enabled),
             id,
             body.keep_last.filter(|n| *n > 0),
+            body.backup_url.as_deref().filter(|u| !u.is_empty()),
+            body.quality,
+            body.webhook_url.as_deref().filter(|u| !u.is_empty()),
+            body.tag.trim().chars().take(40).collect::<String>(),
+            body.epg_id.trim(),
+            i64::from(body.follow_guide),
         ],
     )?;
     drop_future(&state, &id);
@@ -320,20 +381,25 @@ pub async fn run_now(
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
     owned(&state, &user, &id)?;
-    let (owner, title, channel, url, seconds, after, keep): (String, String, String, String, i64, i64, Option<i64>) =
+    let (owner, title, channel, url, seconds, after, keep, tag): (String, String, String, String, i64, i64, Option<i64>, String) =
         state.db.conn().query_row(
-            "SELECT user_id, title, channel_name, source_url, duration_s, pad_after_s, keep_hours FROM schedules WHERE id = ?1",
+            "SELECT user_id, title, channel_name, source_url, duration_s, pad_after_s, keep_hours, tag FROM schedules WHERE id = ?1",
             [&id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?)),
         )?;
+    let keep = match keep {
+        Some(0) => None,
+        Some(h) => Some(h.min(MAX_KEEP_HOURS)),
+        None => super::recordings::keep_for(&state, &user, None),
+    };
     let seconds = seconds + after;
     check_quota(&state, &user, seconds)?;
     check_target(&state, &url).await?;
     let rec = uuid::Uuid::new_v4().to_string();
     state.db.conn().execute(
-        "INSERT INTO recordings (id, user_id, title, channel_name, source_url, status, start_at, max_seconds, keep_hours, created_at, schedule_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, 'queued', ?6, ?7, ?8, ?6, ?9)",
-        params![rec, owner, title, channel, url, now(), seconds, keep, id],
+        "INSERT INTO recordings (id, user_id, title, channel_name, source_url, status, start_at, max_seconds, keep_hours, created_at, schedule_id, tag)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'queued', ?6, ?7, ?8, ?6, ?9, ?10)",
+        params![rec, owner, title, channel, url, now(), seconds, keep, id, tag],
     )?;
     crate::jobs::start(&state, &rec);
     state.db.audit(&user.username, "schedule.run", &title);
@@ -351,9 +417,11 @@ pub async fn duplicate(
     let changed = state.db.conn().execute(
         "INSERT INTO schedules
            (id, user_id, title, channel_name, source_url, tz, start_time, duration_s, days_mask,
-            start_date, end_date, pad_before_s, pad_after_s, keep_hours, enabled, created_at, keep_last)
+            start_date, end_date, pad_before_s, pad_after_s, keep_hours, enabled, created_at, keep_last,
+            backup_url, quality, webhook_url, tag, epg_id, follow_guide)
          SELECT ?1, user_id, substr(title, 1, 112) || ' (copy)', channel_name, source_url, tz, start_time, duration_s,
-                days_mask, start_date, end_date, pad_before_s, pad_after_s, keep_hours, 0, ?2, keep_last
+                days_mask, start_date, end_date, pad_before_s, pad_after_s, keep_hours, 0, ?2, keep_last,
+                backup_url, quality, webhook_url, tag, epg_id, follow_guide
          FROM schedules WHERE id = ?3",
         params![copy, now(), id],
     )?;
@@ -396,4 +464,75 @@ pub async fn pause_all(
         "",
     );
     Ok(Json(json!({ "changed": changed })))
+}
+
+/// Every schedule of the account in the same shape the create call takes, to keep or move to
+/// another server.
+pub async fn export(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+) -> ApiResult<Json<Value>> {
+    let rows: Vec<NewSchedule> = {
+        let conn = state.db.conn();
+        let mut stmt = conn.prepare(
+            "SELECT title, channel_name, source_url, tz, start_time, duration_s, days_mask, start_date,
+                    end_date, pad_before_s, pad_after_s, keep_hours, keep_last, enabled, backup_url,
+                    quality, webhook_url, tag, epg_id, follow_guide
+             FROM schedules WHERE user_id = ?1 ORDER BY created_at",
+        )?;
+        let rows = stmt
+            .query_map([&user.id], |r| {
+                Ok(NewSchedule {
+                    title: r.get(0)?,
+                    channel_name: r.get(1)?,
+                    url: r.get(2)?,
+                    tz: r.get(3)?,
+                    start_time: r.get(4)?,
+                    seconds: r.get(5)?,
+                    days: r.get(6)?,
+                    start_date: r.get(7)?,
+                    end_date: r.get(8)?,
+                    pad_before: r.get(9)?,
+                    pad_after: r.get(10)?,
+                    keep_hours: r.get(11)?,
+                    keep_last: r.get(12)?,
+                    enabled: r.get::<_, i64>(13)? != 0,
+                    backup_url: r.get(14)?,
+                    quality: r.get(15)?,
+                    webhook_url: r.get(16)?,
+                    tag: r.get(17)?,
+                    epg_id: r.get(18)?,
+                    follow_guide: r.get::<_, i64>(19)? != 0,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows
+    };
+    Ok(Json(json!({ "version": 1, "schedules": rows })))
+}
+
+#[derive(Deserialize)]
+pub struct Import {
+    schedules: Vec<NewSchedule>,
+}
+
+/// Adds the schedules of an export. Ones that do not pass the checks are reported, not fatal.
+pub async fn import(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Json(body): Json<Import>,
+) -> ApiResult<Json<Value>> {
+    if body.schedules.len() > 200 {
+        return Err(ApiError::bad("Import at most 200 schedules at a time."));
+    }
+    let mut added = 0;
+    let mut problems = Vec::new();
+    for item in body.schedules {
+        let title = item.title.clone();
+        match create(State(state.clone()), AuthUser(user.clone()), Json(item)).await {
+            Ok(_) => added += 1,
+            Err(error) => problems.push(format!("{title}: {error}")),
+        }
+    }
+    Ok(Json(json!({ "added": added, "problems": problems })))
 }

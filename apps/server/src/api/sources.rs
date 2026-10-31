@@ -31,6 +31,31 @@ pub struct Channel {
     pub url: String,
     pub group: String,
     pub logo: String,
+    /// The playlist's own id for the channel (`tvg-id`), used to find it in the TV guide.
+    pub id: String,
+    /// `live`, `movie` or `series`.
+    pub kind: &'static str,
+}
+
+/// Tells live channels from movies and episodes by the address and the group name.
+fn classify(url: &str, group: &str) -> &'static str {
+    let lower = url.to_ascii_lowercase();
+    let path = lower.split(['?', '#']).next().unwrap_or("");
+    let group = group.to_lowercase();
+    if path.contains("/series/") || group.contains("serie") || group.contains("série") {
+        "series"
+    } else if path.contains("/movie/")
+        || [".mp4", ".mkv", ".avi", ".mov"]
+            .iter()
+            .any(|ext| path.ends_with(ext))
+        || group.contains("movie")
+        || group.contains("vod")
+        || group.contains("film")
+    {
+        "movie"
+    } else {
+        "live"
+    }
 }
 
 /// The value of `key="..."` inside an `#EXTINF` line.
@@ -62,11 +87,14 @@ pub fn parse_m3u(text: &str) -> Vec<Channel> {
                 .filter(|n| !n.is_empty())
                 .or_else(|| attribute(info, "tvg-name"))
                 .unwrap_or_else(|| "Channel".into());
+            let group = attribute(info, "group-title").unwrap_or_default();
             channels.push(Channel {
                 name,
                 url: line.to_string(),
-                group: attribute(info, "group-title").unwrap_or_default(),
+                kind: classify(line, &group),
+                group,
                 logo: attribute(info, "tvg-logo").unwrap_or_default(),
+                id: attribute(info, "tvg-id").unwrap_or_default(),
             });
         }
     }
@@ -91,6 +119,12 @@ fn playlist_url(kind: &str, url: &str, username: &str, password: &str) -> ApiRes
 }
 
 async fn download(state: &AppState, start: Url) -> ApiResult<String> {
+    let bytes = fetch_bytes(state, start, MAX_PLAYLIST_BYTES).await?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// Reads a file from the internet, following redirects one checked hop at a time, up to `max` bytes.
+pub async fn fetch_bytes(state: &AppState, start: Url, max: usize) -> ApiResult<Vec<u8>> {
     let mut url = check_target(state, start.as_str()).await?;
     // Follow redirects by hand so every hop is checked, not only the first address.
     for _ in 0..5 {
@@ -118,16 +152,12 @@ async fn download(state: &AppState, start: Url) -> ApiResult<String> {
                 reply.status()
             )));
         }
-        if reply
-            .content_length()
-            .is_some_and(|n| n as usize > MAX_PLAYLIST_BYTES)
-        {
-            return Err(ApiError::bad("That playlist is too large."));
+        if reply.content_length().is_some_and(|n| n as usize > max) {
+            return Err(ApiError::bad("That file is too large."));
         }
-        let bytes = crate::net::read_capped(reply, MAX_PLAYLIST_BYTES)
+        return crate::net::read_capped(reply, max)
             .await
-            .map_err(|_| ApiError::bad("That playlist is too large or could not be read."))?;
-        return Ok(String::from_utf8_lossy(&bytes).into_owned());
+            .map_err(|_| ApiError::bad("That file is too large or could not be read."));
     }
     Err(ApiError::bad("Too many redirects."))
 }
@@ -277,11 +307,16 @@ pub async fn remove(
 
 #[derive(Deserialize)]
 pub struct Search {
+    /// A source id, or `all` to merge every source of the account (same-named channels become one,
+    /// with the other addresses listed as `alt`).
     source: String,
     #[serde(default)]
     q: String,
     #[serde(default)]
     group: String,
+    /// `live`, `movie` or `series`; empty for everything.
+    #[serde(default)]
+    kind: String,
     #[serde(default)]
     offset: usize,
     #[serde(default = "page")]
@@ -292,16 +327,74 @@ fn page() -> usize {
     100
 }
 
+/// Every channel of every source, with channels of the same name joined: the first address is used
+/// and the others are kept as backups. Movies and episodes are never joined by name.
+async fn merged(
+    state: &AppState,
+    user_id: &str,
+) -> ApiResult<(
+    Arc<Vec<Channel>>,
+    std::collections::HashMap<String, Vec<String>>,
+)> {
+    let ids: Vec<String> = {
+        let conn = state.db.conn();
+        let mut stmt =
+            conn.prepare("SELECT id FROM sources WHERE user_id = ?1 ORDER BY created_at")?;
+        let rows = stmt
+            .query_map([user_id], |r| r.get(0))?
+            .collect::<Result<_, _>>()?;
+        rows
+    };
+    let mut out: Vec<Channel> = Vec::new();
+    let mut by_name: std::collections::HashMap<String, usize> = Default::default();
+    let mut alts: std::collections::HashMap<String, Vec<String>> = Default::default();
+    for id in ids {
+        // One source that cannot be read should not hide the others.
+        let Ok(list) = channels_of(state, user_id, &id).await else {
+            continue;
+        };
+        for channel in list.iter() {
+            let key = crate::epg::norm(&channel.name);
+            if channel.kind == "live" && !key.is_empty() {
+                if let Some(&at) = by_name.get(&key) {
+                    let primary = out[at].url.clone();
+                    if channel.url != primary {
+                        let list = alts.entry(primary).or_default();
+                        if list.len() < 3 && !list.contains(&channel.url) {
+                            list.push(channel.url.clone());
+                        }
+                    }
+                    continue;
+                }
+                by_name.insert(key, out.len());
+            }
+            out.push(channel.clone());
+        }
+    }
+    if out.is_empty() {
+        return Err(ApiError::bad("Add a playlist first."));
+    }
+    Ok((Arc::new(out), alts))
+}
+
 pub async fn channels(
     State(state): State<AppState>,
     AuthUser(user): AuthUser,
     Query(search): Query<Search>,
 ) -> ApiResult<Json<Value>> {
-    let all = channels_of(&state, &user.id, &search.source).await?;
+    let (all, alts) = if search.source == "all" {
+        merged(&state, &user.id).await?
+    } else {
+        (
+            channels_of(&state, &user.id, &search.source).await?,
+            Default::default(),
+        )
+    };
     let needle = search.q.trim().to_lowercase();
     let matching: Vec<&Channel> = all
         .iter()
         .filter(|c| search.group.is_empty() || c.group == search.group)
+        .filter(|c| search.kind.is_empty() || c.kind == search.kind)
         .filter(|c| needle.is_empty() || c.name.to_lowercase().contains(&needle))
         .collect();
     let mut groups: Vec<&str> = all
@@ -315,7 +408,13 @@ pub async fn channels(
         .iter()
         .skip(search.offset)
         .take(search.limit.clamp(1, 500))
-        .map(|c| json!({ "name": c.name, "url": c.url, "group": c.group, "logo": c.logo }))
+        .map(|c| {
+            json!({
+                "name": c.name, "url": c.url, "group": c.group, "logo": c.logo,
+                "id": c.id, "kind": c.kind,
+                "alt": alts.get(&c.url).cloned().unwrap_or_default(),
+            })
+        })
         .collect();
     Ok(Json(json!({
         "channels": items,
@@ -342,8 +441,19 @@ mod tests {
         assert_eq!(channels[0].name, "Alpha News");
         assert_eq!(channels[0].group, "News, World");
         assert_eq!(channels[0].logo, "http://l/a.png");
+        assert_eq!(channels[0].id, "a.fr");
+        assert_eq!(channels[0].kind, "live");
         assert_eq!(channels[1].name, "Beta");
         assert_eq!(channels[1].group, "");
+    }
+
+    #[test]
+    fn movies_and_series_are_told_apart_from_live_channels() {
+        assert_eq!(classify("http://h/movie/u/p/1.mkv", ""), "movie");
+        assert_eq!(classify("http://h/series/u/p/2.mp4", ""), "series");
+        assert_eq!(classify("http://h/live/u/p/3.ts", "News"), "live");
+        assert_eq!(classify("http://h/x/4", "VOD - Action"), "movie");
+        assert_eq!(classify("http://h/x/5", "Séries FR"), "series");
     }
 
     #[test]

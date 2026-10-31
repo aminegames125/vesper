@@ -1,9 +1,12 @@
 mod account;
 mod admin;
+mod files;
+mod guide;
+pub mod library;
 mod proxy;
 mod recordings;
 mod schedules;
-mod sources;
+pub mod sources;
 mod status;
 mod sync;
 
@@ -12,6 +15,7 @@ use axum::{
     Router,
 };
 
+pub use recordings::DEFAULT_KEEP_HOURS;
 pub use sources::Channel;
 
 use crate::state::AppState;
@@ -22,10 +26,15 @@ pub const SETTING_DEFAULTS: &[(&str, &str)] = &[
     ("default_max_concurrent", "1"),
     ("default_max_hours", "4"),
     ("default_storage_gb", "5"),
-    ("default_keep_hours", ""),
+    ("default_keep_hours", recordings::DEFAULT_KEEP_HOURS),
+    ("delete_watched_days", "0"),
     ("allow_private", "false"),
     ("session_days", "30"),
     ("webhook_url", ""),
+    ("epg_url", ""),
+    ("quiet_start", ""),
+    ("quiet_end", ""),
+    ("update_check", "true"),
 ];
 
 pub fn router() -> Router<AppState> {
@@ -44,13 +53,50 @@ pub fn router() -> Router<AppState> {
         .route(
             "/recordings/{id}",
             get(recordings::show)
-                .patch(recordings::rename)
+                .patch(recordings::patch)
                 .delete(recordings::remove),
         )
+        .route("/downloads", post(recordings::create_download))
+        .route(
+            "/recordings/{id}/bookmarks",
+            get(library::bookmarks).post(library::add_bookmark),
+        )
+        .route(
+            "/recordings/{id}/bookmarks/{bookmark}",
+            delete(library::remove_bookmark),
+        )
+        .route(
+            "/recordings/{id}/share",
+            post(library::create_share).get(library::list_shares),
+        )
+        .route(
+            "/recordings/{id}/share/{token}",
+            delete(library::revoke_share),
+        )
+        .route("/recordings/{id}/thumb.jpg", get(library::thumb))
+        .route("/recordings/{id}/export", post(library::export))
+        .route("/recordings/{id}/export.mp4", get(library::export_file))
+        .route("/recordings/{id}/trim", post(library::trim))
+        .route("/share/{token}/index.m3u8", get(library::shared_playlist))
+        .route("/share/{token}/seg/{name}", get(library::shared_segment))
+        .route("/share/{token}/download", get(library::shared_download))
         .route("/recordings/clear-failed", post(recordings::clear_failed))
         .route("/status", get(status::status))
         .route("/channels/test", post(status::test_channel))
         .route("/schedules/pause", post(schedules::pause_all))
+        .route("/schedules/export", get(schedules::export))
+        .route("/schedules/import", post(schedules::import))
+        .route("/guide", get(guide::programmes))
+        .route("/guide/search", get(guide::search))
+        .route("/guide/status", get(guide::guide_status))
+        .route("/guide/refresh", post(guide::refresh))
+        .route("/series-rules", get(guide::rules).post(guide::create_rule))
+        .route(
+            "/series-rules/{id}",
+            axum::routing::patch(guide::set_rule_enabled).delete(guide::remove_rule),
+        )
+        .route("/calendar", get(guide::calendar))
+        .route("/status/storage", get(status::storage))
         .route("/schedules/{id}/run", post(schedules::run_now))
         .route("/schedules/{id}/duplicate", post(schedules::duplicate))
         .route("/recordings/{id}/stop", post(recordings::stop))
@@ -88,6 +134,7 @@ pub fn router() -> Router<AppState> {
             get(admin::settings).put(admin::update_settings),
         )
         .route("/admin/audit", get(admin::audit))
+        .route("/admin/crashes", get(admin::crashes))
         .route("/admin/recordings", get(admin::recordings))
         .route("/admin/schedules", get(admin::schedules))
         .route("/admin/schedules/{id}", delete(admin::delete_schedule))

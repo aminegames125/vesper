@@ -418,6 +418,38 @@ pub async fn settings(State(state): State<AppState>, _admin: AdminUser) -> Json<
     Json(Value::Object(map))
 }
 
+/// The latest crash reports the server wrote itself (`data/crash/`), newest first. Nothing is sent
+/// anywhere; this is only for reading them here.
+pub async fn crashes(State(state): State<AppState>, _admin: AdminUser) -> Json<Value> {
+    let dir = state.config.data_dir.join("crash");
+    let mut files: Vec<_> = std::fs::read_dir(&dir)
+        .map(|entries| entries.flatten().map(|e| e.path()).collect())
+        .unwrap_or_default();
+    files.sort();
+    files.reverse();
+    let reports: Vec<Value> = files
+        .into_iter()
+        .take(5)
+        .filter_map(|path| {
+            let at: i64 = path.file_stem()?.to_str()?.parse().ok()?;
+            let text: String = std::fs::read_to_string(&path)
+                .ok()?
+                .chars()
+                .take(6000)
+                .collect();
+            Some(json!({ "at": at, "report": text }))
+        })
+        .collect();
+    Json(json!({ "crashes": reports }))
+}
+
+/// `HH:MM` on a 24 hour clock.
+fn valid_clock(text: &str) -> bool {
+    text.split_once(':').is_some_and(|(h, m)| {
+        h.parse::<u32>().is_ok_and(|h| h < 24) && m.parse::<u32>().is_ok_and(|m| m < 60)
+    })
+}
+
 pub async fn update_settings(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -438,6 +470,19 @@ pub async fn update_settings(
             return Err(ApiError::bad(
                 "Registration must be closed, invite or open.",
             ));
+        }
+        let invalid = match key.as_str() {
+            "epg_url" | "webhook_url" => {
+                !(text.is_empty() || text.starts_with("http://") || text.starts_with("https://"))
+            }
+            "quiet_start" | "quiet_end" => !(text.is_empty() || valid_clock(&text)),
+            "delete_watched_days" | "default_keep_hours" => {
+                !(text.is_empty() || text.parse::<u32>().is_ok())
+            }
+            _ => false,
+        };
+        if invalid {
+            return Err(ApiError::bad(format!("That value is not valid for {key}.")));
         }
         state.db.set_setting(&key, &text)?;
     }

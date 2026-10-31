@@ -23,7 +23,13 @@ pub(crate) enum Playlist {
 }
 
 /// Reads a playlist body. A master playlist resolves to its highest-bandwidth variant.
+#[cfg(test)]
 pub(crate) fn parse(body: &str, base: &Url) -> Result<Playlist> {
+    parse_with(body, base, false)
+}
+
+/// Like [`parse`], but a master playlist can resolve to its smallest variant to save disk space.
+pub(crate) fn parse_with(body: &str, base: &Url, lowest: bool) -> Result<Playlist> {
     let lines: Vec<&str> = body.lines().map(str::trim).collect();
 
     if lines.iter().any(|l| l.starts_with("#EXT-X-STREAM-INF")) {
@@ -41,7 +47,14 @@ pub(crate) fn parse(body: &str, base: &Url) -> Result<Playlist> {
                 .iter()
                 .find(|l| !l.is_empty() && !l.starts_with('#'))
             {
-                if best.is_none_or(|(b, _)| bandwidth >= b) {
+                let better = |b: u64| {
+                    if lowest {
+                        bandwidth <= b
+                    } else {
+                        bandwidth >= b
+                    }
+                };
+                if best.is_none_or(|(b, _)| better(b)) {
                     best = Some((bandwidth, uri));
                 }
             }
@@ -87,6 +100,7 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
     start: Url,
     sink: &mut dyn Sink,
     run: &mut Run<'_, F>,
+    lowest: bool,
 ) -> Result<()> {
     let mut url = start;
     let mut seen: HashSet<String> = HashSet::new();
@@ -127,7 +141,7 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
             }
         };
 
-        let media = match parse(&body, &url)? {
+        let media = match parse_with(&body, &url, lowest)? {
             Playlist::Master(variant) => {
                 // A master that points back at a master would otherwise loop forever.
                 hops += 1;
@@ -209,6 +223,15 @@ mod tests {
 
     fn base() -> Url {
         Url::parse("https://example.com/live/playlist.m3u8").unwrap()
+    }
+
+    #[test]
+    fn master_can_pick_the_smallest_variant() {
+        let body = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=500000\nlow.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=2000000\nhigh.m3u8\n";
+        match parse_with(body, &base(), true).unwrap() {
+            Playlist::Master(url) => assert_eq!(url.as_str(), "https://example.com/live/low.m3u8"),
+            Playlist::Media(_) => panic!("expected a master playlist"),
+        }
     }
 
     #[test]

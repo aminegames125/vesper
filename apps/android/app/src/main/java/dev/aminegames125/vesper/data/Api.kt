@@ -41,7 +41,7 @@ class Api(
 
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
-    private suspend fun send(method: String, path: String, body: String? = null): String =
+    private suspend fun send(method: String, path: String, body: String? = null, slow: Boolean = false): String =
         withContext(Dispatchers.IO) {
             val url = "$base/api/v1$path".toHttpUrlOrNull()
                 ?: throw ApiException("That server address is not valid.")
@@ -51,7 +51,9 @@ class Api(
                 method(method, payload)
             }.build()
             try {
-                http.newCall(request).execute().use { response ->
+                // A conversion on the server can take minutes; the answer comes when it is done.
+                val client = if (slow) http.newBuilder().readTimeout(20, TimeUnit.MINUTES).build() else http
+                client.newCall(request).execute().use { response ->
                     val text = response.body?.string().orEmpty()
                     if (!response.isSuccessful) {
                         val message = runCatching { AppJson.decodeFromString<ErrorBody>(text).error }
@@ -68,6 +70,12 @@ class Api(
         }
 
     private fun unexpected(): Nothing = throw ApiException("That does not look like a Vesper server.")
+
+    private inline fun <reified T> decode(text: String): T = try {
+        AppJson.decodeFromString(text)
+    } catch (e: SerializationException) {
+        unexpected()
+    }
 
     private suspend inline fun <reified T> get(path: String): T {
         val text = send("GET", path)
@@ -99,7 +107,16 @@ class Api(
         runCatching { send("POST", "/auth/logout") }
     }
 
-    suspend fun recordings(): RecordingList = get("/recordings")
+    suspend fun recordings(tag: String = "", query: String = ""): RecordingList {
+        val url = "$base/api/v1/recordings".toHttpUrlOrNull()
+            ?: throw ApiException("That server address is not valid.")
+        val withQuery = url.newBuilder().addQueryParameter("tag", tag).addQueryParameter("q", query).build()
+        return decode(send("GET", "/recordings?${withQuery.encodedQuery}"))
+    }
+
+    suspend fun download(body: NewDownload) {
+        send("POST", "/downloads", AppJson.encodeToString(body))
+    }
 
     suspend fun recordNow(body: NewRecording) {
         send("POST", "/recordings", AppJson.encodeToString(body))
@@ -113,8 +130,95 @@ class Api(
         send("DELETE", "/recordings/$id")
     }
 
-    suspend fun renameRecording(id: String, title: String) {
-        send("PATCH", "/recordings/$id", AppJson.encodeToString(Rename(title)))
+    suspend fun renameRecording(id: String, title: String) = patch(id, Patch(title = title))
+
+    private suspend fun patch(id: String, body: Patch) {
+        send("PATCH", "/recordings/$id", AppJson.encodeToString(body))
+    }
+
+    /** Hours from now until the item is deleted; 0 keeps it until someone deletes it. */
+    suspend fun setKeep(id: String, hours: Long) = patch(id, Patch(keepHours = hours))
+
+    suspend fun setTag(id: String, tag: String) = patch(id, Patch(tag = tag))
+
+    suspend fun setWatched(id: String, watched: Boolean) = patch(id, Patch(watched = watched))
+
+    suspend fun savePosition(id: String, seconds: Long) = patch(id, Patch(positionS = seconds))
+
+    suspend fun bookmarks(id: String): List<Bookmark> = get<BookmarkList>("/recordings/$id/bookmarks").bookmarks
+
+    suspend fun addBookmark(id: String, atS: Long, label: String = "") {
+        send("POST", "/recordings/$id/bookmarks", AppJson.encodeToString(BookmarkBody(atS, label)))
+    }
+
+    suspend fun deleteBookmark(id: String, bookmark: String) {
+        send("DELETE", "/recordings/$id/bookmarks/$bookmark")
+    }
+
+    /** A link that plays the recording without signing in, for the given number of hours. */
+    suspend fun share(id: String, hours: Long = 24): String {
+        val reply: ShareReply = call("POST", "/recordings/$id/share", Hours(hours))
+        return base + reply.path
+    }
+
+    suspend fun exportMp4(id: String) {
+        send("POST", "/recordings/$id/export", slow = true)
+    }
+
+    suspend fun trim(id: String, fromS: Long, toS: Long) {
+        send("POST", "/recordings/$id/trim", AppJson.encodeToString(Trim(fromS, toS)))
+    }
+
+    suspend fun storage(): StorageUse = get("/status/storage")
+
+    suspend fun guide(epgId: String, name: String, from: Long, to: Long): GuideReply {
+        val url = "$base/api/v1/guide".toHttpUrlOrNull()
+            ?: throw ApiException("That server address is not valid.")
+        val withQuery = url.newBuilder()
+            .addQueryParameter("epg_id", epgId)
+            .addQueryParameter("name", name)
+            .addQueryParameter("from", from.toString())
+            .addQueryParameter("to", to.toString())
+            .build()
+        return decode(send("GET", "/guide?${withQuery.encodedQuery}"))
+    }
+
+    suspend fun searchGuide(query: String): List<GuideHit> {
+        val url = "$base/api/v1/guide/search".toHttpUrlOrNull()
+            ?: throw ApiException("That server address is not valid.")
+        val withQuery = url.newBuilder().addQueryParameter("q", query).build()
+        return decode<GuideHits>(send("GET", "/guide/search?${withQuery.encodedQuery}")).programmes
+    }
+
+    suspend fun guideStatus(): GuideStatus = get("/guide/status")
+
+    suspend fun refreshGuide() {
+        send("POST", "/guide/refresh")
+    }
+
+    suspend fun seriesRules(): List<SeriesRule> = get<RuleList>("/series-rules").rules
+
+    suspend fun createRule(body: NewRule) {
+        send("POST", "/series-rules", AppJson.encodeToString(body))
+    }
+
+    suspend fun deleteRule(id: String) {
+        send("DELETE", "/series-rules/$id")
+    }
+
+    suspend fun calendar(from: Long, to: Long): List<CalendarItem> =
+        get<CalendarReply>("/calendar?from=$from&to=$to").items
+
+    /** The account's schedules as the text of a file, to keep or move to another server. */
+    suspend fun exportSchedules(): String = send("GET", "/schedules/export")
+
+    suspend fun importSchedules(json: String): ImportReply = decode(send("POST", "/schedules/import", json))
+
+    /** Admin only: the server-wide settings, such as the default deletion timer. */
+    suspend fun adminSettings(): Map<String, String> = get("/admin/settings")
+
+    suspend fun setSetting(key: String, value: String) {
+        send("PUT", "/admin/settings", AppJson.encodeToString(mapOf(key to value)))
     }
 
     suspend fun clearFailed() {
@@ -135,7 +239,9 @@ class Api(
 
     suspend fun status(): Status = get("/status")
 
-    suspend fun testChannel(url: String): ProbeReply = call("POST", "/channels/test", Probe(url))
+    /** Opens the stream; with [seconds] (3 to 30) the server records a throwaway sample instead. */
+    suspend fun testChannel(url: String, seconds: Long? = null): ProbeReply =
+        call("POST", "/channels/test", Probe(url, seconds))
 
     suspend fun schedules(): List<Schedule> = get<ScheduleList>("/schedules").schedules
 
@@ -161,13 +267,21 @@ class Api(
         send("DELETE", "/sources/$id")
     }
 
-    suspend fun channels(source: String, query: String, group: String, offset: Int, limit: Int = 100): ChannelPage {
+    suspend fun channels(
+        source: String,
+        query: String,
+        group: String,
+        offset: Int,
+        limit: Int = 100,
+        kind: String = "",
+    ): ChannelPage {
         val url = "$base/api/v1/channels".toHttpUrlOrNull()
             ?: throw ApiException("That server address is not valid.")
         val withQuery = url.newBuilder()
             .addQueryParameter("source", source)
             .addQueryParameter("q", query)
             .addQueryParameter("group", group)
+            .addQueryParameter("kind", kind)
             .addQueryParameter("offset", offset.toString())
             .addQueryParameter("limit", limit.toString())
             .build()
@@ -178,7 +292,16 @@ class Api(
         }
     }
 
+    private fun media(path: String): String =
+        "$base/api/v1/recordings/$path" + (token?.let { "?token=$it" } ?: "")
+
     /** The recording as an HLS playlist; the server accepts the token in the address for media. */
-    fun playlistUrl(id: String): String =
-        "$base/api/v1/recordings/$id/index.m3u8" + (token?.let { "?token=$it" } ?: "")
+    fun playlistUrl(id: String): String = media("$id/index.m3u8")
+
+    /** The whole item as one file; supports seeking, so players and the download manager can use it. */
+    fun fileUrl(id: String): String = media("$id/download")
+
+    fun thumbUrl(id: String): String = media("$id/thumb.jpg")
+
+    fun exportUrl(id: String): String = media("$id/export.mp4")
 }

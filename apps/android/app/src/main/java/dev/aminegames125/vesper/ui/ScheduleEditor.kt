@@ -71,10 +71,16 @@ private val REPEATS = listOf(0 to "Once", EVERY_DAY to "Every day", WEEKDAYS to 
 private val DURATIONS = listOf(15, 30, 45, 60, 90, 120, 180)
 private val PADS = listOf(0, 1, 2, 5, 10)
 private val KEEP_LAST = listOf<Long?>(null, 1, 3, 5, 10)
-private val KEEPS = listOf<Long?>(null, 24, 24 * 7, 24 * 30)
+/** null follows the server's default deletion timer; 0 keeps recordings until they are deleted. */
+private val KEEPS = listOf<Long?>(null, 24, 24 * 7, 24 * 30, 0)
 
-private fun keepLabel(hours: Long?) = when (hours) {
-    null -> "Until I delete it"
+private fun keepLabel(hours: Long?, serverDefault: Long?) = when (hours) {
+    null -> when (serverDefault) {
+        null, 0L -> "Default"
+        24L -> "Default (1 day)"
+        else -> "Default (${serverDefault / 24} days)"
+    }
+    0L -> "Forever"
     24L -> "1 day"
     else -> "${hours / 24} days"
 }
@@ -111,6 +117,13 @@ fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel:
     var padAfter by rememberSaveable { mutableIntStateOf(((editing?.padAfter ?: 120L) / 60).toInt()) }
     var keep by rememberSaveable { mutableStateOf(editing?.keepHours) }
     var keepLast by rememberSaveable { mutableStateOf(editing?.keepLast) }
+    var tag by rememberSaveable { mutableStateOf(editing?.tag ?: "") }
+    var backup by rememberSaveable { mutableStateOf(editing?.backupUrl ?: draft?.alt?.firstOrNull().orEmpty()) }
+    var epgId by rememberSaveable { mutableStateOf(editing?.epgId ?: draft?.id.orEmpty()) }
+    var lowest by rememberSaveable { mutableStateOf(editing?.quality == "lowest") }
+    var followGuide by rememberSaveable { mutableStateOf(editing?.followGuide ?: false) }
+    val status by vm.status.collectAsState()
+    LaunchedEffect(Unit) { vm.loadStatus() }
     var error by remember { mutableStateOf<String?>(null) }
     var warnings by remember { mutableStateOf<List<String>?>(null) }
 
@@ -121,6 +134,8 @@ fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel:
             if (title.isBlank() || title == channelName) title = it.name
             channelName = it.name
             url = it.url
+            backup = it.alt.firstOrNull().orEmpty()
+            epgId = it.id
             vm.picked = null
         }
     }
@@ -149,6 +164,13 @@ fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel:
             keepHours = keep,
             keepLast = keepLast,
             enabled = editing?.enabled ?: true,
+            endDate = editing?.endDate,
+            webhookUrl = editing?.webhookUrl,
+            backupUrl = backup.trim().ifEmpty { null },
+            quality = if (lowest) "lowest" else "best",
+            tag = tag.trim(),
+            epgId = epgId,
+            followGuide = followGuide && epgId.isNotBlank(),
         )
         scope.launch {
             val notes = vm.saveSchedule(editing?.id, body) ?: return@launch
@@ -230,10 +252,47 @@ fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel:
                 PADS.forEach { m -> FilterChip(selected = padAfter == m, onClick = { padAfter = m }, label = { Text(if (m == 0) "Exactly" else "$m min") }) }
             }
 
-            Label("Keep recordings")
+            Label("Delete recordings after")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                KEEPS.forEach { h -> FilterChip(selected = keep == h, onClick = { keep = h }, label = { Text(keepLabel(h)) }) }
+                KEEPS.forEach { h ->
+                    FilterChip(selected = keep == h, onClick = { keep = h }, label = { Text(keepLabel(h, status?.defaultKeepHours)) })
+                }
             }
+            Text(
+                "You can change this later for each recording.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            if (epgId.isNotBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Follow the guide", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "If the programme runs over, keep recording until the guide says it ended.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    androidx.compose.material3.Switch(checked = followGuide, onCheckedChange = { followGuide = it })
+                }
+            }
+
+            Label("Picture quality")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !lowest, onClick = { lowest = false }, label = { Text("Best") })
+                FilterChip(selected = lowest, onClick = { lowest = true }, label = { Text("Smaller files") })
+            }
+
+            OutlinedTextField(tag, { tag = it }, label = { Text("Folder (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                backup,
+                { backup = it },
+                label = { Text("Backup address (optional)") },
+                supportingText = { Text("Used if the channel keeps failing.") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             Label("Keep only the newest")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

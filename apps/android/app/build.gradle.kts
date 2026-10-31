@@ -80,6 +80,11 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.ui)
+    implementation(libs.media3.cast)
+    implementation(libs.play.services.cast.framework)
+    implementation(libs.androidx.mediarouter)
+    implementation(libs.coil.compose)
+    implementation(libs.androidx.tv.material)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

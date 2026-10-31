@@ -135,6 +135,8 @@ pub fn bearer(parts: &Parts) -> Option<String> {
     let media = path.ends_with("/index.m3u8")
         || path.contains("/seg/")
         || path.ends_with("/download")
+        || path.ends_with("/thumb.jpg")
+        || path.ends_with("/export.mp4")
         || path.ends_with("/proxy");
     if !media {
         return None;

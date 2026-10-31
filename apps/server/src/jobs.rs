@@ -23,7 +23,10 @@ use crate::{
 const MAX_RECONNECTS: u32 = 8;
 
 /// A recording is refused when the disk it would be written to has less room than this.
-const MIN_FREE_BYTES: u64 = 512 * 1024 * 1024;
+pub const MIN_FREE_BYTES: u64 = 512 * 1024 * 1024;
+
+/// Downloads an account can have running at once.
+const MAX_DOWNLOADS: i64 = 3;
 
 pub fn recording_dir(state: &AppState, user_id: &str, id: &str) -> PathBuf {
     state.config.recordings_dir().join(user_id).join(id)
@@ -103,6 +106,28 @@ pub fn start(state: &AppState, id: &str) {
     if !matches!(status.as_str(), "scheduled" | "queued") {
         return;
     }
+    let extra = extras(state, id);
+    let is_download = extra.kind == "download";
+    // "Follow the guide": a programme that runs over keeps recording until the guide says it ended.
+    if extra.follow && !extra.epg_id.is_empty() {
+        let stop_at: Option<i64> = state
+            .db
+            .conn()
+            .query_row(
+                "SELECT stop_at FROM epg_programmes
+                 WHERE channel_id = ?1 AND start_at <= ?2 AND stop_at > ?2
+                 ORDER BY start_at DESC LIMIT 1",
+                params![extra.epg_id, start_at + extra.pad_before + 30],
+                |r| r.get(0),
+            )
+            .ok();
+        if let Some(stop_at) = stop_at {
+            let wanted = stop_at + extra.pad_after - start_at;
+            if wanted > max_seconds && wanted <= max_seconds + 3 * 3600 {
+                max_seconds = wanted;
+            }
+        }
+    }
     // Late (the server was down): only record what is left of the programme.
     let late = (now() - start_at).max(0);
     if status == "scheduled" && late > 0 {
@@ -119,7 +144,7 @@ pub fn start(state: &AppState, id: &str) {
         .db
         .conn()
         .query_row(
-            "SELECT COUNT(*) FROM recordings WHERE user_id = ?1 AND status = 'recording'",
+            "SELECT COUNT(*) FROM recordings WHERE user_id = ?1 AND status = 'recording' AND kind != 'download'",
             [&user_id],
             |r| r.get(0),
         )
@@ -127,7 +152,21 @@ pub fn start(state: &AppState, id: &str) {
     if status == "scheduled" && max_seconds < 10 {
         return fail("Missed: the server was not running when this was due.");
     }
-    if max_concurrent > 0 && running >= max_concurrent {
+    if is_download {
+        // Downloads do not use up a recording slot, but a few at a time is plenty.
+        let downloading: i64 = state
+            .db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM recordings WHERE user_id = ?1 AND status = 'recording' AND kind = 'download'",
+                [&user_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        if downloading >= MAX_DOWNLOADS {
+            return fail("Too many downloads at once. Try again when one has finished.");
+        }
+    } else if max_concurrent > 0 && running >= max_concurrent {
         // A scheduled one waits for the other to end (back-to-back programmes overlap by their padding).
         if status == "scheduled" && max_seconds > 60 {
             return;
@@ -164,16 +203,36 @@ pub fn start(state: &AppState, id: &str) {
         return;
     }
 
+    let runtime = tokio::runtime::Handle::try_current().ok();
+    if is_download {
+        let Some(handle) = runtime else {
+            return fail("The server could not start the download.");
+        };
+        handle.spawn(crate::download::run(
+            state.clone(),
+            id.to_string(),
+            user_id,
+            url,
+            keep_hours,
+            stop,
+        ));
+        return;
+    }
+
     // Playlists and redirects can name any address, so the recorder re-checks each one it fetches.
     let guard = (!state.allow_private()).then(|| UrlGuard::new(crate::net::resolves_public));
-    let runtime = tokio::runtime::Handle::try_current().ok();
     let state = state.clone();
     let id = id.to_string();
     let dir = recording_dir(&state, &user_id, &id);
+    let backup = extra.backup.filter(|b| !b.is_empty() && *b != url);
+    let lowest = extra.lowest;
     thread::spawn(move || {
         let started = Instant::now();
         let mut bytes_before = 0u64;
         let mut reconnects = 0u32;
+        // The address being recorded; it flips to the backup (and back) while the stream keeps failing.
+        let mut current = url.clone();
+        let mut switched = 0u32;
         // Drops in a row: a long healthy stretch between two drops starts the count again.
         let mut streak = 0u32;
         let limit_hit = Arc::new(AtomicU8::new(0));
@@ -182,8 +241,12 @@ pub fn start(state: &AppState, id: &str) {
 
         loop {
             let remaining = (max_seconds.max(1) as u64).saturating_sub(started.elapsed().as_secs());
-            let mut options =
-                Options::new(url.clone(), remaining.max(1), Output::Segments(dir.clone()));
+            let mut options = Options::new(
+                current.clone(),
+                remaining.max(1),
+                Output::Segments(dir.clone()),
+            );
+            options.lowest_quality = lowest;
             options.guard = guard.clone();
             options.public_only = guard.is_some();
             options.append = reconnects > 0;
@@ -249,6 +312,17 @@ pub fn start(state: &AppState, id: &str) {
             }
             reconnects += 1;
             streak += 1;
+            // Still failing after a few tries: switch to the other address of the channel, if any.
+            if let Some(other) = &backup {
+                if streak.is_multiple_of(3) {
+                    switched += 1;
+                    current = if current == url {
+                        other.clone()
+                    } else {
+                        url.clone()
+                    };
+                }
+            }
             // Wait longer after each drop, but never past the end of the programme.
             let left = (max_seconds.max(1) as u64).saturating_sub(started.elapsed().as_secs());
             let pause = (5 * u64::from(reconnects))
@@ -280,23 +354,35 @@ pub fn start(state: &AppState, id: &str) {
             .remove(&id);
 
         let finished = now();
-        let keep_until = keep_hours.filter(|h| *h > 0).map(|h| finished + h * 3600);
+        let keep_until = keep_hours
+            .filter(|h| *h > 0)
+            .map(|h| finished.saturating_add(h.min(87_600) * 3600));
         let seconds = started.elapsed().as_secs() as i64;
         let conn = state.db.conn();
         let _ = if bytes_before > 0 {
-            let note = match (reconnects, &last_problem) {
+            let mut note = match (reconnects, &last_problem) {
                 (0, problem) => problem.clone(),
                 (n, Some(problem)) => Some(format!("Reconnected {n} time(s). {problem}")),
                 (n, None) => Some(format!("Reconnected {n} time(s) after the stream dropped.")),
             };
+            if switched > 0 {
+                note = Some(format!(
+                    "{} Used the backup address {switched} time(s).",
+                    note.unwrap_or_default()
+                ));
+            }
             conn.execute(
                 "UPDATE recordings SET status = 'done', bytes = ?1, seconds = ?2, error = ?3, finished_at = ?4, keep_until = ?5 WHERE id = ?6",
                 params![bytes_before as i64, seconds, note, finished, keep_until, id],
             )
         } else {
-            let message = fatal
-                .or(last_problem)
-                .unwrap_or_else(|| "Nothing was captured.".into());
+            let message = fatal.or(last_problem).unwrap_or_else(|| {
+                if stop.load(Ordering::Relaxed) {
+                    "Stopped.".into()
+                } else {
+                    "Nothing was captured.".into()
+                }
+            });
             conn.execute(
                 "UPDATE recordings SET status = 'failed', error = ?1, finished_at = ?2, keep_until = ?3 WHERE id = ?4",
                 params![message, finished, keep_until, id],
@@ -315,28 +401,43 @@ fn after_finish(
     user_id: &str,
     runtime: Option<tokio::runtime::Handle>,
 ) {
-    let row: Option<(String, String, i64, i64, Option<String>, Option<String>)> = state
+    #[allow(clippy::type_complexity)]
+    let row: Option<(String, String, i64, i64, Option<String>, Option<String>, Option<String>, Option<String>)> = state
         .db
         .conn()
         .query_row(
-            "SELECT title, status, seconds, bytes, error, schedule_id FROM recordings WHERE id = ?1",
+            "SELECT r.title, r.status, r.seconds, r.bytes, r.error, r.schedule_id, r.series_rule_id, s.webhook_url
+             FROM recordings r LEFT JOIN schedules s ON s.id = r.schedule_id WHERE r.id = ?1",
             [id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?)),
         )
         .ok();
-    let Some((title, status, seconds, bytes, error, schedule_id)) = row else {
+    let Some((title, status, seconds, bytes, error, schedule_id, series_id, own_hook)) = row else {
         return;
     };
 
     if let Some(schedule) = schedule_id {
         prune_schedule(state, &schedule);
     }
+    if let Some(rule) = series_id {
+        prune_series(state, &rule);
+    }
+    if let Some(handle) = &runtime {
+        if status == "done" {
+            let (state, id) = (state.clone(), id.to_string());
+            handle.spawn(async move { crate::api::library::make_thumb(&state, &id).await });
+        }
+    }
 
-    let url = state.db.setting("webhook_url", "");
-    if url.starts_with("http") {
+    // A schedule can have a webhook of its own; the server-wide one is the fallback.
+    let url = own_hook
+        .filter(|u| u.starts_with("http"))
+        .unwrap_or_else(|| state.db.setting("webhook_url", ""));
+    if url.starts_with("http") && !in_quiet_hours(state) {
         let (Some(runtime), client) = (runtime, state.http.clone()) else {
             return;
         };
+        let guard_state = state.clone();
         let text = match status.as_str() {
             "done" => format!("Vesper recorded \"{title}\" ({} min).", seconds / 60),
             _ => format!(
@@ -350,6 +451,10 @@ fn after_finish(
         });
         let _ = user_id;
         runtime.spawn(async move {
+            // A schedule's own address is checked again: it must not reach into the network.
+            if crate::net::check_target(&guard_state, &url).await.is_err() {
+                return;
+            }
             let _ = client
                 .post(url)
                 .timeout(Duration::from_secs(10))
@@ -358,6 +463,136 @@ fn after_finish(
                 .send()
                 .await;
         });
+    }
+}
+
+/// Sends a message to the server-wide webhook, unless it is quiet hours or none is set.
+pub fn notify(state: &AppState, event: &str, text: &str) {
+    let url = state.db.setting("webhook_url", "");
+    if !url.starts_with("http") || in_quiet_hours(state) {
+        return;
+    }
+    let Ok(handle) = tokio::runtime::Handle::try_current() else {
+        return;
+    };
+    let client = state.http.clone();
+    let body = serde_json::json!({ "event": event, "content": text, "text": text }).to_string();
+    handle.spawn(async move {
+        let _ = client
+            .post(url)
+            .timeout(Duration::from_secs(10))
+            .header("content-type", "application/json")
+            .body(body)
+            .send()
+            .await;
+    });
+}
+
+/// The same follow-up as after a recording, for a finished download.
+pub fn after_download(state: &AppState, id: &str, runtime: Option<tokio::runtime::Handle>) {
+    after_finish(state, id, "", runtime);
+}
+
+/// Minutes since midnight for an `HH:MM` setting.
+fn minutes_of(value: &str) -> Option<u32> {
+    let (h, m) = value.trim().split_once(':')?;
+    let (h, m): (u32, u32) = (h.parse().ok()?, m.parse().ok()?);
+    (h < 24 && m < 60).then_some(h * 60 + m)
+}
+
+/// True when `now` falls inside the quiet window, which may run past midnight (22:00 to 07:00).
+fn within(start: u32, end: u32, now: u32) -> bool {
+    match start.cmp(&end) {
+        std::cmp::Ordering::Equal => false,
+        std::cmp::Ordering::Less => (start..end).contains(&now),
+        std::cmp::Ordering::Greater => now >= start || now < end,
+    }
+}
+
+/// Notifications from the server wait out the quiet hours set by the admin, in the server's local time.
+fn in_quiet_hours(state: &AppState) -> bool {
+    use chrono::Timelike;
+    let (Some(start), Some(end)) = (
+        minutes_of(&state.db.setting("quiet_start", "")),
+        minutes_of(&state.db.setting("quiet_end", "")),
+    ) else {
+        return false;
+    };
+    let local = chrono::Local::now();
+    within(start, end, local.hour() * 60 + local.minute())
+}
+
+/// Things about a recording that come from its schedule rather than from the recording itself.
+#[derive(Default)]
+struct Extras {
+    kind: String,
+    backup: Option<String>,
+    lowest: bool,
+    follow: bool,
+    epg_id: String,
+    pad_before: i64,
+    pad_after: i64,
+}
+
+fn extras(state: &AppState, id: &str) -> Extras {
+    state
+        .db
+        .conn()
+        .query_row(
+            "SELECT r.kind, COALESCE(r.backup_url, s.backup_url), COALESCE(s.quality, 'best'),
+                    COALESCE(s.follow_guide, 0), COALESCE(s.epg_id, ''),
+                    COALESCE(s.pad_before_s, 0), COALESCE(s.pad_after_s, 0)
+             FROM recordings r LEFT JOIN schedules s ON s.id = r.schedule_id WHERE r.id = ?1",
+            [id],
+            |r| {
+                Ok(Extras {
+                    kind: r.get(0)?,
+                    backup: r.get(1)?,
+                    lowest: r.get::<_, String>(2)? == "lowest",
+                    follow: r.get::<_, i64>(3)? != 0,
+                    epg_id: r.get(4)?,
+                    pad_before: r.get(5)?,
+                    pad_after: r.get(6)?,
+                })
+            },
+        )
+        .unwrap_or_default()
+}
+
+/// Deletes the oldest finished episodes of a series rule beyond its "keep the last N" limit.
+fn prune_series(state: &AppState, rule_id: &str) {
+    let keep: Option<i64> = state
+        .db
+        .conn()
+        .query_row(
+            "SELECT keep_last FROM series_rules WHERE id = ?1",
+            [rule_id],
+            |r| r.get(0),
+        )
+        .ok()
+        .flatten();
+    let Some(keep) = keep.filter(|n| *n > 0) else {
+        return;
+    };
+    let old: Vec<(String, String)> = {
+        let conn = state.db.conn();
+        let Ok(mut stmt) = conn.prepare(
+            "SELECT id, user_id FROM recordings WHERE series_rule_id = ?1 AND status = 'done'
+             ORDER BY COALESCE(finished_at, 0) DESC, created_at DESC LIMIT -1 OFFSET ?2",
+        ) else {
+            return;
+        };
+        stmt.query_map(params![rule_id, keep], |r| Ok((r.get(0)?, r.get(1)?)))
+            .map(|rows| rows.flatten().collect())
+            .unwrap_or_default()
+    };
+    for (id, owner) in old {
+        remove_files(state, &owner, &id);
+        let _ = state
+            .db
+            .conn()
+            .execute("DELETE FROM recordings WHERE id = ?1", [&id]);
+        state.db.audit("system", "recording.pruned", &id);
     }
 }
 
@@ -402,7 +637,8 @@ fn prune_schedule(state: &AppState, schedule_id: &str) {
 pub fn spawn_background(state: AppState) {
     // A recording cannot survive a restart, so anything still marked as running was cut short.
     let _ = state.db.conn().execute(
-        "UPDATE recordings SET status = 'failed', error = 'The server restarted while recording.', finished_at = ?1
+        "UPDATE recordings SET status = 'failed', error = 'The server restarted while recording.', finished_at = ?1,
+           keep_until = COALESCE(keep_until, ?1 + 86400)
          WHERE status = 'recording'",
         [now()],
     );
@@ -413,6 +649,7 @@ pub fn spawn_background(state: AppState) {
         loop {
             tokio::time::sleep(Duration::from_secs(5)).await;
             tick += 1;
+            crate::tasks::run(&state, tick);
 
             // Keep the next two weeks of every repeating schedule created.
             if tick.is_multiple_of(12) {

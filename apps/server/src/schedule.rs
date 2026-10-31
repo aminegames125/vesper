@@ -157,6 +157,37 @@ struct Row {
     pad_before_s: i64,
     pad_after_s: i64,
     keep_hours: Option<i64>,
+    tag: String,
+}
+
+/// How long an occurrence is kept. The schedule's own choice wins (0 means forever); otherwise the
+/// account's setting, otherwise the server's default timer.
+fn keep_for_occurrence(state: &AppState, user_id: &str, schedule_keep: Option<i64>) -> Option<i64> {
+    match schedule_keep {
+        Some(0) => None,
+        Some(hours) => Some(hours),
+        None => {
+            let account: Option<i64> = state
+                .db
+                .conn()
+                .query_row(
+                    "SELECT keep_hours FROM users WHERE id = ?1",
+                    [user_id],
+                    |r| r.get(0),
+                )
+                .ok()
+                .flatten();
+            account
+                .or_else(|| {
+                    state
+                        .db
+                        .setting("default_keep_hours", crate::api::DEFAULT_KEEP_HOURS)
+                        .parse()
+                        .ok()
+                })
+                .filter(|h| *h > 0)
+        }
+    }
 }
 
 /// Creates the recordings for every enabled rule's coming occurrences. Safe to run repeatedly:
@@ -166,7 +197,7 @@ pub fn materialise(state: &AppState) {
         let conn = state.db.conn();
         let Ok(mut stmt) = conn.prepare(
             "SELECT id, user_id, title, channel_name, source_url, tz, start_time, duration_s, days_mask,
-                    start_date, end_date, pad_before_s, pad_after_s, keep_hours
+                    start_date, end_date, pad_before_s, pad_after_s, keep_hours, tag
              FROM schedules WHERE enabled = 1
                AND user_id IN (SELECT id FROM users WHERE status = 'active' AND role != 'guest')",
         ) else {
@@ -188,6 +219,7 @@ pub fn materialise(state: &AppState) {
                 pad_before_s: r.get(11)?,
                 pad_after_s: r.get(12)?,
                 keep_hours: r.get(13)?,
+                tag: r.get(14)?,
             })
         })
         .map(|rows| rows.flatten().collect())
@@ -206,12 +238,13 @@ pub fn materialise(state: &AppState) {
         ) else {
             continue;
         };
+        let keep = keep_for_occurrence(state, &row.user_id, row.keep_hours);
         for start in occurrences(&rule, from, until) {
             let _ = state.db.conn().execute(
                 "INSERT OR IGNORE INTO recordings
                    (id, user_id, title, channel_name, source_url, status, start_at, max_seconds,
-                    keep_hours, created_at, schedule_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, 'scheduled', ?6, ?7, ?8, ?9, ?10)",
+                    keep_hours, created_at, schedule_id, tag)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 'scheduled', ?6, ?7, ?8, ?9, ?10, ?11)",
                 params![
                     uuid::Uuid::new_v4().to_string(),
                     row.user_id,
@@ -220,9 +253,10 @@ pub fn materialise(state: &AppState) {
                     row.source_url,
                     start - row.pad_before_s,
                     row.duration_s + row.pad_before_s + row.pad_after_s,
-                    row.keep_hours,
+                    keep,
                     now(),
                     row.id,
+                    row.tag,
                 ],
             );
         }

@@ -36,8 +36,12 @@ private val LightFallback = lightColorScheme(
 
 /** Material 3 as the system draws it: the phone's own colours when it has them, a dark screen on TV. */
 @Composable
-fun VesperTheme(isTv: Boolean, content: @Composable () -> Unit) {
-    val dark = isTv || isSystemInDarkTheme()
+fun VesperTheme(isTv: Boolean, mode: String = "system", content: @Composable () -> Unit) {
+    val dark = isTv || when (mode) {
+        "dark" -> true
+        "light" -> false
+        else -> isSystemInDarkTheme()
+    }
     val context = LocalContext.current
     val scheme = when {
         !isTv && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->

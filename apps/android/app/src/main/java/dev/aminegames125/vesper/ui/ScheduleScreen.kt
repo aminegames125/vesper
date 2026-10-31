@@ -42,7 +42,7 @@ import dev.aminegames125.vesper.data.formatUntil
 
 /** The next recordings that will happen, and the schedules that make them. */
 @Composable
-fun ScheduleScreen(vm: VesperViewModel, onNew: () -> Unit, onEdit: (Schedule) -> Unit) {
+fun ScheduleScreen(vm: VesperViewModel, onNew: () -> Unit, onEdit: (Schedule) -> Unit, onGuide: () -> Unit, onCalendar: () -> Unit) {
     val schedules by vm.schedules.collectAsState()
     val recordings by vm.recordings.collectAsState()
     var toDelete by remember { mutableStateOf<Schedule?>(null) }
@@ -63,6 +63,7 @@ fun ScheduleScreen(vm: VesperViewModel, onNew: () -> Unit, onEdit: (Schedule) ->
                 "No schedules yet",
                 "Pick a channel and a time, for example 11:00 to 11:30, and Vesper records it for you.",
                 Modifier.padding(padding),
+                action = { TextButton(onClick = onGuide) { Text("Or pick a programme from the TV guide") } },
             )
         } else {
             LazyColumn(
@@ -70,6 +71,12 @@ fun ScheduleScreen(vm: VesperViewModel, onNew: () -> Unit, onEdit: (Schedule) ->
                 contentPadding = PaddingValues(start = pageHorizontal(), end = pageHorizontal(), top = 8.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.OutlinedButton(onClick = onGuide) { Text("TV guide") }
+                        androidx.compose.material3.OutlinedButton(onClick = onCalendar) { Text("This week") }
+                    }
+                }
                 if (upcoming.isNotEmpty()) {
                     item { SectionTitle("Coming up") }
                     items(upcoming, key = { "up-${it.id}" }) { recording ->

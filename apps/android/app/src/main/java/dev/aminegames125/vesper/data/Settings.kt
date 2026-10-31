@@ -24,6 +24,9 @@ class Settings(private val context: Context) {
     private val usernameKey = stringPreferencesKey("username")
     private val announcedKey = stringSetPreferencesKey("announced")
     private val favoritesKey = stringSetPreferencesKey("favorites")
+    private val themeKey = stringPreferencesKey("theme")
+    private val quietStartKey = stringPreferencesKey("quiet_start")
+    private val quietEndKey = stringPreferencesKey("quiet_end")
 
     val stored: Flow<Stored> = context.store.data
         .catch { emit(emptyPreferences()) }
@@ -56,6 +59,31 @@ class Settings(private val context: Context) {
         context.store.edit {
             val now = it[favoritesKey].orEmpty()
             it[favoritesKey] = if (url in now) now - url else now + url
+        }
+    }
+
+    /** `system`, `light` or `dark`. */
+    val theme: Flow<String> = context.store.data
+        .catch { emit(emptyPreferences()) }
+        .map { it[themeKey] ?: "system" }
+
+    suspend fun setTheme(value: String) {
+        context.store.edit { it[themeKey] = value }
+    }
+
+    /** Notifications from this app stay quiet between these two times (`HH:MM`); empty means never. */
+    val quietStart: Flow<String> = context.store.data
+        .catch { emit(emptyPreferences()) }
+        .map { it[quietStartKey].orEmpty() }
+
+    val quietEnd: Flow<String> = context.store.data
+        .catch { emit(emptyPreferences()) }
+        .map { it[quietEndKey].orEmpty() }
+
+    suspend fun setQuiet(start: String, end: String) {
+        context.store.edit {
+            it[quietStartKey] = start
+            it[quietEndKey] = end
         }
     }
 

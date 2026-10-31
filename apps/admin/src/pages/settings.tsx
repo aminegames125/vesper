@@ -60,12 +60,38 @@ export function SettingsPage({ client, lite }: { client: CloudClient; lite: bool
       )}
 
       <Card title="Notifications">
-        <div className="p-5">
+        <div className="flex flex-col gap-4 p-5">
           <Field
             label="Webhook address"
             value={form.webhook_url ?? ""}
             onChange={(e) => set("webhook_url", e.target.value)}
-            hint="Vesper posts here when a recording finishes or fails. Works with Discord, ntfy and Slack-style hooks. Leave empty to turn off."
+            hint="Vesper posts here when a recording finishes or fails, or a channel stops answering. Works with Discord, ntfy and Slack-style hooks. Leave empty to turn off."
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Field
+              label="Quiet from"
+              type="time"
+              value={form.quiet_start ?? ""}
+              onChange={(e) => set("quiet_start", e.target.value)}
+              hint="No webhook messages in this window (server time)."
+            />
+            <Field
+              label="Quiet until"
+              type="time"
+              value={form.quiet_end ?? ""}
+              onChange={(e) => set("quiet_end", e.target.value)}
+            />
+          </div>
+        </div>
+      </Card>
+
+      <Card title="TV guide">
+        <div className="p-5">
+          <Field
+            label="Guide address (XMLTV)"
+            value={form.epg_url ?? ""}
+            onChange={(e) => set("epg_url", e.target.value)}
+            hint="An .xml or .xml.gz link from your provider. It is read twice a day and powers the guide, series rules and the 'follow the guide' option. Leave empty to turn off."
           />
         </div>
       </Card>
@@ -95,14 +121,45 @@ export function SettingsPage({ client, lite }: { client: CloudClient; lite: bool
             onChange={(e) => set("default_storage_gb", e.target.value)}
           />
           <Field
-            label="Keep recordings (hours)"
+            label="Delete after (hours)"
             type="number"
             min={0}
             value={form.default_keep_hours}
             onChange={(e) => set("default_keep_hours", e.target.value)}
-            hint="Empty or 0 = until deleted. Short values keep storage small."
+            hint="The default timer for new recordings and downloads: 168 = a week. Empty or 0 = keep until deleted. Each item can be changed later."
           />
         </div>
+      </Card>
+
+      <Card title="Storage">
+        <div className="p-5">
+          <Field
+            label="Delete watched items after (days)"
+            type="number"
+            min={0}
+            value={form.delete_watched_days ?? "0"}
+            onChange={(e) => set("delete_watched_days", e.target.value)}
+            hint="Once someone marks a recording as watched, it is deleted after this many days. 0 = off."
+          />
+        </div>
+      </Card>
+
+      <Card title="Updates">
+        <label className="flex items-start gap-3 p-5 text-sm">
+          <input
+            type="checkbox"
+            checked={form.update_check !== "false"}
+            onChange={(e) => set("update_check", String(e.target.checked))}
+            className="mt-1 size-4 accent-[var(--accent)]"
+          />
+          <span>
+            <b className="block">Check for new versions</b>
+            <span className="text-muted">
+              Once a week the server asks GitHub for the latest release and tells the app if there
+              is one. Nothing else is sent.
+            </span>
+          </span>
+        </label>
       </Card>
 
       {!lite && (

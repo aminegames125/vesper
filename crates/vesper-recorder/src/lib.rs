@@ -74,6 +74,8 @@ pub struct Options {
     /// Refuse to connect to private network addresses, checking the address actually connected to
     /// (which closes the gap between checking a name and connecting to it).
     pub public_only: bool,
+    /// Pick the smallest variant of a master playlist instead of the best one, to save disk space.
+    pub lowest_quality: bool,
 }
 
 impl Options {
@@ -87,6 +89,7 @@ impl Options {
             append: false,
             more_to_come: false,
             public_only: false,
+            lowest_quality: false,
         }
     }
 }
@@ -216,7 +219,13 @@ pub fn record(
 
     let is_hls = url.path().to_lowercase().ends_with(".m3u8");
     let outcome = if is_hls {
-        hls::record_hls(&client, url, sink.as_mut(), &mut run)
+        hls::record_hls(
+            &client,
+            url,
+            sink.as_mut(),
+            &mut run,
+            options.lowest_quality,
+        )
     } else {
         record_raw(&client, url, sink.as_mut(), &mut run)
     };

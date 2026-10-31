@@ -2,12 +2,16 @@ mod api;
 mod auth;
 mod config;
 mod db;
+mod download;
+mod epg;
 mod error;
+mod ffmpeg;
 mod guard;
 mod jobs;
 mod net;
 mod schedule;
 mod state;
+mod tasks;
 mod web;
 
 use std::{
@@ -20,7 +24,10 @@ use std::{
 use axum::Router;
 use clap::Parser;
 use tower_http::{
-    compression::CompressionLayer,
+    compression::{
+        predicate::{DefaultPredicate, NotForContentType, Predicate},
+        CompressionLayer,
+    },
     cors::{AllowHeaders, AllowOrigin, Any, CorsLayer},
 };
 use tracing::info;
@@ -64,6 +71,7 @@ async fn main() {
 
     let config = Config::parse();
     std::fs::create_dir_all(config.recordings_dir()).expect("could not create the data folder");
+    install_crash_log(config.data_dir.join("crash"));
     let db = Db::open(&config.data_dir.join("vesper.db")).expect("could not open the database");
 
     if config.is_lite() {
@@ -101,7 +109,13 @@ async fn main() {
             state.clone(),
             guard::lite,
         ))
-        .layer(CompressionLayer::new())
+        .layer(
+            CompressionLayer::new().compress_when(
+                DefaultPredicate::new()
+                    .and(NotForContentType::const_new("video/"))
+                    .and(NotForContentType::const_new("application/octet-stream")),
+            ),
+        )
         .with_state(state.clone());
 
     let listener = tokio::net::TcpListener::bind(&state.config.bind)
@@ -130,6 +144,27 @@ async fn main() {
     })
     .await
     .expect("server error");
+}
+
+/// Writes what went wrong to `data/crash/` when the server panics, so it can be read later in the
+/// admin panel. Nothing leaves the machine.
+fn install_crash_log(dir: std::path::PathBuf) {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = std::fs::create_dir_all(&dir);
+        let report = format!("{info}\n\n{}", std::backtrace::Backtrace::force_capture());
+        let _ = std::fs::write(dir.join(format!("{}.log", db::now())), report);
+        // Keep only the latest few.
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            let mut files: Vec<_> = entries.flatten().map(|e| e.path()).collect();
+            files.sort();
+            let extra = files.len().saturating_sub(20);
+            for old in files.into_iter().take(extra) {
+                let _ = std::fs::remove_file(old);
+            }
+        }
+        previous(info);
+    }));
 }
 
 /// Creates the administrator named on the command line, once.

@@ -52,6 +52,20 @@ export interface CloudRecording {
   finishedAt: number | null;
   /** The repeating schedule this recording came from, if any. */
   scheduleId: string | null;
+  /** `recording` for something captured from a channel, `download` for a saved movie or episode. */
+  kind: "recording" | "download";
+  /** Folder name; empty for none. */
+  tag: string;
+  watched: boolean;
+  /** Where playback stopped, in seconds. */
+  positionS: number;
+  backupUrl: string | null;
+  /** True when a thumbnail exists (the server needs ffmpeg to make them). */
+  thumb: boolean;
+  fileName: string | null;
+  seriesRuleId: string | null;
+  /** Size a download is going to reach, when the provider said. */
+  totalBytes: number | null;
 }
 
 export interface NewRecording {
@@ -64,6 +78,16 @@ export interface NewRecording {
   start_at?: number;
   /** 0 keeps it forever; leave out for the account default. */
   keep_hours?: number;
+  /** A second address for the same channel, tried when the first keeps failing. */
+  backup_url?: string;
+  tag?: string;
+}
+
+export interface NewDownload {
+  title: string;
+  url: string;
+  keep_hours?: number;
+  tag?: string;
 }
 
 /** Bit 0 is Monday and bit 6 is Sunday; 0 records once, on the start date. */
@@ -95,6 +119,12 @@ export interface Schedule {
   createdAt: number;
   /** Epoch seconds of the next occurrence that has not started, or null. */
   nextStart: number | null;
+  backupUrl: string | null;
+  quality: "best" | "lowest";
+  webhookUrl: string | null;
+  tag: string;
+  epgId: string;
+  followGuide: boolean;
 }
 
 export interface NewSchedule {
@@ -109,8 +139,17 @@ export interface NewSchedule {
   end_date?: string | null;
   pad_before?: number;
   pad_after?: number;
+  /** 0 keeps the recordings forever; leave out for the server's default timer. */
   keep_hours?: number;
+  keep_last?: number | null;
   enabled?: boolean;
+  backup_url?: string | null;
+  quality?: "best" | "lowest";
+  webhook_url?: string | null;
+  tag?: string;
+  epg_id?: string;
+  /** Keep recording until the guide says the programme has ended. */
+  follow_guide?: boolean;
 }
 
 export interface Source {
@@ -134,6 +173,95 @@ export interface Channel {
   url: string;
   group: string;
   logo: string;
+  /** The playlist's id for the channel, used to find it in the guide. */
+  id: string;
+  kind: "live" | "movie" | "series";
+  /** Other addresses of the same channel (only when sources are merged). */
+  alt: string[];
+}
+
+export interface Programme {
+  startAt: number;
+  stopAt: number;
+  title: string;
+  description: string;
+}
+
+export interface GuideHit extends Programme {
+  channelId: string;
+  channelName: string;
+}
+
+export interface SeriesRule {
+  id: string;
+  title: string;
+  epgChannelId: string;
+  channelName: string;
+  url: string;
+  backupUrl: string | null;
+  padBefore: number;
+  padAfter: number;
+  keepHours: number | null;
+  keepLast: number | null;
+  tag: string;
+  enabled: boolean;
+}
+
+export interface NewSeriesRule {
+  title: string;
+  epg_channel_id: string;
+  channel_name?: string;
+  url: string;
+  backup_url?: string;
+  pad_before?: number;
+  pad_after?: number;
+  keep_hours?: number;
+  keep_last?: number;
+  tag?: string;
+}
+
+export interface CalendarItem {
+  id: string;
+  title: string;
+  channelName: string;
+  startAt: number;
+  endAt: number;
+  status: RecordingStatus;
+  /** More recordings run together than the account allows. */
+  clash: boolean;
+}
+
+export interface Bookmark {
+  id: string;
+  atS: number;
+  label: string;
+}
+
+export interface ServerStatus {
+  version: string;
+  mode: string;
+  diskFree: number | null;
+  diskTotal: number | null;
+  recording: number;
+  scheduled: number;
+  failed: number;
+  next: { title: string; startAt: number } | null;
+  /** MP4 export, cutting and thumbnails need ffmpeg on the server. */
+  ffmpeg: boolean;
+  perDayBytes: number;
+  /** Days of room left at the recent pace, or null when nothing was recorded lately. */
+  daysLeft: number | null;
+  expiring: { id: string; title: string; keepUntil: number }[];
+  brokenChannels: { name: string; detail: string; checkedAt: number }[];
+  /** The newer release, like `v0.15.0`, when there is one. */
+  updateAvailable: string | null;
+  defaultKeepHours: number | null;
+}
+
+export interface StorageUse {
+  folders: { name: string; bytes: number; count: number }[];
+  sources: { name: string; bytes: number; count: number }[];
+  biggest: { id: string; title: string; bytes: number }[];
 }
 
 export interface AdminUser {
@@ -220,8 +348,13 @@ export type ServerSettings = Record<
   | "default_max_hours"
   | "default_storage_gb"
   | "default_keep_hours"
+  | "delete_watched_days"
   | "allow_private"
   | "webhook_url"
+  | "epg_url"
+  | "quiet_start"
+  | "quiet_end"
+  | "update_check"
   | "session_days",
   string
 >;
@@ -326,10 +459,49 @@ export class CloudClient {
     this.post<{ ok: boolean }>("/auth/password", { current, new: next });
 
   // ---- recordings ----
-  listRecordings = () =>
-    this.get<{ recordings: CloudRecording[]; storageUsed: number; storageLimit: number }>(
-      "/recordings",
+  listRecordings = (filter: { tag?: string; q?: string; kind?: string } = {}) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(filter)) if (value) query.set(key, value);
+    const suffix = query.size ? `?${query}` : "";
+    return this.get<{
+      recordings: CloudRecording[];
+      tags: string[];
+      storageUsed: number;
+      storageLimit: number;
+    }>(`/recordings${suffix}`);
+  };
+  /** Saves a movie or episode file from a source address on the server. */
+  createDownload = (body: NewDownload) => this.post<{ id: string }>("/downloads", body);
+  /** Changes the title, folder, keep time, or watch state. `keep_hours` counts from now; 0 = forever. */
+  patchRecording = (
+    id: string,
+    patch: Partial<{
+      title: string;
+      tag: string;
+      keep_hours: number;
+      watched: boolean;
+      position_s: number;
+    }>,
+  ) => this.request<{ ok: boolean }>("PATCH", `/recordings/${id}`, patch);
+  bookmarks = (id: string) => this.get<{ bookmarks: Bookmark[] }>(`/recordings/${id}/bookmarks`);
+  addBookmark = (id: string, atS: number, label = "") =>
+    this.post<{ id: string }>(`/recordings/${id}/bookmarks`, { at_s: atS, label });
+  deleteBookmark = (id: string, bookmark: string) =>
+    this.request<{ ok: boolean }>("DELETE", `/recordings/${id}/bookmarks/${bookmark}`);
+  /** A link that plays one recording without signing in, until it expires. */
+  shareRecording = (id: string, hours = 24) =>
+    this.post<{ token: string; path: string; download: string; expiresAt: number }>(
+      `/recordings/${id}/share`,
+      { hours },
     );
+  /** Needs ffmpeg on the server (see `status().ffmpeg`). */
+  exportRecording = (id: string) => this.post<{ path: string }>(`/recordings/${id}/export`);
+  trimRecording = (id: string, fromS: number, toS: number) =>
+    this.post<{ id: string }>(`/recordings/${id}/trim`, { from_s: fromS, to_s: toS });
+  thumbUrl = (id: string) =>
+    `${this.baseUrl}/api/v1/recordings/${id}/thumb.jpg${this.token ? `?token=${this.token}` : ""}`;
+  exportUrl = (id: string) =>
+    `${this.baseUrl}/api/v1/recordings/${id}/export.mp4${this.token ? `?token=${this.token}` : ""}`;
   createRecording = (body: NewRecording) => this.post<{ id: string }>("/recordings", body);
   stopRecording = (id: string) => this.post<{ ok: boolean }>(`/recordings/${id}/stop`);
   deleteRecording = (id: string) => this.request<{ ok: boolean }>("DELETE", `/recordings/${id}`);
@@ -353,26 +525,60 @@ export class CloudClient {
   renameRecording = (id: string, title: string) =>
     this.request<{ ok: boolean }>("PATCH", `/recordings/${id}`, { title });
   clearFailedRecordings = () => this.post<{ removed: number }>("/recordings/clear-failed");
-  status = () =>
-    this.request<{
-      version: string;
-      mode: string;
-      diskFree: number | null;
-      diskTotal: number | null;
-      recording: number;
-      scheduled: number;
-      failed: number;
-      next: { title: string; startAt: number } | null;
-    }>("GET", "/status");
-  testChannel = (url: string) =>
-    this.post<{ ok: boolean; status: number; contentType: string }>("/channels/test", { url });
+  status = () => this.get<ServerStatus>("/status");
+  storage = () => this.get<StorageUse>("/status/storage");
+  /** Opens the stream; with `seconds` (3 to 30) it records a throwaway sample instead. */
+  testChannel = (url: string, seconds?: number) =>
+    this.post<{
+      ok: boolean;
+      status?: number;
+      contentType?: string;
+      bytes?: number;
+      kbps?: number;
+      error?: string;
+    }>("/channels/test", { url, seconds });
+  exportSchedules = () =>
+    this.get<{ version: number; schedules: NewSchedule[] }>("/schedules/export");
+  importSchedules = (schedules: NewSchedule[]) =>
+    this.post<{ added: number; problems: string[] }>("/schedules/import", { schedules });
+
+  // ---- guide, series rules, calendar ----
+  guide = (query: { epgId?: string; name?: string; from?: number; to?: number }) => {
+    const params = new URLSearchParams();
+    if (query.epgId) params.set("epg_id", query.epgId);
+    if (query.name) params.set("name", query.name);
+    if (query.from) params.set("from", String(query.from));
+    if (query.to) params.set("to", String(query.to));
+    return this.get<{ channelId: string | null; programmes: Programme[] }>(`/guide?${params}`);
+  };
+  searchGuide = (q: string) =>
+    this.get<{ programmes: GuideHit[] }>(`/guide/search?q=${encodeURIComponent(q)}`);
+  guideStatus = () =>
+    this.get<{
+      configured: boolean;
+      channels: number;
+      programmes: number;
+      updatedAt: number | null;
+    }>("/guide/status");
+  refreshGuide = () => this.post<{ programmes: number }>("/guide/refresh");
+  seriesRules = () => this.get<{ rules: SeriesRule[] }>("/series-rules");
+  createSeriesRule = (body: NewSeriesRule) => this.post<{ id: string }>("/series-rules", body);
+  setSeriesRuleEnabled = (id: string, enabled: boolean) =>
+    this.request<{ ok: boolean }>("PATCH", `/series-rules/${id}`, { enabled });
+  deleteSeriesRule = (id: string) => this.request<{ ok: boolean }>("DELETE", `/series-rules/${id}`);
+  calendar = (from?: number, to?: number) => {
+    const params = new URLSearchParams();
+    if (from) params.set("from", String(from));
+    if (to) params.set("to", String(to));
+    return this.get<{ items: CalendarItem[] }>(`/calendar?${params}`);
+  };
 
   listSources = () => this.get<{ sources: Source[] }>("/sources");
   createSource = (body: NewSource) => this.post<{ id: string }>("/sources", body);
   deleteSource = (id: string) => this.request<{ ok: boolean }>("DELETE", `/sources/${id}`);
   channels = (
     source: string,
-    options: { q?: string; group?: string; offset?: number; limit?: number } = {},
+    options: { q?: string; group?: string; kind?: string; offset?: number; limit?: number } = {},
   ) => {
     const query = new URLSearchParams({ source });
     for (const [key, value] of Object.entries(options)) {
@@ -442,6 +648,8 @@ export class CloudClient {
     updateSettings: (patch: Partial<ServerSettings>) =>
       this.request<{ ok: boolean }>("PUT", "/admin/settings", patch),
     audit: (limit = 100) => this.get<AuditEntry[]>(`/admin/audit?limit=${limit}`),
+    /** Crash reports the server wrote itself; they never leave the machine. */
+    crashes: () => this.get<{ crashes: { at: number; report: string }[] }>("/admin/crashes"),
     recordings: () => this.get<AdminRecording[]>("/admin/recordings"),
     deleteRecording: (id: string) =>
       this.request<{ ok: boolean }>("DELETE", `/admin/recordings/${id}`),
