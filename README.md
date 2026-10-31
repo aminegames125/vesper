@@ -50,6 +50,7 @@ Vesper is a **recorder first**. It uses your own IPTV playlist (an M3U link or a
 | **Server status** | Settings shows the server's free disk, how many days of room are left, what records next, what is about to be deleted and any channel that stopped answering. |
 | **TV guide** | Add an XMLTV link and pick a programme by name instead of typing a time. Record it once or **every time it is on**, and let a programme that runs over keep recording until the guide says it ended. |
 | **Movies and series** | Save a movie or episode from your playlist onto the server, watch it later (with seeking), and copy it to the phone. |
+| **Share a link to cast** | Share or open any stream link or `.m3u` / `.m3u8` playlist with Vesper and cast a channel from it to a Chromecast, or record it. The phone does not play live channels itself, which would take the provider's connection; a TV does. |
 | **Chromecast and quality** | If a stream will not play on your Android TV app, play it on the phone and cast it; the Chromecast fetches the stream itself. When the stream offers several qualities (an HLS playlist with resolutions), choose 1080p, 720p and so on, or leave it on automatic, both on the phone and when casting. |
 | **Backup address and quality** | A channel's second address takes over when the first keeps failing, and you can record smaller files. |
 | **A real library** | Folders, a watched mark, *continue watching*, bookmarks, thumbnails, share links that work for a day, and (with ffmpeg) MP4 export and cutting. |

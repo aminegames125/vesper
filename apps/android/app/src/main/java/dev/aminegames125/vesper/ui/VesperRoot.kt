@@ -252,6 +252,12 @@ private fun MainScaffold(vm: VesperViewModel, gate: Gate.Ready, isTv: Boolean) {
                             bookmarks = emptyList(),
                             onProgress = { _, _ -> },
                             onBookmark = {},
+                            castOnly = !isTv,
+                            onZap = { step ->
+                                val live = vm.browser.value.channels.filter { it.isLive }
+                                val at = live.indexOfFirst { it.url == channel.url }
+                                if (live.size > 1 && at >= 0) vm.watching = live[(at + step + live.size) % live.size]
+                            },
                             onBack = { nav.popBackStack() },
                         )
                     }

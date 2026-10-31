@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
                 val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
                 vm.sharedUrl = Regex("https?://\\S+").find(text)?.value
             }
+            Intent.ACTION_VIEW -> vm.sharedUrl = intent.dataString?.takeIf { it.startsWith("http") }
             ACTION_RECORD -> vm.launchRoute = "channels"
             ACTION_CALENDAR -> vm.launchRoute = "calendar"
         }

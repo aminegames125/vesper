@@ -199,7 +199,9 @@ pub fn record(
             }
         }));
     }
-    let client = builder.build().map_err(|e| Error::Http(e.to_string()))?;
+    let client = builder
+        .build()
+        .map_err(|e| Error::Http(e.without_url().to_string()))?;
 
     let mut sink: Box<dyn Sink> = match &options.output {
         Output::File(path) => Box::new(FileSink::create(path)?),
@@ -266,7 +268,7 @@ fn record_raw<F: FnMut(Progress)>(
         .get(url)
         .send()
         .and_then(|r| r.error_for_status())
-        .map_err(|e| Error::Http(e.to_string()))?;
+        .map_err(|e| Error::Http(e.without_url().to_string()))?;
     // Reads happen on their own thread so a silent connection cannot block Stop or the silence check.
     let (tx, rx) = mpsc::sync_channel::<std::io::Result<Vec<u8>>>(16);
     thread::spawn(move || {

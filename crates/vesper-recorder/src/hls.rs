@@ -131,7 +131,7 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
                 // A single failed fetch is normal on a live stream; give up only after several in a row.
                 failures += 1;
                 if failures >= 5 {
-                    return Err(Error::Http(e.to_string()));
+                    return Err(Error::Http(e.without_url().to_string()));
                 }
                 let until = Instant::now() + Duration::from_secs(2);
                 while Instant::now() < until && !run.done() {

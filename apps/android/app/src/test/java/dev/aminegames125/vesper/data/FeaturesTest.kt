@@ -166,4 +166,18 @@ high/index.m3u8"""
         assertEquals("http://h:1/api/v1/recordings/x/download?token=tok", api.fileUrl("x"))
         assertNotNull(api.exportUrl("x"))
     }
+
+    @Test
+    fun aSharedPlaylistListsItsChannelsAndAStreamListsNone() {
+        val playlist = """#EXTM3U
+#EXTINF:-1 tvg-logo="http://l/a.png" group-title="News",Alpha News
+http://h/live/u/p/1.ts
+#EXTINF:-1,Beta
+rel/2.m3u8"""
+        val channels = parsePlaylistChannels(playlist, "http://h/lists/x.m3u")
+        assertEquals(listOf("Alpha News", "Beta"), channels.map { it.name })
+        assertEquals("News", channels[0].group)
+        assertEquals("http://h/lists/rel/2.m3u8", channels[1].url)
+        assertTrue(parsePlaylistChannels("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nlow.m3u8", "http://h/").isEmpty())
+    }
 }

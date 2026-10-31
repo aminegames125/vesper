@@ -45,6 +45,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -126,6 +131,10 @@ fun PlayerScreen(
     onProgress: (positionSeconds: Long, finished: Boolean) -> Unit,
     onBookmark: (positionSeconds: Long) -> Unit,
     onDeleteBookmark: (String) -> Unit = {},
+    /** On a phone, a live channel is not played locally: this screen only sends it to a TV. */
+    castOnly: Boolean = false,
+    /** On a TV, the remote changes channel: -1 for the previous one, 1 for the next. Null when it cannot. */
+    onZap: ((Int) -> Unit)? = null,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -153,6 +162,7 @@ fun PlayerScreen(
     val latestProgress by rememberUpdatedState(onProgress)
 
     fun loadCandidate(index: Int, positionMs: Long) {
+        if (castOnly) return
         val (address, mime) = candidates[index]
         val item = MediaItem.Builder().setUri(address).apply { mime?.let(::setMimeType) }.build()
         exo.setMediaItem(item, if (positionMs > 0) positionMs else C.TIME_UNSET)
@@ -294,7 +304,28 @@ fun PlayerScreen(
 
     BackHandler(onBack = onBack)
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    // A TV remote: up and down (or the channel keys) change channel while the controls are hidden,
+    // and the menu key opens the picture quality list.
+    var banner by remember { mutableStateOf(true) }
+    LaunchedEffect(source.url) {
+        banner = true
+        delay(4_000)
+        banner = false
+    }
+    val remoteKeys = Modifier.onPreviewKeyEvent { event ->
+        if (!isTv || event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+        val zap = onZap
+        when (event.key) {
+            Key.ChannelUp, Key.PageUp -> if (zap != null && source.live) { zap(-1); true } else false
+            Key.ChannelDown, Key.PageDown -> if (zap != null && source.live) { zap(1); true } else false
+            Key.DirectionUp -> if (zap != null && source.live && !overlay) { zap(-1); true } else false
+            Key.DirectionDown -> if (zap != null && source.live && !overlay) { zap(1); true } else false
+            Key.Menu -> if (heightsOf(variants).size > 1) { showQuality = true; true } else false
+            else -> false
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(Color.Black).then(remoteKeys)) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
@@ -327,6 +358,37 @@ fun PlayerScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 if (cast != null && !isTv) CastButton(cast)
+            }
+        }
+
+        if (isTv && (banner || overlay) && !inPip) {
+            Column(
+                Modifier.align(Alignment.BottomStart).padding(start = 48.dp, bottom = 56.dp, end = 48.dp)
+                    .background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 20.dp, vertical = 12.dp),
+            ) {
+                Text(source.title, color = Color.White, style = MaterialTheme.typography.headlineSmall, maxLines = 1)
+                val hints = buildList {
+                    if (source.live && onZap != null) add("Up / Down: change channel")
+                    if (heightsOf(variants).size > 1) add("Menu: picture quality")
+                    add("Back: leave")
+                }
+                Text(hints.joinToString("   ·   "), color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+
+        if (castOnly && current === exo) {
+            Column(
+                Modifier.align(Alignment.Center).padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(source.title, color = Color.White, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    if (cast?.available == true) "Pick a TV or Chromecast to start it there." else "Casting needs Google Play services, which this phone does not have.",
+                    color = Color.White.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (cast != null) CastButton(cast)
             }
         }
 

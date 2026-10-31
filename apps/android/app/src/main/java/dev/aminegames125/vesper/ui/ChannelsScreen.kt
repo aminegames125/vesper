@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
@@ -50,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import dev.aminegames125.vesper.ui.theme.LocalIsTv
 import coil.compose.AsyncImage
 import dev.aminegames125.vesper.data.Channel
 import dev.aminegames125.vesper.data.GuideHit
@@ -78,8 +80,19 @@ fun ChannelsScreen(
     LaunchedEffect(Unit) { vm.loadSources() }
     // A stream shared from another app: offer to record it right away.
     val shared = vm.sharedUrl
-    LaunchedEffect(shared) {
-        if (shared != null) recordNow = Channel(name = shared.toHttpUrlOrNull()?.host ?: "Shared stream", url = shared)
+    shared?.let { link ->
+        SharedLinkDialog(
+            url = link,
+            onCast = { channel ->
+                vm.sharedUrl = null
+                onWatch(channel)
+            },
+            onRecord = { channel ->
+                vm.sharedUrl = null
+                recordNow = channel
+            },
+            onDismiss = { vm.sharedUrl = null },
+        )
     }
 
     Scaffold(
@@ -205,6 +218,7 @@ private fun ChannelRow(
     onSample: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
+    val isTv = LocalIsTv.current
     ListItem(
         modifier = Modifier.clickable(onClick = onPick),
         leadingContent = if (channel.logo.isNotBlank()) {
@@ -228,7 +242,13 @@ private fun ChannelRow(
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (channel.isLive) {
-                    IconButton(onClick = onWatch) { Icon(Icons.Filled.PlayArrow, contentDescription = "Watch ${channel.name}") }
+                    // The phone does not play live channels (that would use the provider's connection
+                    // while a recording needs it); it sends them to a TV. A TV plays them.
+                    if (isTv) {
+                        IconButton(onClick = onWatch) { Icon(Icons.Filled.PlayArrow, contentDescription = "Watch ${channel.name}") }
+                    } else {
+                        IconButton(onClick = onWatch) { Icon(Icons.Filled.Cast, contentDescription = "Cast ${channel.name} to a TV") }
+                    }
                 } else {
                     IconButton(onClick = onDownload) { Icon(Icons.Filled.Download, contentDescription = "Download ${channel.name} to the server") }
                 }
@@ -241,7 +261,7 @@ private fun ChannelRow(
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More for ${channel.name}") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     if (!channel.isLive) {
-                        DropdownMenuItem(text = { Text("Watch") }, onClick = { menu = false; onWatch() })
+                        DropdownMenuItem(text = { Text(if (isTv) "Watch" else "Cast to a TV") }, onClick = { menu = false; onWatch() })
                     }
                     if (channel.isLive) {
                         DropdownMenuItem(text = { Text("Record now") }, onClick = { menu = false; onRecordNow() })

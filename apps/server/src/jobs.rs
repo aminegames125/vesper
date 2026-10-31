@@ -28,6 +28,23 @@ pub const MIN_FREE_BYTES: u64 = 512 * 1024 * 1024;
 /// Downloads an account can have running at once.
 const MAX_DOWNLOADS: i64 = 3;
 
+/// The other way a provider may serve the same live channel: `/live/u/p/1.ts` and `/live/u/p/1.m3u8`.
+fn other_form(url: &str) -> Option<String> {
+    let (path, query) = match url.split_once('?') {
+        Some((p, q)) => (p, format!("?{q}")),
+        None => (url, String::new()),
+    };
+    if !path.contains("/live/") {
+        return None;
+    }
+    if let Some(base) = path.strip_suffix(".ts") {
+        Some(format!("{base}.m3u8{query}"))
+    } else {
+        path.strip_suffix(".m3u8")
+            .map(|base| format!("{base}.ts{query}"))
+    }
+}
+
 pub fn recording_dir(state: &AppState, user_id: &str, id: &str) -> PathBuf {
     state.config.recordings_dir().join(user_id).join(id)
 }
@@ -225,6 +242,11 @@ pub fn start(state: &AppState, id: &str) {
     let id = id.to_string();
     let dir = recording_dir(&state, &user_id, &id);
     let backup = extra.backup.filter(|b| !b.is_empty() && *b != url);
+    // Without a backup, the other form of the same address is tried: providers often answer one of
+    // `.ts` and `.m3u8` for a channel with "404" while the other works.
+    let swapped = backup.is_none().then(|| other_form(&url)).flatten();
+    let swap_every = if swapped.is_some() { 1 } else { 3 };
+    let backup = backup.or(swapped);
     let lowest = extra.lowest;
     thread::spawn(move || {
         let started = Instant::now();
@@ -314,7 +336,7 @@ pub fn start(state: &AppState, id: &str) {
             streak += 1;
             // Still failing after a few tries: switch to the other address of the channel, if any.
             if let Some(other) = &backup {
-                if streak.is_multiple_of(3) {
+                if streak.is_multiple_of(swap_every) {
                     switched += 1;
                     current = if current == url {
                         other.clone()
@@ -708,5 +730,24 @@ pub fn stop(state: &AppState, id: &str) -> bool {
             true
         }
         None => false,
+    }
+}
+
+#[cfg(test)]
+mod other_form_tests {
+    use super::other_form;
+
+    #[test]
+    fn a_live_address_has_a_twin() {
+        assert_eq!(
+            other_form("http://h/live/u/p/1.ts").as_deref(),
+            Some("http://h/live/u/p/1.m3u8")
+        );
+        assert_eq!(
+            other_form("http://h/live/u/p/1.m3u8?x=1").as_deref(),
+            Some("http://h/live/u/p/1.ts?x=1")
+        );
+        assert_eq!(other_form("http://h/movie/u/p/1.mp4"), None);
+        assert_eq!(other_form("http://h/stream/1"), None);
     }
 }
