@@ -2,6 +2,7 @@ mod api;
 mod auth;
 mod config;
 mod db;
+mod discovery;
 mod download;
 mod epg;
 mod error;
@@ -133,6 +134,16 @@ async fn main() {
     if !state.config.is_lite() && state.db.user_count() == 0 {
         info!("No accounts yet: open the admin panel to create the first administrator.");
     }
+
+    // Kept alive until the server stops; dropping it would stop the announcement.
+    let _announcement = if state.config.no_discovery {
+        None
+    } else {
+        listener
+            .local_addr()
+            .ok()
+            .and_then(|a| discovery::announce(a.port(), state.config.mode.as_str()))
+    };
 
     axum::serve(
         listener,

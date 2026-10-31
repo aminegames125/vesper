@@ -59,6 +59,10 @@ pub struct Config {
     #[arg(long, env = "VESPER_TRUST_PROXY")]
     pub trust_proxy: bool,
 
+    /// Do not announce this server on the local network (mDNS), so the app cannot find it by itself.
+    #[arg(long, env = "VESPER_NO_DISCOVERY")]
+    pub no_discovery: bool,
+
     /// A command run whenever the time of the next scheduled recording changes, with the time in
     /// the VESPER_NEXT_START environment variable (epoch seconds). Use it to set a wake timer
     /// (rtcwake, schtasks). It can only be set here, never from the app or the admin panel.

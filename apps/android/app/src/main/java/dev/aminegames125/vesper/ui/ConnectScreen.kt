@@ -14,19 +14,24 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import dev.aminegames125.vesper.data.FoundServer
+import dev.aminegames125.vesper.data.discoverServers
 
 /** First run: the address of your Vesper server, then your account if the server has accounts. */
 @Composable
@@ -56,6 +61,23 @@ fun ConnectScreen(
 @Composable
 private fun AddressForm(gate: Gate.NeedServer, busy: Boolean, onConnect: (String) -> Unit) {
     var address by remember(gate.address) { mutableStateOf(gate.address) }
+    val context = LocalContext.current
+    var nearby by remember { mutableStateOf(emptyList<FoundServer>()) }
+    LaunchedEffect(Unit) { discoverServers(context).collect { nearby = it } }
+    if (nearby.isNotEmpty()) {
+        Text("Found on your network", style = MaterialTheme.typography.titleSmall)
+        nearby.forEach { server ->
+            OutlinedButton(onClick = { onConnect(server.address) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(server.name)
+                    Text(server.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        Text("Or type an address:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        Text("Looking for a Vesper server on your network…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
     Text(
         "Enter the address of the Vesper server that will make the recordings, for example 192.168.1.20:8484.",
         color = MaterialTheme.colorScheme.onSurfaceVariant,
