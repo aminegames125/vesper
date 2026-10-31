@@ -21,6 +21,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdd
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material3.AlertDialog
@@ -63,7 +66,12 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import dev.aminegames125.vesper.cast.CastButton
 import dev.aminegames125.vesper.cast.CastSupport
+import dev.aminegames125.vesper.cast.Variant
+import dev.aminegames125.vesper.cast.fetchVariants
+import dev.aminegames125.vesper.cast.heightsOf
 import dev.aminegames125.vesper.cast.isLocalOnly
+import dev.aminegames125.vesper.cast.pickVariant
+import dev.aminegames125.vesper.cast.qualityLabel
 import dev.aminegames125.vesper.cast.mimeFor
 import dev.aminegames125.vesper.data.Bookmark
 import dev.aminegames125.vesper.data.formatClock
@@ -117,6 +125,7 @@ fun PlayerScreen(
     bookmarks: List<Bookmark>,
     onProgress: (positionSeconds: Long, finished: Boolean) -> Unit,
     onBookmark: (positionSeconds: Long) -> Unit,
+    onDeleteBookmark: (String) -> Unit = {},
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -151,10 +160,19 @@ fun PlayerScreen(
         exo.playWhenReady = true
     }
 
+    // The qualities a stream offers, and the tallest picture the person allows (0 follows the connection).
+    var variants by remember(source) { mutableStateOf(emptyList<Variant>()) }
+    var maxHeight by remember(source) { mutableIntStateOf(0) }
+    var showQuality by remember { mutableStateOf(false) }
+    LaunchedEffect(source) { variants = fetchVariants(source.castUrl) }
+
+    fun castTarget(): String =
+        if (maxHeight > 0) pickVariant(variants, maxHeight)?.url ?: source.castUrl else source.castUrl
+
     fun castItem(): MediaItem =
         MediaItem.Builder()
-            .setUri(source.castUrl)
-            .setMimeType(source.castMime ?: mimeFor(source.castUrl))
+            .setUri(castTarget())
+            .setMimeType(source.castMime ?: mimeFor(castTarget()))
             .setMediaMetadata(MediaMetadata.Builder().setTitle(source.title).build())
             .build()
 
@@ -172,6 +190,22 @@ fun PlayerScreen(
         } else {
             failed = false
             loadCandidate(attempt.coerceAtMost(candidates.lastIndex), position)
+        }
+    }
+
+    fun chooseQuality(height: Int) {
+        maxHeight = height
+        val player = current
+        if (player === exo) {
+            exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().apply {
+                if (height == 0) clearVideoSizeConstraints() else setMaxVideoSize(Int.MAX_VALUE, height)
+            }.build()
+        } else {
+            // A Chromecast picks its own quality, so it is handed the address of the one chosen.
+            val position = if (source.live) C.TIME_UNSET else player.currentPosition
+            player.setMediaItem(castItem(), position)
+            player.prepare()
+            player.playWhenReady = true
         }
     }
 
@@ -315,7 +349,12 @@ fun PlayerScreen(
                         )
                     }
                 }
-                if (!source.live) {
+                if (heightsOf(variants).size > 1 && !isTv) {
+                    IconButton(onClick = { showQuality = true }) {
+                        Icon(Icons.Filled.HighQuality, contentDescription = "Picture quality", tint = Color.White)
+                    }
+                }
+                if (!source.live && !isTv) {
                     IconButton(onClick = { onBookmark(current.currentPosition / 1000) }) {
                         Icon(Icons.Filled.BookmarkAdd, contentDescription = "Add a bookmark here", tint = Color.White)
                     }
@@ -337,6 +376,33 @@ fun PlayerScreen(
         }
     }
 
+    if (showQuality) {
+        AlertDialog(
+            onDismissRequest = { showQuality = false },
+            title = { Text("Picture quality") },
+            text = {
+                Column {
+                    (listOf(0) + heightsOf(variants)).forEach { height ->
+                        ListItem(
+                            headlineContent = { Text(qualityLabel(height)) },
+                            trailingContent = if (maxHeight == height) ({ Icon(Icons.Filled.Check, contentDescription = "Selected") }) else null,
+                            modifier = Modifier.clickable {
+                                chooseQuality(height)
+                                showQuality = false
+                            },
+                        )
+                    }
+                    Text(
+                        "A lower quality uses less data and buffers less on a slow connection.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { showQuality = false }) { Text("Close") } },
+        )
+    }
+
     if (showBookmarks) {
         AlertDialog(
             onDismissRequest = { showBookmarks = false },
@@ -347,6 +413,12 @@ fun PlayerScreen(
                         ListItem(
                             headlineContent = { Text(bookmark.label.ifBlank { formatClock(bookmark.atS) }) },
                             supportingContent = if (bookmark.label.isNotBlank()) ({ Text(formatClock(bookmark.atS)) }) else null,
+                            trailingContent = {
+                                IconButton(onClick = {
+                                    onDeleteBookmark(bookmark.id)
+                                    if (bookmarks.size <= 1) showBookmarks = false
+                                }) { Icon(Icons.Filled.Delete, contentDescription = "Delete this bookmark") }
+                            },
                             modifier = Modifier.clickable {
                                 current.seekTo(bookmark.atS * 1000)
                                 showBookmarks = false

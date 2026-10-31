@@ -45,6 +45,7 @@ pub fn router() -> Router<AppState> {
         .route("/auth/register", post(account::register))
         .route("/auth/logout", post(account::logout))
         .route("/auth/me", get(account::me))
+        .route("/auth/media-token", post(account::media_token))
         .route("/auth/password", post(account::change_password))
         .route(
             "/recordings",

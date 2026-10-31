@@ -331,6 +331,9 @@ data class CalendarReply(val items: List<CalendarItem> = emptyList())
 data class Bookmark(val id: String, val atS: Long, val label: String = "")
 
 @Serializable
+internal data class MediaToken(val token: String)
+
+@Serializable
 data class BookmarkList(val bookmarks: List<Bookmark> = emptyList())
 
 @Serializable

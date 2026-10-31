@@ -24,7 +24,7 @@ pub async fn stats(State(state): State<AppState>, _admin: AdminUser) -> ApiResul
         "mode": state.config.mode.as_str(),
         "users": count("SELECT COUNT(*) FROM users WHERE id != 'local'"),
         "suspended": count("SELECT COUNT(*) FROM users WHERE status = 'suspended'"),
-        "sessions": count("SELECT COUNT(*) FROM sessions WHERE expires_at > strftime('%s','now')"),
+        "sessions": count("SELECT COUNT(*) FROM sessions WHERE agent <> 'media' AND expires_at > strftime('%s','now')"),
         "recordings": {
             "total": count("SELECT COUNT(*) FROM recordings"),
             "recording": running,
@@ -46,7 +46,7 @@ pub async fn users(State(state): State<AppState>, _admin: AdminUser) -> ApiResul
                 u.note, u.created_at, u.last_login,
                 COALESCE((SELECT SUM(bytes) FROM recordings WHERE user_id = u.id), 0),
                 (SELECT COUNT(*) FROM recordings WHERE user_id = u.id),
-                (SELECT COUNT(*) FROM sessions WHERE user_id = u.id AND expires_at > ?1)
+                (SELECT COUNT(*) FROM sessions WHERE agent <> 'media' AND user_id = u.id AND expires_at > ?1)
          FROM users u WHERE u.id != 'local' ORDER BY u.created_at",
     )?;
     let rows = stmt

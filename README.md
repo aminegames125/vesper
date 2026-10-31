@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://aminegames125.github.io/vesper/">Website</a> ·
   <a href="#-what-it-does">What it does</a> ·
   <a href="#-quick-start">Quick start</a> ·
   <a href="#-the-android-app">Android app</a> ·
@@ -23,7 +24,7 @@
 
 **Tell it a channel and a time, and it records.** "Channel 7, every weekday, 11:00 to 11:30." Vesper's server does the recording on a machine that stays on, and a native Android or Android TV app is the remote control: set it up on the sofa, watch the recording tonight.
 
-Vesper is a **recorder, not a player**. It uses your own IPTV playlist (an M3U link or an Xtream login), and it does one job well.
+Vesper is a **recorder first**. It uses your own IPTV playlist (an M3U link or an Xtream login) and does one job well: record what you chose, keep the disk tidy, and let you watch it later. You can also watch a channel live, pick a lower picture quality on a slow connection, and cast it to a Chromecast. See the [website](https://aminegames125.github.io/vesper/) for a tour.
 
 - **Record now** or **schedule** it: once, daily, weekdays, weekends or on the days you pick.
 - **Native Android and Android TV app.** Material 3, the system's own colours, no webview. One APK for phone, tablet and TV.
@@ -49,7 +50,7 @@ Vesper is a **recorder, not a player**. It uses your own IPTV playlist (an M3U l
 | **Server status** | Settings shows the server's free disk, how many days of room are left, what records next, what is about to be deleted and any channel that stopped answering. |
 | **TV guide** | Add an XMLTV link and pick a programme by name instead of typing a time. Record it once or **every time it is on**, and let a programme that runs over keep recording until the guide says it ended. |
 | **Movies and series** | Save a movie or episode from your playlist onto the server, watch it later (with seeking), and copy it to the phone. |
-| **Chromecast** | If a stream will not play on your Android TV app, play it on the phone and cast it; the Chromecast fetches the stream itself. |
+| **Chromecast and quality** | If a stream will not play on your Android TV app, play it on the phone and cast it; the Chromecast fetches the stream itself. When the stream offers several qualities (an HLS playlist with resolutions), choose 1080p, 720p and so on, or leave it on automatic, both on the phone and when casting. |
 | **Backup address and quality** | A channel's second address takes over when the first keeps failing, and you can record smaller files. |
 | **A real library** | Folders, a watched mark, *continue watching*, bookmarks, thumbnails, share links that work for a day, and (with ffmpeg) MP4 export and cutting. |
 | **Android TV home** | A TV screen with rows of cards for what is recording, what is next and what to carry on watching, made for a remote. |

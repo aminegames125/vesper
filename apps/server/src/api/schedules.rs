@@ -508,7 +508,11 @@ pub async fn export(
             .collect::<Result<Vec<_>, _>>()?;
         rows
     };
-    Ok(Json(json!({ "version": 1, "schedules": rows })))
+    Ok(Json(json!({
+        "version": 1,
+        "note": "Channel addresses can contain your provider login. Keep this file private.",
+        "schedules": rows,
+    })))
 }
 
 #[derive(Deserialize)]

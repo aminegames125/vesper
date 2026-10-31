@@ -577,7 +577,7 @@ fn prune_series(state: &AppState, rule_id: &str) {
     let old: Vec<(String, String)> = {
         let conn = state.db.conn();
         let Ok(mut stmt) = conn.prepare(
-            "SELECT id, user_id FROM recordings WHERE series_rule_id = ?1 AND status = 'done'
+            "SELECT id, user_id FROM recordings WHERE series_rule_id = ?1 AND status = 'done' AND pinned = 0
              ORDER BY COALESCE(finished_at, 0) DESC, created_at DESC LIMIT -1 OFFSET ?2",
         ) else {
             return;
@@ -614,7 +614,7 @@ fn prune_schedule(state: &AppState, schedule_id: &str) {
     let old: Vec<(String, String)> = {
         let conn = state.db.conn();
         let Ok(mut stmt) = conn.prepare(
-            "SELECT id, user_id FROM recordings WHERE schedule_id = ?1 AND status = 'done'
+            "SELECT id, user_id FROM recordings WHERE schedule_id = ?1 AND status = 'done' AND pinned = 0
              ORDER BY COALESCE(finished_at, 0) DESC, created_at DESC LIMIT -1 OFFSET ?2",
         ) else {
             return;

@@ -119,6 +119,17 @@ pub fn create_session(state: &AppState, user_id: &str, agent: &str, ip: &str) ->
     Ok(token)
 }
 
+/// A token that only opens media addresses and lasts a day. Players, the download manager and a
+/// Chromecast get this in the address instead of the real session token.
+pub fn create_media_session(state: &AppState, user_id: &str) -> ApiResult<String> {
+    let token = random_token();
+    state.db.conn().execute(
+        "INSERT INTO sessions (token_hash, user_id, created_at, expires_at, agent, ip) VALUES (?1, ?2, ?3, ?4, 'media', '')",
+        params![token_hash(&token), user_id, now(), now() + 86_400],
+    )?;
+    Ok(token)
+}
+
 pub fn bearer(parts: &Parts) -> Option<String> {
     if let Some(value) = parts
         .headers
@@ -166,18 +177,21 @@ impl FromRequestParts<AppState> for AuthUser {
             return Ok(AuthUser(user));
         }
         let token = bearer(parts).ok_or(ApiError::Unauthorized)?;
+        // A media token travels in addresses, so it is refused anywhere a header would be used.
+        let via_header = i64::from(parts.headers.contains_key("authorization"));
         let user = conn
             .query_row(
                 &format!(
                     "SELECT {} FROM users u JOIN sessions s ON s.user_id = u.id
-                     WHERE s.token_hash = ?1 AND s.expires_at > ?2",
+                     WHERE s.token_hash = ?1 AND s.expires_at > ?2
+                       AND (s.agent <> 'media' OR ?3 = 0)",
                     USER_COLUMNS
                         .split(", ")
                         .map(|c| format!("u.{c}"))
                         .collect::<Vec<_>>()
                         .join(", ")
                 ),
-                params![token_hash(&token), now()],
+                params![token_hash(&token), now(), via_header],
                 user_from_row,
             )
             .map_err(|_| ApiError::Unauthorized)?;

@@ -2,6 +2,8 @@ package dev.aminegames125.vesper.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import dev.aminegames125.vesper.data.KEEP_CHOICES
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -76,9 +79,11 @@ private val NOW_CHOICES = listOf(
     0L to "Until I stop it",
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RecordNowDialog(channel: Channel, onDismiss: () -> Unit, onStart: (Long) -> Unit) {
+fun RecordNowDialog(channel: Channel, onDismiss: () -> Unit, onStart: (Long, Long?) -> Unit) {
     var seconds by remember { mutableStateOf(3600L) }
+    var keep by remember { mutableStateOf<Long?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Record ${channel.name} now") },
@@ -93,9 +98,16 @@ fun RecordNowDialog(channel: Channel, onDismiss: () -> Unit, onStart: (Long) -> 
                         Text(label, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp))
                     }
                 }
+                Text("Delete after", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = keep == null, onClick = { keep = null }, label = { Text("Usual") })
+                    KEEP_CHOICES.forEach { (hours, label) ->
+                        FilterChip(selected = keep == hours, onClick = { keep = hours }, label = { Text(label) })
+                    }
+                }
             }
         },
-        confirmButton = { Button(onClick = { onStart(seconds) }) { Text("Start recording") } },
+        confirmButton = { Button(onClick = { onStart(seconds, keep) }) { Text("Start recording") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

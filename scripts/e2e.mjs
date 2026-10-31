@@ -197,6 +197,13 @@ try {
     "share playlist opens from another site with CORS (for Chromecast)",
     `${sharedList.status} ${sharedList.headers.get("access-control-allow-origin")}`,
   );
+  // ---- a media token opens media addresses only
+  const media = await api("POST", "/auth/media-token");
+  check(media.s === 200 && media.j.token, "media token made", JSON.stringify(media.j));
+  const viaQuery = await fetch(`${BASE}/recordings/${rec.j.id}/index.m3u8?token=${media.j.token}`, { headers: foreign });
+  check(viaQuery.status === 200, "media token plays a recording from another site", viaQuery.status);
+  const pin = await api("PATCH", `/recordings/${rec.j.id}`, { keep_hours: 0 });
+  check(pin.s === 200, "recording pinned forever");
   const seg = await fetch(`${BASE}/share/${share.j.token}/seg/seg00000.ts`, { headers: { ...foreign, range: "bytes=0-187" } });
   check(seg.status === 206 && (await seg.arrayBuffer()).byteLength === 188, "share segment supports range");
   const guarded = await fetch(`${BASE}/recordings`, { headers: foreign });

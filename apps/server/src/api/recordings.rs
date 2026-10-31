@@ -298,8 +298,8 @@ fn apply_keep(state: &AppState, id: &str, status: &str, hours: i64) -> rusqlite:
         .db
         .conn()
         .execute(
-            "UPDATE recordings SET keep_until = ?1, keep_hours = ?2 WHERE id = ?3",
-            params![until, keep, id],
+            "UPDATE recordings SET keep_until = ?1, keep_hours = ?2, pinned = ?3 WHERE id = ?4",
+            params![until, keep, i64::from(keep.is_none()), id],
         )
         .map(|_| ())
 }

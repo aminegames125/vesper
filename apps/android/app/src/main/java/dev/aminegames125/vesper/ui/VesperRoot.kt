@@ -268,6 +268,7 @@ private fun MainScaffold(vm: VesperViewModel, gate: Gate.Ready, isTv: Boolean) {
                         bookmarks = bookmarks,
                         onProgress = { seconds, finished -> vm.saveProgress(id, seconds, finished) },
                         onBookmark = { seconds -> vm.addBookmark(id, seconds) },
+                        onDeleteBookmark = { bookmark -> vm.deleteBookmark(id, bookmark) },
                         onBack = { nav.popBackStack() },
                     )
                 }

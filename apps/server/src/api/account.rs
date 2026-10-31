@@ -280,6 +280,15 @@ pub async fn logout(
     Ok(Json(json!({ "ok": true })))
 }
 
+/// A token for media addresses only, valid for a day. The app asks again before it runs out.
+pub async fn media_token(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+) -> ApiResult<Json<Value>> {
+    let token = crate::auth::create_media_session(&state, &user.id)?;
+    Ok(Json(json!({ "token": token })))
+}
+
 pub async fn me(State(state): State<AppState>, AuthUser(user): AuthUser) -> Json<Value> {
     Json(user_json(&state, &user))
 }

@@ -172,8 +172,8 @@ fun ChannelsScreen(
                 recordNow = null
                 vm.sharedUrl = null
             },
-            onStart = { seconds ->
-                vm.recordNow(channel, seconds)
+            onStart = { seconds, keep ->
+                vm.recordNow(channel, seconds, keep)
                 recordNow = null
                 vm.sharedUrl = null
                 onBack()

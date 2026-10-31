@@ -1,6 +1,9 @@
 package dev.aminegames125.vesper.data
 
 import dev.aminegames125.vesper.cast.castUrlFor
+import dev.aminegames125.vesper.cast.heightsOf
+import dev.aminegames125.vesper.cast.parseVariants
+import dev.aminegames125.vesper.cast.pickVariant
 import dev.aminegames125.vesper.cast.isLocalOnly
 import dev.aminegames125.vesper.cast.mimeFor
 import dev.aminegames125.vesper.ui.playbackCandidates
@@ -135,6 +138,23 @@ class FeaturesTest {
         assertEquals("/api/v1/recordings/abc", request.path)
         assertEquals("""{"keep_hours":24}""", request.body.readUtf8())
         server.shutdown()
+    }
+
+    @Test
+    fun theQualitiesOfAStreamAreRead() {
+        val master = """#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360
+low/index.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720
+http://other/mid.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080
+high/index.m3u8"""
+        val variants = parseVariants(master, "http://h/live/1.m3u8")
+        assertEquals(listOf(1080, 720, 360), heightsOf(variants))
+        assertEquals("http://h/live/low/index.m3u8", variants.first().url)
+        assertEquals("http://other/mid.m3u8", pickVariant(variants, 720)!!.url)
+        assertEquals("http://h/live/low/index.m3u8", pickVariant(variants, 240)!!.url)
+        assertTrue(parseVariants("not a playlist", "http://h/").isEmpty())
     }
 
     @Test

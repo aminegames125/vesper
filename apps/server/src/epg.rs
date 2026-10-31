@@ -356,6 +356,36 @@ pub fn match_series(state: &AppState) {
             .map(|rows| rows.flatten().collect())
             .unwrap_or_default()
         };
+        // A programme that moved leaves its old slot behind; drop slots the guide no longer has.
+        if !programmes.is_empty() {
+            let valid: std::collections::HashSet<i64> =
+                programmes.iter().map(|(s, _, _)| s - before).collect();
+            let stale: Vec<String> = {
+                let conn = state.db.conn();
+                let Ok(mut stmt) = conn.prepare(
+                    "SELECT id, start_at FROM recordings
+                     WHERE series_rule_id = ?1 AND status = 'scheduled' AND start_at > ?2",
+                ) else {
+                    continue;
+                };
+                stmt.query_map(params![id, now() + before], |r| {
+                    Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+                })
+                .map(|rows| {
+                    rows.flatten()
+                        .filter(|(_, at)| !valid.contains(at))
+                        .map(|(row, _)| row)
+                        .collect()
+                })
+                .unwrap_or_default()
+            };
+            for row in stale {
+                let _ = state
+                    .db
+                    .conn()
+                    .execute("DELETE FROM recordings WHERE id = ?1", [row]);
+            }
+        }
         for (start, stop, programme_title) in programmes {
             // A guide entry that runs for more than a day is a mistake, not a programme.
             if stop <= start || stop - start > 86_400 {

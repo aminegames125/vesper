@@ -38,6 +38,15 @@ class Api(
 ) {
     @Volatile var base: String = ""
     @Volatile var token: String? = null
+        set(value) {
+            field = value
+            mediaToken = null
+            mediaTokenAt = 0
+        }
+
+    /** A day-long token that only opens media addresses, so the real one stays out of them. */
+    @Volatile var mediaToken: String? = null
+    @Volatile var mediaTokenAt: Long = 0
 
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
@@ -293,7 +302,13 @@ class Api(
     }
 
     private fun media(path: String): String =
-        "$base/api/v1/recordings/$path" + (token?.let { "?token=$it" } ?: "")
+        "$base/api/v1/recordings/$path" + ((mediaToken ?: token)?.let { "?token=$it" } ?: "")
+
+    suspend fun refreshMediaToken() {
+        val reply: MediaToken = decode(send("POST", "/auth/media-token"))
+        mediaToken = reply.token
+        mediaTokenAt = System.currentTimeMillis()
+    }
 
     /** The recording as an HLS playlist; the server accepts the token in the address for media. */
     fun playlistUrl(id: String): String = media("$id/index.m3u8")

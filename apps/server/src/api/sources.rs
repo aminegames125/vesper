@@ -355,7 +355,7 @@ async fn merged(
         };
         for channel in list.iter() {
             let key = crate::epg::norm(&channel.name);
-            if channel.kind == "live" && !key.is_empty() {
+            if channel.kind == "live" && !key.is_empty() && channel.name != "Channel" {
                 if let Some(&at) = by_name.get(&key) {
                     let primary = out[at].url.clone();
                     if channel.url != primary {

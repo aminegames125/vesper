@@ -211,6 +211,12 @@ class VesperViewModel(app: Application, private val saved: SavedStateHandle) : A
         }
     }
 
+    fun deleteBookmark(id: String, bookmark: String) {
+        viewModelScope.launch {
+            if (guard { api.deleteBookmark(id, bookmark) } != null) loadBookmarks(id)
+        }
+    }
+
     fun setKeep(id: String, hours: Long) {
         viewModelScope.launch {
             if (guard { api.setKeep(id, hours) } != null) {
@@ -548,6 +554,9 @@ class VesperViewModel(app: Application, private val saved: SavedStateHandle) : A
         if (_gate.value !is Gate.Ready) return
         viewModelScope.launch {
             guard {
+                if (System.currentTimeMillis() - api.mediaTokenAt > 6 * 3_600_000L) {
+                    runCatching { api.refreshMediaToken() }
+                }
                 val list = api.recordings()
                 _recordings.value = list.recordings
                 _storage.value = list.storageUsed to list.storageLimit
@@ -705,10 +714,10 @@ class VesperViewModel(app: Application, private val saved: SavedStateHandle) : A
         }
     }
 
-    fun recordNow(channel: Channel, seconds: Long) {
+    fun recordNow(channel: Channel, seconds: Long, keepHours: Long? = null) {
         viewModelScope.launch {
             _busy.value = true
-            if (guard { api.recordNow(NewRecording(channel.name, channel.name, channel.url, seconds, backupUrl = channel.alt.firstOrNull())) } != null) {
+            if (guard { api.recordNow(NewRecording(channel.name, channel.name, channel.url, seconds, keepHours = keepHours, backupUrl = channel.alt.firstOrNull())) } != null) {
                 _messages.tryEmit("Recording ${channel.name}.")
                 refresh()
             }

@@ -238,6 +238,7 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     add_column(conn, "schedules", "backup_url", "TEXT")?;
     add_column(conn, "schedules", "quality", "TEXT NOT NULL DEFAULT 'best'")?;
     add_column(conn, "schedules", "webhook_url", "TEXT")?;
+    add_column(conn, "recordings", "pinned", "INTEGER NOT NULL DEFAULT 0")?;
     add_column(conn, "schedules", "tag", "TEXT NOT NULL DEFAULT ''")?;
     add_column(conn, "schedules", "epg_id", "TEXT NOT NULL DEFAULT ''")?;
     add_column(

@@ -1,54 +1,65 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" role="img" aria-label="Vesper: schedule your IPTV recordings">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 440" role="img" aria-label="Vesper: a scheduled IPTV recorder">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#14141a"/>
-      <stop offset="1" stop-color="#0a0a0c"/>
+      <stop offset="0" stop-color="#151518"/>
+      <stop offset="1" stop-color="#0b0b0d"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0.18" cy="0.35" r="0.6">
-      <stop offset="0" stop-color="#ff5c7a" stop-opacity="0.22"/>
+    <radialGradient id="glow" cx="0.82" cy="0.5" r="0.55">
+      <stop offset="0" stop-color="#ff5c7a" stop-opacity="0.2"/>
       <stop offset="1" stop-color="#ff5c7a" stop-opacity="0"/>
     </radialGradient>
-    <pattern id="scan" width="8" height="8" patternUnits="userSpaceOnUse">
-      <rect width="8" height="1" fill="#ffffff" opacity="0.035"/>
-    </pattern>
+    <clipPath id="card"><rect width="1280" height="440" rx="28"/></clipPath>
+    <style>
+      .rec { animation: pulse 1.6s ease-in-out infinite; }
+      .grow { transform-origin: left center; transform-box: fill-box; animation: grow 5s ease-in-out infinite alternate; }
+      @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+      @keyframes grow { from { transform: scaleX(.55) } to { transform: scaleX(1) } }
+      @media (prefers-reduced-motion: reduce) { .rec, .grow { animation: none } }
+    </style>
   </defs>
-  <rect width="1280" height="420" rx="28" fill="url(#bg)"/>
-  <rect width="1280" height="420" rx="28" fill="url(#glow)"/>
-  <rect width="1280" height="420" rx="28" fill="url(#scan)"/>
-  <rect x="0.5" y="0.5" width="1279" height="419" rx="27.5" fill="none" stroke="#2a2a30"/>
 
-  <!-- mark -->
-  <g transform="translate(88 96) scale(3.6)">
-    <rect x="8" y="10" width="48" height="7" rx="3.5" fill="#FF5C7A"/>
-    <rect x="14" y="21" width="36" height="7" rx="3.5" fill="#F4F1EA"/>
-    <rect x="20" y="32" width="24" height="7" rx="3.5" fill="#F4F1EA"/>
-    <rect x="26" y="43" width="12" height="7" rx="3.5" fill="#F4F1EA"/>
+  <g clip-path="url(#card)">
+    <rect width="1280" height="440" fill="url(#bg)"/>
+    <rect width="1280" height="440" fill="url(#glow)"/>
+
+    <!-- timeline grid -->
+    <g stroke="#ffffff" stroke-opacity="0.06">
+      <path d="M700 70v300M780 70v300M860 70v300M940 70v300M1020 70v300M1100 70v300M1180 70v300"/>
+    </g>
+    <g font-family="'Segoe UI',system-ui,sans-serif" font-size="14" fill="#6e6e78">
+      <text x="700" y="56">20:00</text><text x="860" y="56">22:00</text><text x="1020" y="56">00:00</text><text x="1180" y="56">02:00</text>
+    </g>
+
+    <!-- schedule rows -->
+    <g font-family="'Segoe UI',system-ui,sans-serif" font-size="17" font-weight="600">
+      <rect x="716" y="100" width="200" height="40" rx="12" fill="#1e1e22" stroke="#2a2a30"/>
+      <rect class="grow" x="716" y="100" width="200" height="40" rx="12" fill="#ff5c7a"/>
+      <circle class="rec" cx="738" cy="120" r="6" fill="#0d0d0f"/>
+      <text x="754" y="126" fill="#1a0a0f">Evening news</text>
+
+      <rect x="860" y="156" width="256" height="40" rx="12" fill="#1e1e22" stroke="#2a2a30"/>
+      <text x="880" y="182" fill="#f4f1ea">Match of the day</text>
+
+      <rect x="780" y="212" width="170" height="40" rx="12" fill="#1e1e22" stroke="#2a2a30"/>
+      <text x="800" y="238" fill="#f4f1ea">Documentary</text>
+
+      <rect x="1020" y="268" width="150" height="40" rx="12" fill="#1e1e22" stroke="#2a2a30"/>
+      <text x="1040" y="294" fill="#f4f1ea">Late film</text>
+
+      <rect x="700" y="324" width="190" height="40" rx="12" fill="#1e1e22" stroke="#2a2a30" stroke-dasharray="5 5"/>
+      <text x="720" y="350" fill="#9a9aa3">Every weekday</text>
+    </g>
+
+    <!-- mark and name -->
+    <g transform="translate(72 34) scale(2.6)">
+      <rect x="8" y="10" width="48" height="7" rx="3.5" fill="#FF5C7A"/>
+      <rect x="14" y="21" width="36" height="7" rx="3.5" fill="#F4F1EA"/>
+      <rect x="20" y="32" width="24" height="7" rx="3.5" fill="#F4F1EA"/>
+      <rect x="26" y="43" width="12" height="7" rx="3.5" fill="#F4F1EA"/>
+    </g>
+    <text x="80" y="262" font-family="'Segoe UI',system-ui,sans-serif" font-size="104" font-weight="800" fill="#F4F1EA" letter-spacing="-4">Vesper</text>
+    <text x="84" y="312" font-family="'Segoe UI',system-ui,sans-serif" font-size="28" fill="#9a9aa3">Your IPTV, recorded while you are away.</text>
+    <text x="84" y="372" font-family="'Segoe UI',system-ui,sans-serif" font-size="19" fill="#6e6e78">Schedules · TV guide · Downloads · Chromecast · Android and Android TV</text>
   </g>
-
-  <text x="360" y="190" font-family="'Bricolage Grotesque','Segoe UI',system-ui,sans-serif" font-size="108" font-weight="800" fill="#F4F1EA" letter-spacing="-3">Vesper</text>
-  <text x="364" y="244" font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="30" fill="#9a9aa3">Schedule your IPTV recordings. It records while you are away.</text>
-
-  <g font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="20" font-weight="600">
-    <rect x="364" y="288" width="132" height="44" rx="22" fill="#ff5c7a"/>
-    <text x="430" y="317" text-anchor="middle" fill="#1a0a0f">Record now</text>
-    <rect x="508" y="288" width="160" height="44" rx="22" fill="#1e1e22" stroke="#2a2a30"/>
-    <text x="588" y="317" text-anchor="middle" fill="#F4F1EA">Schedules</text>
-    <rect x="680" y="288" width="196" height="44" rx="22" fill="#1e1e22" stroke="#2a2a30"/>
-    <text x="778" y="317" text-anchor="middle" fill="#F4F1EA">Repeats and padding</text>
-    <rect x="888" y="288" width="124" height="44" rx="22" fill="#1e1e22" stroke="#2a2a30"/>
-    <text x="950" y="317" text-anchor="middle" fill="#F4F1EA">Rust</text>
-  </g>
-
-  <!-- devices -->
-  <g fill="none" stroke="#F4F1EA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.85">
-    <rect x="1000" y="86" width="190" height="124" rx="12"/>
-    <path d="M1060 226h70M1095 210v16"/>
-    <rect x="1148" y="170" width="52" height="96" rx="10" fill="#0a0a0c"/>
-    <path d="M1166 254h16"/>
-  </g>
-  <rect x="1012" y="98" width="166" height="8" rx="4" fill="#FF5C7A"/>
-  <rect x="1012" y="116" width="124" height="8" rx="4" fill="#F4F1EA" opacity="0.7"/>
-  <rect x="1012" y="134" width="84" height="8" rx="4" fill="#F4F1EA" opacity="0.5"/>
-
-  <text x="88" y="378" font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="18" fill="#6e6e78">Server for Windows and Linux  —  native apps for Android and Android TV</text>
+  <rect x="0.5" y="0.5" width="1279" height="439" rx="27.5" fill="none" stroke="#2a2a30"/>
 </svg>
