@@ -1,24 +1,21 @@
-import { useMemo, useState } from "react";
-import { ChannelCard, ChannelRow, cleanName } from "../components/cards";
-import { IconButton, LayoutGridIcon, ListIcon } from "../components/icons";
+import { useMemo, useRef, useState } from "react";
+import { ChannelLogo, cleanName } from "../components/cards";
+import { HeartIcon, IconButton, PlayIcon } from "../components/icons";
 import { Paged } from "../components/paged";
-import { Notice, PageHeader, Segmented } from "../components/ui";
+import { formatClock, nowNext } from "../lib/epg";
+import { useGuide, useSeen } from "../lib/guide-cache";
 import { groupBy } from "../lib/m3u";
+import { channelPlayable } from "../lib/playable";
 import { useStore } from "../lib/store";
+import type { Channel } from "../lib/types";
 import { NoSources } from "./no-sources";
 
-type Layout = "grid" | "list";
-type Sort = "default" | "az";
+const FAVOURITES = "\u0000favourites";
 
-const read = <T extends string>(key: string, fallback: T): T => {
-  try {
-    return (localStorage.getItem(key) as T) || fallback;
-  } catch {
-    return fallback;
-  }
-};
-
-/** Two columns: categories on the left, channels on the right. */
+/**
+ * Live TV as three panes: categories, the channel list, and a preview of the channel you are on.
+ * Clicking selects, double-clicking (or the Watch button) plays.
+ */
 export function Live() {
   const channels = useStore((s) => s.channels);
   const favorites = useStore((s) => s.favorites);
@@ -27,10 +24,8 @@ export function Live() {
   const query = useStore((s) => s.query)
     .trim()
     .toLowerCase();
-  const [layout, setLayout] = useState<Layout>(() => read("vesper.live.layout", "grid"));
-  const [sort, setSort] = useState<Sort>("default");
-  const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [filter, setFilter] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const groups = useMemo(() => groupBy(channels), [channels]);
   const shownGroups = groups.filter(([name]) =>
@@ -39,47 +34,49 @@ export function Live() {
 
   const visible = useMemo(() => {
     let list = channels;
-    if (group) list = list.filter((c) => c.group === group);
-    if (onlyFavorites) list = list.filter((c) => favorites.includes(c.id));
+    if (group === FAVOURITES) list = list.filter((c) => favorites.includes(c.id));
+    else if (group) list = list.filter((c) => c.group === group);
     if (query) list = list.filter((c) => c.name.toLowerCase().includes(query));
-    if (sort === "az")
-      list = [...list].sort((a, b) => cleanName(a.name).localeCompare(cleanName(b.name)));
     return list;
-  }, [channels, group, onlyFavorites, favorites, query, sort]);
+  }, [channels, group, favorites, query]);
 
   if (channels.length === 0) return <NoSources />;
 
-  const chooseLayout = (next: Layout) => {
-    setLayout(next);
-    try {
-      localStorage.setItem("vesper.live.layout", next);
-    } catch {
-      /* the choice just will not be remembered */
-    }
-  };
+  const selected = visible.find((c) => c.id === selectedId) ?? visible[0];
+  const title = group === FAVOURITES ? "Favourites" : group === "" ? "All channels" : group;
 
   return (
-    <div className="flex gap-8">
-      <aside className="sticky top-0 hidden h-[calc(100vh-9rem)] w-56 flex-none flex-col lg:flex">
+    <div className="grid h-[calc(100vh-7rem)] grid-cols-[13.5rem_minmax(0,1fr)_23rem] gap-8 max-xl:grid-cols-[13.5rem_minmax(0,1fr)] max-lg:grid-cols-[minmax(0,1fr)]">
+      <aside className="flex min-h-0 flex-col max-lg:hidden">
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter categories"
-          aria-label="Filter categories"
-          className="mb-2 rounded-full border border-line bg-panel px-4 py-2 text-sm placeholder:text-muted focus:border-accent focus:outline-none"
+          placeholder="Find a category"
+          aria-label="Find a category"
+          className="mb-3 rounded-xl bg-raised px-3.5 py-2 text-sm placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         />
         <ul className="min-h-0 flex-1 overflow-y-auto pr-1">
           <li>
-            <CategoryRow
+            <Category
               label="All channels"
               count={channels.length}
               active={group === ""}
               onClick={() => setGroup("")}
             />
           </li>
+          {favorites.length > 0 && (
+            <li>
+              <Category
+                label="Favourites"
+                count={channels.filter((c) => favorites.includes(c.id)).length}
+                active={group === FAVOURITES}
+                onClick={() => setGroup(FAVOURITES)}
+              />
+            </li>
+          )}
           {shownGroups.map(([name, list]) => (
             <li key={name}>
-              <CategoryRow
+              <Category
                 label={name}
                 count={list.length}
                 active={group === name}
@@ -90,80 +87,42 @@ export function Live() {
         </ul>
       </aside>
 
-      <div className="min-w-0 flex-1">
-        <PageHeader
-          title={group || "Live TV"}
-          count={visible.length}
-          actions={
-            <>
-              <select
-                aria-label="Category"
-                value={group}
-                onChange={(e) => setGroup(e.target.value)}
-                className="rounded-full border border-line bg-panel px-3 py-2 text-sm lg:hidden"
-              >
-                <option value="">All channels</option>
-                {groups.map(([name]) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-              <Segmented
-                label="Favourites"
-                value={onlyFavorites ? "fav" : "all"}
-                onChange={(v) => setOnlyFavorites(v === "fav")}
-                options={[
-                  { value: "all", label: "All" },
-                  { value: "fav", label: "Favourites" },
-                ]}
-              />
-              <Segmented
-                label="Sort"
-                value={sort}
-                onChange={setSort}
-                options={[
-                  { value: "default", label: "Provider order" },
-                  { value: "az", label: "A–Z" },
-                ]}
-              />
-              <IconButton
-                icon={LayoutGridIcon}
-                label="Grid view"
-                active={layout === "grid"}
-                onClick={() => chooseLayout("grid")}
-              />
-              <IconButton
-                icon={ListIcon}
-                label="List view"
-                active={layout === "list"}
-                onClick={() => chooseLayout("list")}
-              />
-            </>
-          }
-        />
-        {visible.length === 0 ? (
-          <Notice title="No channels here">Try another category, or clear the search.</Notice>
-        ) : layout === "grid" ? (
-          <Paged
-            items={visible}
-            minWidth="15rem"
-            render={(c) => <ChannelCard channel={c} list={visible} />}
-          />
-        ) : (
-          <Paged
-            items={visible}
-            list
-            pageSize={80}
-            render={(c) => <ChannelRow channel={c} list={visible} />}
-          />
-        )}
-      </div>
+      <section className="flex min-h-0 min-w-0 flex-col">
+        <h1 className="mb-4 flex items-baseline gap-3 text-3xl font-bold">
+          {title}
+          <span className="text-sm font-medium text-muted tabular-nums">
+            {visible.length.toLocaleString()}
+          </span>
+        </h1>
+        <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+          {visible.length === 0 ? (
+            <p className="py-10 text-muted">
+              No channels here. Try another category or clear the search.
+            </p>
+          ) : (
+            <Paged
+              items={visible}
+              list
+              pageSize={80}
+              render={(c) => (
+                <LiveRow
+                  channel={c}
+                  list={visible}
+                  active={c.id === selected?.id}
+                  onSelect={() => setSelectedId(c.id)}
+                />
+              )}
+            />
+          )}
+        </div>
+      </section>
+
+      {selected && <Preview key={selected.id} channel={selected} list={visible} />}
     </div>
   );
 }
 
-function CategoryRow({
+function Category({
   label,
   count,
   active,
@@ -179,10 +138,137 @@ function CategoryRow({
       type="button"
       onClick={onClick}
       aria-current={active ? "true" : undefined}
-      className="fade flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm text-muted hover:bg-raised hover:text-paper aria-[current=true]:bg-tint aria-[current=true]:font-semibold aria-[current=true]:text-accent"
+      className="fade flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm text-muted hover:text-paper aria-[current=true]:bg-paper aria-[current=true]:font-semibold aria-[current=true]:text-ink"
     >
       <span className="truncate">{label}</span>
-      <span className="text-xs">{count}</span>
+      <span className="text-xs tabular-nums opacity-70">{count}</span>
     </button>
+  );
+}
+
+function LiveRow({
+  channel,
+  list,
+  active,
+  onSelect,
+}: {
+  channel: Channel;
+  list: Channel[];
+  active: boolean;
+  onSelect: () => void;
+}) {
+  const play = useStore((s) => s.play);
+  const ref = useRef<HTMLButtonElement>(null);
+  const seen = useSeen(ref);
+  const guide = useGuide(channel, seen, 3);
+  const { now, progress } = nowNext(guide ?? []);
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={onSelect}
+      onDoubleClick={() => play(channelPlayable(channel), list)}
+      aria-current={active ? "true" : undefined}
+      className="fade flex w-full items-center gap-4 rounded-xl px-3 py-2.5 text-left hover:bg-raised aria-[current=true]:bg-raised aria-[current=true]:ring-1 aria-[current=true]:ring-line"
+    >
+      <ChannelLogo channel={channel} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-medium">{cleanName(channel.name)}</span>
+        <span className="block h-4 truncate text-xs text-muted">{now?.title ?? channel.group}</span>
+        {now && (
+          <span className="mt-1 block h-0.5 overflow-hidden rounded bg-line">
+            <span
+              className="block h-full bg-accent"
+              style={{ width: `${Math.round(progress * 100)}%` }}
+            />
+          </span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+/** The right-hand pane: a large look at the channel, what is on and what comes next. */
+function Preview({ channel, list }: { channel: Channel; list: Channel[] }) {
+  const play = useStore((s) => s.play);
+  const favourite = useStore((s) => s.favorites.includes(channel.id));
+  const toggleFavorite = useStore((s) => s.toggleFavorite);
+  const guide = useGuide(channel, true, 6);
+  const { now, next, progress } = nowNext(guide ?? []);
+  const upcoming = (guide ?? []).filter((p) => p.start > Date.now() / 1000).slice(1, 4);
+
+  return (
+    <aside className="flex min-h-0 flex-col gap-5 overflow-y-auto max-xl:hidden">
+      <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-2xl bg-panel">
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-br from-accent/15 to-transparent"
+        />
+        {channel.logo ? (
+          <img src={channel.logo} alt="" className="relative size-full object-contain p-8" />
+        ) : (
+          <span className="relative font-display text-5xl font-bold text-muted">
+            {cleanName(channel.name).slice(0, 2).toUpperCase()}
+          </span>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold">{cleanName(channel.name)}</h2>
+        <p className="mt-1 text-sm text-muted">{channel.group}</p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => play(channelPlayable(channel), list)}
+          className="fade inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-accent py-2.5 text-sm font-semibold text-on-accent hover:brightness-110"
+        >
+          <PlayIcon size={16} color="currentColor" isAnimated={false} /> Watch live
+        </button>
+        <IconButton
+          icon={HeartIcon}
+          label={favourite ? "Remove from favourites" : "Add to favourites"}
+          active={favourite}
+          onClick={() => toggleFavorite(channel.id)}
+        />
+      </div>
+
+      <div className="rounded-2xl bg-panel p-4">
+        {now ? (
+          <>
+            <p className="text-xs text-muted tabular-nums">
+              Now · {formatClock(now.start)} – {formatClock(now.end)}
+            </p>
+            <p className="mt-1 font-semibold">{now.title}</p>
+            <span className="my-3 block h-1 overflow-hidden rounded bg-line">
+              <span
+                className="block h-full bg-accent"
+                style={{ width: `${Math.round(progress * 100)}%` }}
+              />
+            </span>
+            {now.description && (
+              <p className="line-clamp-4 text-sm text-muted">{now.description}</p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted">No programme information for this channel.</p>
+        )}
+      </div>
+
+      {(next || upcoming.length > 0) && (
+        <ul className="flex flex-col gap-3 text-sm">
+          {[next, ...upcoming].filter(Boolean).map((p) => (
+            <li key={p?.id} className="flex gap-3">
+              <span className="w-12 flex-none text-muted tabular-nums">
+                {p && formatClock(p.start)}
+              </span>
+              <span className="truncate">{p?.title}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </aside>
   );
 }

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { WhatsNew } from "./components/onboarding";
 import { Nav, Toast } from "./components/shell";
 import { TvHome, TvShell } from "./components/tv";
@@ -50,6 +50,8 @@ export function App() {
   }, [refresh]);
 
   useEffect(() => applyTheme(theme), [theme]);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => setScrolled(false), [view, detail]);
   useRecordingEvents();
   useScheduler();
   useCloudSync();
@@ -81,10 +83,13 @@ export function App() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <Nav />
+    <div className="relative h-full">
+      <Nav solid={scrolled || (view !== "home" && !detail)} />
       <main
-        className={`min-h-0 flex-1 overflow-y-auto ${detail ? "" : "px-8 py-6 max-md:px-4 max-md:pb-24"}`}
+        onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 24)}
+        className={`h-full overflow-y-auto ${
+          detail || view === "home" ? "" : "px-8 pb-6 pt-20 max-md:px-4 max-md:pb-24"
+        }`}
       >
         {detail ? <Detail /> : <View />}
       </main>

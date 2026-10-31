@@ -37,7 +37,7 @@ function Backdrop({ image, children }: { image?: string; children: React.ReactNo
           className="absolute inset-x-0 top-0 h-[60vh] w-full object-cover opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent)]"
         />
       )}
-      <div className="relative px-10 py-8">
+      <div className="relative px-10 pb-8 pt-24">
         <IconButton
           icon={ArrowLeftIcon}
           label="Back"

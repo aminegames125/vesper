@@ -183,8 +183,9 @@ export class CloudClient {
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
       });
-    } catch {
-      throw new CloudError("Could not reach the server. Check the address and your network.", 0);
+    } catch (e) {
+      const why = e instanceof Error && e.message ? ` (${e.message})` : "";
+      throw new CloudError(`Could not reach the server${why}. Check the address and your network.`, 0);
     }
     const text = await response.text();
     let data: unknown = null;

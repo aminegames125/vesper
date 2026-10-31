@@ -144,7 +144,7 @@ function BottomItem({ view, label, icon: Icon }: { view: View; label: string; ic
  * The top bar: the mark on the left, five places in the middle, search and tools on the right.
  * On a phone-width window it becomes a bottom bar instead.
  */
-export function Nav() {
+export function Nav({ solid }: { solid: boolean }) {
   const setView = useStore((s) => s.setView);
   const query = useStore((s) => s.query);
   const view = useStore((s) => s.view);
@@ -181,7 +181,13 @@ export function Nav() {
 
   return (
     <>
-      <header className="grid flex-none grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-line px-6 py-3 max-md:grid-cols-[auto_1fr] max-md:px-4">
+      <header
+        className={`absolute inset-x-0 top-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-b px-6 py-3 transition-[background-color,border-color] duration-300 max-md:grid-cols-[auto_1fr] max-md:px-4 ${
+          solid
+            ? "border-line bg-ink/85 backdrop-blur-xl"
+            : "scope-dark border-transparent bg-gradient-to-b from-black/70 to-transparent"
+        }`}
+      >
         <button
           type="button"
           onClick={() => setView("home")}
