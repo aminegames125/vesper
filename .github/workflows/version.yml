@@ -1,0 +1,52 @@
+name: Version
+
+# Every push to main gets a version: the next number is worked out from the commit messages
+# (feat: -> minor, feat!: or BREAKING CHANGE -> major, anything else -> patch), written into
+# every config, the README and the changelog, committed, tagged, and then the release is started.
+on:
+  push:
+    branches: [main]
+
+# One run at a time so two quick pushes cannot pick the same number.
+concurrency:
+  group: version
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  version:
+    name: Bump version, tag and release
+    # The commit made below starts with "chore(release)"; skipping it prevents a loop.
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release)') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Work out and write the next version
+        id: bump
+        run: echo "version=$(node scripts/bump-version.mjs auto)" >> "$GITHUB_OUTPUT"
+      - name: Commit, tag and push
+        if: steps.bump.outputs.version != ''
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(release): v${VERSION}"
+          git tag -a "v${VERSION}" -m "Vesper ${VERSION}"
+          git push origin HEAD:main "v${VERSION}"
+      # A tag pushed with the workflow token does not trigger other workflows, so start the release by hand.
+      - name: Start the release
+        if: steps.bump.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: gh workflow run release.yml -f "tag=v${VERSION}"
