@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.2] - 2026-10-31 <!-- release: patch; push: 15; changes: 1 -->
+
+### Changed
+- Turn Vesper into a scheduled IPTV recorder, old player lives on old-vesper
+
 ## [0.11.1] - 2026-10-31 <!-- release: patch; push: 14; changes: 1 -->
 
 ### Fixed
