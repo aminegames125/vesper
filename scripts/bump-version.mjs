@@ -9,8 +9,14 @@
 //   "feat!:", "type(scope)!:" or a "BREAKING CHANGE" body -> major
 //   "feat:" / "feat(scope):"                              -> minor
 //   anything else                                         -> patch
+//
+// Each changelog entry also records what kind of release it is and how big it was, in a comment
+// the app reads to draw its banner:
+//   ## [0.9.0] - 2026-10-31 <!-- release: minor; push: 12; changes: 7 -->
+// `push` is the running number of pushes to main that produced a release (one tag per push) and
+// `changes` is how many commits that push carried.
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -49,6 +55,22 @@ function commitsSince(tag) {
     .filter((c) => !/^chore\(release\)/.test(c.subject));
 }
 
+/** What kind of release these commits make: "major" (breaking), "minor" (a feature) or "patch". */
+function releaseType(commits) {
+  const breaking = commits.some((c) => /^\w+(\([^)]*\))?!:/.test(c.subject) || /BREAKING CHANGE/.test(c.body));
+  const feature = commits.some((c) => /^feat(\([^)]*\))?:/i.test(c.subject));
+  return breaking ? "major" : feature ? "minor" : "patch";
+}
+
+/** The number of releases made so far, plus this one. */
+function pushNumber() {
+  try {
+    return git("tag", "-l", "v[0-9]*").split("\n").filter(Boolean).length + 1;
+  } catch {
+    return 1;
+  }
+}
+
 function nextVersion() {
   const tag = lastTag();
   const base = tag ? tag.slice(1) : JSON.parse(readFileSync(file("package.json"), "utf8")).version;
@@ -56,10 +78,10 @@ function nextVersion() {
   const commits = commitsSince(tag);
   if (tag && commits.length === 0) return null;
   let [major, minor, patch] = base.split(".").map(Number);
-  const breaking = commits.some((c) => /^\w+(\([^)]*\))?!:/.test(c.subject) || /BREAKING CHANGE/.test(c.body));
-  const feature = commits.some((c) => /^feat(\([^)]*\))?:/i.test(c.subject));
-  if (breaking && major > 0) [major, minor, patch] = [major + 1, 0, 0];
-  else if (breaking || feature) [minor, patch] = [minor + 1, 0];
+  const type = releaseType(commits);
+  // Before 1.0 a breaking change only moves the minor number.
+  if (type === "major" && major > 0) [major, minor, patch] = [major + 1, 0, 0];
+  else if (type !== "patch") [minor, patch] = [minor + 1, 0];
   else patch += 1;
   return `${major}.${minor}.${patch}`;
 }
@@ -81,7 +103,7 @@ function versionCode(version) {
   return major * 10000 + minor * 100 + patch;
 }
 
-function changelogEntry(version, commits) {
+function changelogEntry(version, commits, meta) {
   const date = new Date().toISOString().slice(0, 10);
   const groups = { Added: [], Fixed: [], Changed: [] };
   for (const { subject } of commits) {
@@ -94,12 +116,44 @@ function changelogEntry(version, commits) {
   const sections = Object.entries(groups)
     .filter(([, lines]) => lines.length)
     .map(([title, lines]) => `### ${title}\n${lines.join("\n")}`);
-  return `## [${version}] - ${date}\n\n${sections.join("\n\n") || "- Maintenance release."}\n\n`;
+  const marker = `<!-- release: ${meta.type}; push: ${meta.push}; changes: ${meta.changes} -->`;
+  return `## [${version}] - ${date} ${marker}\n\n${sections.join("\n\n") || "- Maintenance release."}\n\n`;
+}
+
+const KIND_LABEL = { major: "MAJOR UPDATE", minor: "MINOR UPDATE", patch: "PATCH" };
+const GLOW = { major: 0.5, minor: 0.3, patch: 0.14 };
+
+/** The banner shown at the top of GitHub release notes and the README: version, kind and size. */
+function bannerSvg(version, { type, push, changes }) {
+  const counts = `Push ${push}  ·  ${changes} ${changes === 1 ? "change" : "changes"}`;
+  const chip = KIND_LABEL[type];
+  const chipWidth = 44 + chip.length * 13;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 300" role="img" aria-label="Vesper ${version}, ${KIND_LABEL[type].toLowerCase()}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14141a"/>
+      <stop offset="1" stop-color="#0a0a0c"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.85" cy="0.1" r="0.7">
+      <stop offset="0" stop-color="#ff5c7a" stop-opacity="${GLOW[type]}"/>
+      <stop offset="1" stop-color="#ff5c7a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="300" rx="28" fill="url(#bg)"/>
+  <rect width="1280" height="300" rx="28" fill="url(#glow)"/>
+  <text x="72" y="82" fill="#8b8b95" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="30" font-weight="600">Vesper</text>
+  <text x="68" y="206" fill="#f4f4f6" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="128" font-weight="800">${version}</text>
+  <rect x="${1208 - chipWidth}" y="56" width="${chipWidth}" height="46" rx="23" fill="${type === "major" ? "#ff5c7a" : "#ff5c7a" + (type === "minor" ? "30" : "18")}"/>
+  <text x="${1208 - chipWidth / 2}" y="87" text-anchor="middle" fill="${type === "major" ? "#14141a" : "#ff5c7a"}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="1.5">${chip}</text>
+  <text x="1208" y="250" text-anchor="end" fill="#8b8b95" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26">${counts}</text>
+</svg>
+`;
 }
 
 function setVersion(version) {
   if (!SEMVER.test(version)) throw new Error(`"${version}" is not a version like 1.2.3`);
   const commits = commitsSince(lastTag());
+  const meta = { type: releaseType(commits), push: pushNumber(), changes: commits.length };
 
   for (const path of JSON_FILES) setJsonVersion(path, version);
   setJsonVersion("apps/app/src-tauri/tauri.conf.json", version);
@@ -108,12 +162,16 @@ function setVersion(version) {
     text.replace(/(\[workspace\.package\][^[]*?\nversion\s*=\s*")[^"]+(")/, `$1${version}$2`),
   );
   // Cargo.lock lists the workspace crates too; keeping it in step lets `cargo --locked` pass.
-  edit("Cargo.lock", (text) =>
-    WORKSPACE_CRATES.reduce(
-      (acc, name) => acc.replace(new RegExp(`(name = "${name}"\\nversion = ")[^"]+(")`), `$1${version}$2`),
-      text,
-    ),
-  );
+  // The desktop crate keeps its own lockfile too.
+  for (const lock of ["Cargo.lock", "apps/app/src-tauri/Cargo.lock"]) {
+    if (!existsSync(file(lock))) continue;
+    edit(lock, (text) =>
+      WORKSPACE_CRATES.reduce(
+        (acc, name) => acc.replace(new RegExp(`(name = "${name}"\\nversion = ")[^"]+(")`), `$1${version}$2`),
+        text,
+      ),
+    );
+  }
 
   edit("apps/android/app/build.gradle.kts", (text) =>
     text
@@ -126,15 +184,17 @@ function setVersion(version) {
     text
       .replace(
         /(<!-- version:start -->)[\s\S]*?(<!-- version:end -->)/,
-        `$1<img alt="Version" src="https://img.shields.io/badge/version-${version}-FF5C7A?style=for-the-badge&labelColor=151518" />$2`,
+        `$1<img alt="Version" src="https://img.shields.io/badge/version-${version}-FF5C7A?style=for-the-badge&labelColor=151518" /> <img alt="${meta.type} update" src="https://img.shields.io/badge/release-${meta.type}-FF5C7A?style=for-the-badge&labelColor=151518" />$2`,
       )
       .replace(/(Pushing a tag such as `v)\d+\.\d+\.\d+(`)/, `$1${version}$2`),
   );
 
   edit("CHANGELOG.md", (text) => {
     if (text.includes(`## [${version}]`)) return text;
-    return text.replace(/(^## \[)/m, `${changelogEntry(version, commits)}$1`);
+    return text.replace(/(^## \[)/m, `${changelogEntry(version, commits, meta)}$1`);
   });
+
+  writeFileSync(file("brand/release-banner.svg"), bannerSvg(version, meta));
 
   edit("scripts/make-msix.ps1", (text) =>
     text.replace(/-Version \d+\.\d+\.\d+ -Out Vesper-\d+\.\d+\.\d+-/, `-Version ${version} -Out Vesper-${version}-`),
