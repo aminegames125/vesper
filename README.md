@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/aminegames125/vesper/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/aminegames125/vesper/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white&style=for-the-badge&color=FF5C7A&labelColor=151518" /></a>
   <a href="https://github.com/aminegames125/vesper/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/aminegames125/vesper?include_prereleases&style=for-the-badge&color=FF5C7A&labelColor=151518&logo=github" /></a>
-  <!-- version:start --><img alt="Version" src="https://img.shields.io/badge/version-0.6.0-FF5C7A?style=for-the-badge&labelColor=151518" /><!-- version:end -->
+  <!-- version:start --><img alt="Version" src="https://img.shields.io/badge/version-0.7.0-FF5C7A?style=for-the-badge&labelColor=151518" /><!-- version:end -->
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-FF5C7A?style=for-the-badge&labelColor=151518" /></a>
   <a href="https://github.com/aminegames125/vesper/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/aminegames125/vesper?style=for-the-badge&color=FF5C7A&labelColor=151518&logo=github" /></a>
 </p>
@@ -258,7 +258,7 @@ You need Node 22+, pnpm 10+ and a recent stable Rust. On Windows install the *Vi
 
 ### Releases
 
-Every push to `main` is versioned automatically by [`version.yml`](.github/workflows/version.yml): it picks the next number from the commit messages (`feat:` is a minor bump, `feat!:` a major one, everything else a patch), updates every config, this README and the changelog, tags the commit and starts the release. Put `[skip ci]` in a commit message to skip it. Pushing a tag such as `v0.6.0` by hand runs [`release.yml`](.github/workflows/release.yml): it builds the Windows and Linux installers (server inside), the Android APK (TV-ready), the server for Windows, Linux x64 and Linux arm64, a Docker image on GHCR, then publishes one GitHub release with checksums.
+Every push to `main` is versioned automatically by [`version.yml`](.github/workflows/version.yml): it picks the next number from the commit messages (`feat:` is a minor bump, `feat!:` a major one, everything else a patch), updates every config, this README and the changelog, tags the commit and starts the release. Put `[skip ci]` in a commit message to skip it. Pushing a tag such as `v0.7.0` by hand runs [`release.yml`](.github/workflows/release.yml): it builds the Windows and Linux installers (server inside), the Android APK (TV-ready), the server for Windows, Linux x64 and Linux arm64, a Docker image on GHCR, then publishes one GitHub release with checksums.
 
 ## 🎨 Design
 

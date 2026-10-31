@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - 2026-10-31
+
+### Added
+- Rotating full-bleed TV billboard, floating TV bar, Android first-run welcome
+
 ## [0.6.0] - 2026-10-31
 
 ### Added
