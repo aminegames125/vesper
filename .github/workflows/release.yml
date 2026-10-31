@@ -144,7 +144,9 @@ jobs:
           java-version: 17
       - name: Install the NDK
         run: |
-          sdkmanager "ndk;27.2.12479018"
+          SDKM=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -n 1)
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "ndk;27.2.12479018"
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
