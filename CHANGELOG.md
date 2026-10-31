@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.18.0] - 2026-10-31 <!-- release: minor; push: 24; changes: 1 -->
+
+### Added
+- Cast from shared links and playlists, TV channel zapping, fewer 404 failures
+
 ## [0.17.0] - 2026-10-31 <!-- release: minor; push: 23; changes: 1 -->
 
 ### Added
