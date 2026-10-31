@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.0] - 2026-10-31 <!-- release: minor; push: 13; changes: 1 -->
+
+### Added
+- Shorter rounded navigation with a More menu on desktop, phone and TV
+
 ## [0.10.0] - 2026-10-31 <!-- release: minor; push: 12; changes: 2 -->
 
 ### Added
