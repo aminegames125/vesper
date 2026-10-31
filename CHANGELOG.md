@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.15.0] - 2026-10-31 <!-- release: minor; push: 21; changes: 1 -->
+
+### Added
+- Downloads, deletion timer, Chromecast, TV guide, series rules and a TV home screen
+
 ## [0.14.1] - 2026-10-31 <!-- release: patch; push: 20; changes: 1 -->
 
 ### Fixed
