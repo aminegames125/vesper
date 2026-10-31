@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.0] - 2026-10-31
+
+### Added
+- Immersive desktop layout, three-pane Live TV, fix cloud and stream access on ports
+
 ## [0.8.0] - 2026-10-31
 
 ### Added
