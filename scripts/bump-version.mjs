@@ -97,6 +97,11 @@ function setJsonVersion(path, version) {
   edit(path, (text) => text.replace(/^(\s*"version":\s*")[^"]+(")/m, `$1${version}$2`));
 }
 
+function versionCode(version) {
+  const [major, minor, patch] = version.split(".").map(Number);
+  return major * 10000 + minor * 100 + patch;
+}
+
 function changelogEntry(version, commits, meta) {
   const date = new Date().toISOString().slice(0, 10);
   const groups = { Added: [], Fixed: [], Changed: [] };
@@ -160,6 +165,13 @@ function setVersion(version) {
       (acc, name) => acc.replace(new RegExp(`(name = "${name}"\nversion = ")[^"]+(")`), `$1${version}$2`),
       text,
     ),
+  );
+
+  edit("apps/android/app/build.gradle.kts", (text) =>
+    text
+      .replace(/(\?: )\d+(\s*\n\s*versionName)/, `$1${versionCode(version)}$2`)
+      .replace(/(versionName = \(findProperty\("versionName"\) as String\?\) \?: ")[^"]+(")/, `$1${version}$2`)
+      .replace(/-PversionName=[\d.]+ -PversionCode=\d+/, `-PversionName=${version} -PversionCode=${versionCode(version)}`),
   );
 
   edit("README.md", (text) =>

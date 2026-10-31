@@ -1,11 +1,12 @@
 ## Vesper
 
-Scheduled IPTV recording: a server for Linux and Windows. Native Android and Android TV apps are planned.
+Scheduled IPTV recording: a server for Linux and Windows, and a native app for Android and Android TV.
 
 ### Downloads
 
 | What | File |
 | --- | --- |
+| Android and Android TV | `Vesper-…-android.apk` |
 | Server, Windows | `vesper-server-…-windows-x64.zip` |
 | Server, Linux x64 | `vesper-server-…-linux-x64.tar.gz` |
 | Server, Linux arm64 | `vesper-server-…-linux-arm64.tar.gz` |

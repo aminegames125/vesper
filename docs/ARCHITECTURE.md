@@ -1,11 +1,12 @@
 # Architecture
 
-Vesper is a pnpm + Turborepo monorepo with a Cargo workspace. JavaScript and Rust meet in two places: the embedded admin panel and the HTTP API. The native Android and Android TV apps are planned and will talk to that API.
+Vesper is a pnpm + Turborepo monorepo with a Cargo workspace. JavaScript and Rust meet in two places: the embedded admin panel and the HTTP API. The native Android and Android TV app talks to that API.
 
 ## Packages
 
 | Path | Language | What it is |
 | --- | --- | --- |
+| `apps/android` | Kotlin (Jetpack Compose, Material 3) | The Android and Android TV app: schedules, record now, recordings, playback. Talks to the server over HTTP; one view model, no dependency-injection framework. |
 | `apps/admin` | TypeScript (React) | Admin panel. Built to static files and **embedded into the server binary** with `rust-embed`. |
 | `apps/server` | Rust (axum, rusqlite) | `vesper-server`. API, recorder jobs, scheduler, retention, admin panel hosting. |
 | `crates/vesper-recorder` | Rust | Records HLS and raw streams to a file or a segment folder. Used by the server. |

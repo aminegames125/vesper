@@ -18,6 +18,7 @@ vesper-server --mode full --bind 127.0.0.1:8484 --data-dir /var/lib/vesper
 | `--admin-user` | `VESPER_ADMIN_USER` | – | Create this administrator on first start (full mode). |
 | `--admin-password` | `VESPER_ADMIN_PASSWORD` | – | Password for that administrator. |
 | `--allow-private` | `VESPER_ALLOW_PRIVATE` | off | Let the proxy and recorder reach private network addresses. Always on in lite mode. |
+| `--trust-proxy` | `VESPER_TRUST_PROXY` | off | Read the client address from a reverse proxy's `X-Forwarded-For`, so sign-in limits work behind it. |
 
 Without `--admin-user`, a fresh full server shows a setup screen at `/admin/` where you create the first administrator.
 
@@ -79,7 +80,7 @@ Per-account limits (0 means no limit): recordings at once, longest recording in 
 
 ## Recording and retention
 
-`POST /api/v1/recordings` starts a recording now, or at `start_at` (epoch seconds). The server pulls the stream with the same recorder the apps use and saves it as HLS: a folder of `.ts` segments and an `index.m3u8`. Because it is HLS, any device can play it, **even while it is still recording**.
+`POST /api/v1/recordings` starts a recording now, or at `start_at` (epoch seconds). `seconds` is its length; `0` records until it is stopped, up to the account's longest recording (a day when there is no limit). The server pulls the stream with the same recorder the apps use and saves it as HLS: a folder of `.ts` segments and an `index.m3u8`. Because it is HLS, any device can play it, **even while it is still recording**.
 
 - Live playlists start at the live edge, not at the provider's backlog.
 - A recording ends when `seconds` of video have been captured, when stopped, or when the stream ends.
