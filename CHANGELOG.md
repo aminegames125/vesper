@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.22.1] - 2026-10-31 <!-- release: patch; push: 29; changes: 1 -->
+
+### Changed
+- Keep the add-on version in step with the release
+
 ## [0.22.0] - 2026-10-31 <!-- release: minor; push: 28; changes: 3 -->
 
 ### Added
