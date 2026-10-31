@@ -2,7 +2,16 @@
 
 An add-on for [Kodi](https://kodi.tv) 19 (Matrix) and later. It is a thin remote for your Vesper server: recordings, playlists and schedules stay on the server, and Kodi only plays them. It works on every Kodi (Android TV and Fire TV, LibreELEC, CoreELEC, Windows, Linux, macOS) because it is plain Python.
 
-## Install
+## Install (recommended: the repository, so it updates itself)
+
+1. Download [repository.vesper-1.0.0.zip](https://amineos.dev/vesper/kodi/repository.vesper/repository.vesper-1.0.0.zip) (on a TV box, open that address in its browser or put the file on a USB stick).
+2. In Kodi: **Settings > System > Add-ons**, turn on **Unknown sources**.
+3. **Add-ons > Install from zip file** and pick it.
+4. **Add-ons > Install from repository > Vesper repository > Video add-ons > Vesper > Install.**
+
+From then on Kodi checks for new versions on its own. The repository is rebuilt after every Vesper release.
+
+## Install from a single zip (no updates)
 
 1. Download `plugin.video.vesper-….zip` from the [latest release](https://github.com/aminegames125/vesper/releases/latest).
 2. In Kodi: **Settings > System > Add-ons**, turn on **Unknown sources**.

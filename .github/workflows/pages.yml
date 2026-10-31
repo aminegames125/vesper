@@ -8,7 +8,12 @@ on:
       - "apps/site/**"
       - "docs/screenshots/**"
       - "brand/**"
+      - "apps/kodi/**"
       - ".github/workflows/pages.yml"
+  # A new release has a new version number, and the Kodi repository must offer it.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -22,6 +27,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +38,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @vesper/site build
+      - name: Kodi repository (served at /kodi/)
+        run: python apps/kodi/make_repo.py --version "$(node -p "require('./package.json').version")" --out apps/site/dist/kodi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
