@@ -1,7 +1,7 @@
 {
   "name": "vesper",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Vesper: a fast, light IPTV player and its optional cloud server.",
   "license": "MIT",
   "packageManager": "pnpm@11.7.0",
