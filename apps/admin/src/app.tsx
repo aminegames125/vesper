@@ -5,6 +5,7 @@ import { AuditPage } from "./pages/audit";
 import { Dashboard } from "./pages/dashboard";
 import { InvitesPage } from "./pages/invites";
 import { RecordingsPage } from "./pages/recordings";
+import { SchedulesPage } from "./pages/schedules";
 import { SettingsPage } from "./pages/settings";
 import { UsersPage } from "./pages/users";
 import { Button, Field } from "./ui";
@@ -27,13 +28,14 @@ const writeToken = (token: string | null) => {
   }
 };
 
-type Page = "dashboard" | "users" | "invites" | "recordings" | "audit" | "settings";
+type Page = "dashboard" | "users" | "invites" | "recordings" | "schedules" | "audit" | "settings";
 
 const PAGES: { id: Page; label: string; full?: boolean }[] = [
   { id: "dashboard", label: "Overview" },
   { id: "users", label: "Users", full: true },
   { id: "invites", label: "Invites", full: true },
   { id: "recordings", label: "Recordings" },
+  { id: "schedules", label: "Schedules" },
   { id: "audit", label: "Activity" },
   { id: "settings", label: "Settings" },
 ];
@@ -118,6 +120,7 @@ export function App() {
     users: <UsersPage client={client} me={user} />,
     invites: <InvitesPage client={client} />,
     recordings: <RecordingsPage client={client} />,
+    schedules: <SchedulesPage client={client} />,
     audit: <AuditPage client={client} />,
     settings: <SettingsPage client={client} lite={lite} />,
   }[page];

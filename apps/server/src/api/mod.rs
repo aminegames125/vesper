@@ -79,5 +79,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/admin/audit", get(admin::audit))
         .route("/admin/recordings", get(admin::recordings))
+        .route("/admin/schedules", get(admin::schedules))
+        .route("/admin/schedules/{id}", delete(admin::delete_schedule))
         .route("/admin/recordings/{id}", delete(admin::delete_recording))
 }

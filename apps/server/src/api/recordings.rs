@@ -94,7 +94,13 @@ pub async fn create(
     AuthUser(user): AuthUser,
     Json(body): Json<NewRecording>,
 ) -> ApiResult<Json<Value>> {
-    check_quota(&state, &user, body.seconds)?;
+    // 0 means "until I stop it": run as long as the account allows (a day when there is no limit).
+    let seconds = match body.seconds {
+        0 if user.max_hours > 0 => user.max_hours * 3600,
+        0 => 24 * 3600,
+        n => n,
+    };
+    check_quota(&state, &user, seconds)?;
     check_target(&state, &body.url).await?;
     let title: String = body.title.trim().chars().take(120).collect();
     if title.is_empty() {
@@ -116,7 +122,7 @@ pub async fn create(
         "INSERT INTO recordings (id, user_id, title, channel_name, source_url, status, start_at, max_seconds, keep_hours, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![id, user.id, title, body.channel_name.chars().take(120).collect::<String>(), body.url,
-                if later { "scheduled" } else { "queued" }, if later { start_at } else { now() }, body.seconds, keep_hours, now()],
+                if later { "scheduled" } else { "queued" }, if later { start_at } else { now() }, seconds, keep_hours, now()],
     )?;
     if !later {
         jobs::start(&state, &id);

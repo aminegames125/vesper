@@ -507,3 +507,46 @@ pub async fn delete_recording(
     state.db.audit(&admin.username, "recording.delete", &id);
     Ok(Json(json!({ "ok": true })))
 }
+
+pub async fn schedules(State(state): State<AppState>, _admin: AdminUser) -> ApiResult<Json<Value>> {
+    let conn = state.db.conn();
+    let mut stmt = conn.prepare(
+        "SELECT s.id, u.username, s.title, s.channel_name, s.tz, s.start_time, s.duration_s, s.days_mask,
+                s.start_date, s.end_date, s.enabled,
+                (SELECT MIN(start_at) FROM recordings
+                  WHERE schedule_id = s.id AND status = 'scheduled' AND start_at > ?1)
+         FROM schedules s JOIN users u ON u.id = s.user_id ORDER BY s.created_at DESC LIMIT 500",
+    )?;
+    let rows = stmt
+        .query_map([crate::db::now()], |r| {
+            Ok(json!({
+                "id": r.get::<_, String>(0)?, "user": r.get::<_, String>(1)?, "title": r.get::<_, String>(2)?,
+                "channelName": r.get::<_, String>(3)?, "tz": r.get::<_, String>(4)?, "startTime": r.get::<_, String>(5)?,
+                "seconds": r.get::<_, i64>(6)?, "days": r.get::<_, i64>(7)?, "startDate": r.get::<_, String>(8)?,
+                "endDate": r.get::<_, Option<String>>(9)?, "enabled": r.get::<_, i64>(10)? != 0,
+                "nextStart": r.get::<_, Option<i64>>(11)?,
+            }))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Json(Value::Array(rows)))
+}
+
+pub async fn delete_schedule(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    let conn = state.db.conn();
+    conn.execute(
+        "DELETE FROM recordings WHERE schedule_id = ?1 AND status = 'scheduled' AND start_at > ?2",
+        rusqlite::params![id, crate::db::now()],
+    )?;
+    conn.execute(
+        "UPDATE recordings SET schedule_id = NULL WHERE schedule_id = ?1",
+        [&id],
+    )?;
+    conn.execute("DELETE FROM schedules WHERE id = ?1", [&id])?;
+    drop(conn);
+    state.db.audit(&admin.username, "schedule.delete", &id);
+    Ok(Json(json!({ "ok": true })))
+}

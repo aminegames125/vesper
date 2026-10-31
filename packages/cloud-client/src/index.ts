@@ -58,6 +58,7 @@ export interface NewRecording {
   title: string;
   channel_name?: string;
   url: string;
+  /** Length in seconds. 0 records until stopped, up to the account's longest recording. */
   seconds: number;
   /** Epoch seconds. Leave out to start now. */
   start_at?: number;
@@ -187,6 +188,21 @@ export interface AdminRecording {
   keepUntil: number | null;
   error: string | null;
   createdAt: number;
+}
+
+export interface AdminSchedule {
+  id: string;
+  user: string;
+  title: string;
+  channelName: string;
+  tz: string;
+  startTime: string;
+  seconds: number;
+  days: number;
+  startDate: string;
+  endDate: string | null;
+  enabled: boolean;
+  nextStart: number | null;
 }
 
 export interface AuditEntry {
@@ -406,6 +422,9 @@ export class CloudClient {
     recordings: () => this.get<AdminRecording[]>("/admin/recordings"),
     deleteRecording: (id: string) =>
       this.request<{ ok: boolean }>("DELETE", `/admin/recordings/${id}`),
+    schedules: () => this.get<AdminSchedule[]>("/admin/schedules"),
+    deleteSchedule: (id: string) =>
+      this.request<{ ok: boolean }>("DELETE", `/admin/schedules/${id}`),
   };
 }
 
@@ -416,6 +435,16 @@ export const formatBytes = (bytes: number) => {
   if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${bytes} B`;
+};
+
+/** "Once", "Every day", "Weekdays" or the day names of a schedule's day mask. */
+export const describeDays = (mask: number) => {
+  if (mask === 0) return "Once";
+  if (mask === EVERY_DAY) return "Every day";
+  if (mask === WEEKDAYS) return "Weekdays";
+  if (mask === WEEKEND) return "Weekends";
+  const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  return names.filter((_, i) => mask & (1 << i)).join(", ");
 };
 
 export const formatDuration = (seconds: number) => {
