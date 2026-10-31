@@ -15,9 +15,9 @@ android {
         applicationId = "dev.aminegames125.vesper"
         minSdk = 24
         targetSdk = 35
-        // CI overrides these from the release tag (-PversionName=0.3.0 -PversionCode=300).
-        versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 300
-        versionName = (findProperty("versionName") as String?) ?: "0.3.0"
+        // CI overrides these from the release tag (-PversionName=0.3.1 -PversionCode=301).
+        versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 301
+        versionName = (findProperty("versionName") as String?) ?: "0.3.1"
     }
 
     signingConfigs {
