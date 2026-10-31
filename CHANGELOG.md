@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-10-31
+
+### Added
+- Netflix-style TV top bar and expanding rows
+
 ## [0.4.0] - 2026-10-31
 
 ### Added
