@@ -4,6 +4,7 @@ package dev.aminegames125.vesper.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -82,13 +84,21 @@ fun ScheduleScreen(vm: VesperViewModel, onNew: () -> Unit, onEdit: (Schedule) ->
                     }
                 }
                 if (schedules.isNotEmpty()) {
-                    item { SectionTitle("Schedules") }
+                    item {
+                        val allPaused = schedules.none { it.enabled }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) { SectionTitle("Schedules") }
+                            TextButton(onClick = { vm.pauseAll(!allPaused) }) { Text(if (allPaused) "Resume all" else "Pause all") }
+                        }
+                    }
                     items(schedules, key = { it.id }) { schedule ->
                         ScheduleCard(
                             schedule,
                             onClick = { onEdit(schedule) },
                             onToggle = { vm.setScheduleEnabled(schedule.id, it) },
                             onDelete = { toDelete = schedule },
+                            onRun = { vm.runSchedule(schedule.id) },
+                            onCopy = { vm.duplicateSchedule(schedule.id) },
                         )
                     }
                 }
@@ -111,7 +121,7 @@ fun ScheduleScreen(vm: VesperViewModel, onNew: () -> Unit, onEdit: (Schedule) ->
 }
 
 @Composable
-private fun ScheduleCard(schedule: Schedule, onClick: () -> Unit, onToggle: (Boolean) -> Unit, onDelete: () -> Unit) {
+private fun ScheduleCard(schedule: Schedule, onClick: () -> Unit, onToggle: (Boolean) -> Unit, onDelete: () -> Unit, onRun: () -> Unit, onCopy: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -129,6 +139,10 @@ private fun ScheduleCard(schedule: Schedule, onClick: () -> Unit, onToggle: (Boo
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = onRun) { Text("Record now") }
+                    TextButton(onClick = onCopy) { Text("Duplicate") }
+                }
             }
             Switch(checked = schedule.enabled, onCheckedChange = onToggle)
             IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Delete ${schedule.title}") }

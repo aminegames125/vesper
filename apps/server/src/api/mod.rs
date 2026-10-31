@@ -4,6 +4,7 @@ mod proxy;
 mod recordings;
 mod schedules;
 mod sources;
+mod status;
 mod sync;
 
 use axum::{
@@ -24,6 +25,7 @@ pub const SETTING_DEFAULTS: &[(&str, &str)] = &[
     ("default_keep_hours", ""),
     ("allow_private", "false"),
     ("session_days", "30"),
+    ("webhook_url", ""),
 ];
 
 pub fn router() -> Router<AppState> {
@@ -41,8 +43,16 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/recordings/{id}",
-            get(recordings::show).delete(recordings::remove),
+            get(recordings::show)
+                .patch(recordings::rename)
+                .delete(recordings::remove),
         )
+        .route("/recordings/clear-failed", post(recordings::clear_failed))
+        .route("/status", get(status::status))
+        .route("/channels/test", post(status::test_channel))
+        .route("/schedules/pause", post(schedules::pause_all))
+        .route("/schedules/{id}/run", post(schedules::run_now))
+        .route("/schedules/{id}/duplicate", post(schedules::duplicate))
         .route("/recordings/{id}/stop", post(recordings::stop))
         .route("/recordings/{id}/keep", post(recordings::set_keep))
         .route("/recordings/{id}/index.m3u8", get(recordings::playlist))

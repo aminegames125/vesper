@@ -70,6 +70,7 @@ data class Schedule(
     val padBefore: Long = 0,
     val padAfter: Long = 0,
     val keepHours: Long? = null,
+    val keepLast: Long? = null,
     val enabled: Boolean = true,
     val nextStart: Long? = null,
 )
@@ -92,6 +93,7 @@ data class NewSchedule(
     @SerialName("pad_before") val padBefore: Long = 0,
     @SerialName("pad_after") val padAfter: Long = 0,
     @SerialName("keep_hours") val keepHours: Long? = null,
+    @SerialName("keep_last") val keepLast: Long? = null,
     val enabled: Boolean = true,
 )
 
@@ -148,3 +150,27 @@ internal data class Credentials(val username: String, val password: String, val 
 
 @Serializable
 internal data class ErrorBody(val error: String = "")
+
+@Serializable
+data class NextUp(val title: String, val startAt: Long)
+
+/** The server's own summary of itself, shown in Settings. */
+@Serializable
+data class Status(
+    val version: String = "",
+    val diskFree: Long? = null,
+    val diskTotal: Long? = null,
+    val recording: Int = 0,
+    val scheduled: Int = 0,
+    val failed: Int = 0,
+    val next: NextUp? = null,
+)
+
+@Serializable
+data class ProbeReply(val ok: Boolean = false, val status: Int = 0)
+
+@Serializable
+internal data class Rename(val title: String)
+
+@Serializable
+internal data class Probe(val url: String)

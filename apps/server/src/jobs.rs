@@ -44,6 +44,9 @@ pub fn storage_used(state: &AppState, user_id: &str) -> i64 {
 
 /// Checks the account's rules before a recording is accepted.
 pub fn check_quota(state: &AppState, user: &User, seconds: i64) -> ApiResult<()> {
+    if seconds > 30 * 24 * 3600 {
+        return Err(ApiError::bad("A recording can be at most 30 days long."));
+    }
     if user.role == "guest" {
         return Err(ApiError::forbidden("Guest accounts cannot record."));
     }
@@ -85,9 +88,26 @@ pub fn start(state: &AppState, id: &str) {
         [id],
         |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?, r.get::<_, Option<i64>>(3)?, r.get::<_, i64>(4)?, r.get::<_, i64>(5)?)),
     );
-    let Ok((user_id, url, max_seconds, keep_hours, max_concurrent, storage)) = row else {
+    let Ok((user_id, url, mut max_seconds, keep_hours, max_concurrent, storage)) = row else {
         return;
     };
+    let (start_at, status): (i64, String) = state
+        .db
+        .conn()
+        .query_row(
+            "SELECT start_at, status FROM recordings WHERE id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap_or((0, String::new()));
+    if !matches!(status.as_str(), "scheduled" | "queued") {
+        return;
+    }
+    // Late (the server was down): only record what is left of the programme.
+    let late = (now() - start_at).max(0);
+    if status == "scheduled" && late > 0 {
+        max_seconds -= late;
+    }
 
     let fail = |message: &str| {
         let _ = state.db.conn().execute(
@@ -104,7 +124,14 @@ pub fn start(state: &AppState, id: &str) {
             |r| r.get(0),
         )
         .unwrap_or(0);
+    if status == "scheduled" && max_seconds < 10 {
+        return fail("Missed: the server was not running when this was due.");
+    }
     if max_concurrent > 0 && running >= max_concurrent {
+        // A scheduled one waits for the other to end (back-to-back programmes overlap by their padding).
+        if status == "scheduled" && max_seconds > 60 {
+            return;
+        }
         return fail("Too many recordings at once for this account.");
     }
     if storage > 0 && storage_used(state, &user_id) >= storage {
@@ -120,13 +147,26 @@ pub fn start(state: &AppState, id: &str) {
         .lock()
         .unwrap_or_else(|p| p.into_inner())
         .insert(id.to_string(), stop.clone());
-    let _ = state.db.conn().execute(
-        "UPDATE recordings SET status = 'recording' WHERE id = ?1",
-        [id],
-    );
+    let claimed = state
+        .db
+        .conn()
+        .execute(
+            "UPDATE recordings SET status = 'recording' WHERE id = ?1 AND status IN ('scheduled', 'queued')",
+            [id],
+        )
+        .unwrap_or(0);
+    if claimed == 0 {
+        state
+            .jobs
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .remove(id);
+        return;
+    }
 
     // Playlists and redirects can name any address, so the recorder re-checks each one it fetches.
     let guard = (!state.allow_private()).then(|| UrlGuard::new(crate::net::resolves_public));
+    let runtime = tokio::runtime::Handle::try_current().ok();
     let state = state.clone();
     let id = id.to_string();
     let dir = recording_dir(&state, &user_id, &id);
@@ -230,7 +270,100 @@ pub fn start(state: &AppState, id: &str) {
                 params![message, finished, keep_until, id],
             )
         };
+        drop(conn);
+        after_finish(&state, &id, &user_id, runtime);
     });
+}
+
+/// What happens once a recording has ended: tell the webhook and trim old episodes of its schedule.
+#[allow(clippy::type_complexity)]
+fn after_finish(
+    state: &AppState,
+    id: &str,
+    user_id: &str,
+    runtime: Option<tokio::runtime::Handle>,
+) {
+    let row: Option<(String, String, i64, i64, Option<String>, Option<String>)> = state
+        .db
+        .conn()
+        .query_row(
+            "SELECT title, status, seconds, bytes, error, schedule_id FROM recordings WHERE id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+        )
+        .ok();
+    let Some((title, status, seconds, bytes, error, schedule_id)) = row else {
+        return;
+    };
+
+    if let Some(schedule) = schedule_id {
+        prune_schedule(state, &schedule);
+    }
+
+    let url = state.db.setting("webhook_url", "");
+    if url.starts_with("http") {
+        let (Some(runtime), client) = (runtime, state.http.clone()) else {
+            return;
+        };
+        let text = match status.as_str() {
+            "done" => format!("Vesper recorded \"{title}\" ({} min).", seconds / 60),
+            _ => format!(
+                "Vesper could not record \"{title}\": {}",
+                error.clone().unwrap_or_default()
+            ),
+        };
+        let body = serde_json::json!({
+            "event": format!("recording.{status}"), "id": id, "title": title, "seconds": seconds,
+            "bytes": bytes, "error": error, "content": text, "text": text,
+        });
+        let _ = user_id;
+        runtime.spawn(async move {
+            let _ = client
+                .post(url)
+                .timeout(Duration::from_secs(10))
+                .header("content-type", "application/json")
+                .body(body.to_string())
+                .send()
+                .await;
+        });
+    }
+}
+
+/// Deletes the oldest finished recordings of a schedule beyond its "keep the last N" limit.
+fn prune_schedule(state: &AppState, schedule_id: &str) {
+    let keep: Option<i64> = state
+        .db
+        .conn()
+        .query_row(
+            "SELECT keep_last FROM schedules WHERE id = ?1",
+            [schedule_id],
+            |r| r.get(0),
+        )
+        .ok()
+        .flatten();
+    let Some(keep) = keep.filter(|n| *n > 0) else {
+        return;
+    };
+    let old: Vec<(String, String)> = {
+        let conn = state.db.conn();
+        let Ok(mut stmt) = conn.prepare(
+            "SELECT id, user_id FROM recordings WHERE schedule_id = ?1 AND status = 'done'
+             ORDER BY COALESCE(finished_at, 0) DESC, created_at DESC LIMIT -1 OFFSET ?2",
+        ) else {
+            return;
+        };
+        stmt.query_map(params![schedule_id, keep], |r| Ok((r.get(0)?, r.get(1)?)))
+            .map(|rows| rows.flatten().collect())
+            .unwrap_or_default()
+    };
+    for (id, owner) in old {
+        remove_files(state, &owner, &id);
+        let _ = state
+            .db
+            .conn()
+            .execute("DELETE FROM recordings WHERE id = ?1", [&id]);
+        state.db.audit("system", "recording.pruned", &id);
+    }
 }
 
 /// Background work: start scheduled recordings, expire old ones, and clean up after a crash.

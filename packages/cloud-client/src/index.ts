@@ -89,6 +89,8 @@ export interface Schedule {
   padBefore: number;
   padAfter: number;
   keepHours: number | null;
+  /** Only the newest N finished recordings are kept, or null for all. */
+  keepLast: number | null;
   enabled: boolean;
   createdAt: number;
   /** Epoch seconds of the next occurrence that has not started, or null. */
@@ -219,6 +221,7 @@ export type ServerSettings = Record<
   | "default_storage_gb"
   | "default_keep_hours"
   | "allow_private"
+  | "webhook_url"
   | "session_days",
   string
 >;
@@ -343,6 +346,26 @@ export class CloudClient {
   setScheduleEnabled = (id: string, enabled: boolean) =>
     this.request<{ ok: boolean }>("PATCH", `/schedules/${id}`, { enabled });
   deleteSchedule = (id: string) => this.request<{ ok: boolean }>("DELETE", `/schedules/${id}`);
+  runSchedule = (id: string) => this.post<{ id: string }>(`/schedules/${id}/run`);
+  duplicateSchedule = (id: string) => this.post<{ id: string }>(`/schedules/${id}/duplicate`);
+  pauseAllSchedules = (paused: boolean) =>
+    this.post<{ changed: number }>("/schedules/pause", { paused });
+  renameRecording = (id: string, title: string) =>
+    this.request<{ ok: boolean }>("PATCH", `/recordings/${id}`, { title });
+  clearFailedRecordings = () => this.post<{ removed: number }>("/recordings/clear-failed");
+  status = () =>
+    this.request<{
+      version: string;
+      mode: string;
+      diskFree: number | null;
+      diskTotal: number | null;
+      recording: number;
+      scheduled: number;
+      failed: number;
+      next: { title: string; startAt: number } | null;
+    }>("GET", "/status");
+  testChannel = (url: string) =>
+    this.post<{ ok: boolean; status: number; contentType: string }>("/channels/test", { url });
 
   listSources = () => this.get<{ sources: Source[] }>("/sources");
   createSource = (body: NewSource) => this.post<{ id: string }>("/sources", body);

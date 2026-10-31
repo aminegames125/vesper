@@ -23,6 +23,7 @@ class Settings(private val context: Context) {
     private val tokenKey = stringPreferencesKey("token")
     private val usernameKey = stringPreferencesKey("username")
     private val announcedKey = stringSetPreferencesKey("announced")
+    private val favoritesKey = stringSetPreferencesKey("favorites")
 
     val stored: Flow<Stored> = context.store.data
         .catch { emit(emptyPreferences()) }
@@ -35,6 +36,7 @@ class Settings(private val context: Context) {
             it[serverKey] = server
             if (token == null) it.remove(tokenKey) else it[tokenKey] = token
             it[usernameKey] = username
+            if (token == null) it.remove(announcedKey)
         }
     }
 
@@ -42,6 +44,18 @@ class Settings(private val context: Context) {
         context.store.edit {
             it.remove(tokenKey)
             it.remove(usernameKey)
+            it.remove(announcedKey)
+        }
+    }
+
+    val favorites: Flow<Set<String>> = context.store.data
+        .catch { emit(emptyPreferences()) }
+        .map { it[favoritesKey].orEmpty() }
+
+    suspend fun toggleFavorite(url: String) {
+        context.store.edit {
+            val now = it[favoritesKey].orEmpty()
+            it[favoritesKey] = if (url in now) now - url else now + url
         }
     }
 

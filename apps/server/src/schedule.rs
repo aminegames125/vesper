@@ -167,7 +167,8 @@ pub fn materialise(state: &AppState) {
         let Ok(mut stmt) = conn.prepare(
             "SELECT id, user_id, title, channel_name, source_url, tz, start_time, duration_s, days_mask,
                     start_date, end_date, pad_before_s, pad_after_s, keep_hours
-             FROM schedules WHERE enabled = 1",
+             FROM schedules WHERE enabled = 1
+               AND user_id IN (SELECT id FROM users WHERE status = 'active' AND role != 'guest')",
         ) else {
             return;
         };

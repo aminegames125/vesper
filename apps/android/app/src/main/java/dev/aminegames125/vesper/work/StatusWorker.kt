@@ -18,6 +18,8 @@ import androidx.work.WorkerParameters
 import dev.aminegames125.vesper.MainActivity
 import dev.aminegames125.vesper.R
 import dev.aminegames125.vesper.VesperApp
+import dev.aminegames125.vesper.data.Api
+import dev.aminegames125.vesper.data.ApiException
 import dev.aminegames125.vesper.data.Recording
 import java.util.concurrent.TimeUnit
 
@@ -67,11 +69,13 @@ class StatusWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         val container = (applicationContext as VesperApp).container
         val stored = container.settings.current()
         if (stored.server.isEmpty()) return Result.success()
-        val api = container.api
+        val api = Api()
         api.base = stored.server
         api.token = stored.token
         val list = try {
             api.recordings().recordings
+        } catch (e: ApiException) {
+            return if (e.code == 401 || e.code == 403) Result.success() else Result.retry()
         } catch (e: Exception) {
             return Result.retry()
         }

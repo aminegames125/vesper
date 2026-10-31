@@ -13,6 +13,7 @@ import dev.aminegames125.vesper.data.Recording
 import dev.aminegames125.vesper.data.Schedule
 import dev.aminegames125.vesper.data.ServerInfo
 import dev.aminegames125.vesper.data.Source
+import dev.aminegames125.vesper.data.Status
 import dev.aminegames125.vesper.data.User
 import dev.aminegames125.vesper.data.normalizeServer
 import kotlinx.coroutines.Job
@@ -22,7 +23,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Where the app is on its way to being usable. */
@@ -67,6 +70,12 @@ class VesperViewModel(app: Application) : AndroidViewModel(app) {
     private val _schedules = MutableStateFlow<List<Schedule>>(emptyList())
     val schedules: StateFlow<List<Schedule>> = _schedules.asStateFlow()
 
+    val favorites: StateFlow<Set<String>> =
+        settings.favorites.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    private val _status = MutableStateFlow<Status?>(null)
+    val status: StateFlow<Status?> = _status.asStateFlow()
+
     private val _sources = MutableStateFlow<List<Source>>(emptyList())
     val sources: StateFlow<List<Source>> = _sources.asStateFlow()
 
@@ -101,7 +110,12 @@ class VesperViewModel(app: Application) : AndroidViewModel(app) {
                     else -> Gate.Ready(info, api.me())
                 }
             } catch (e: ApiException) {
-                if (e.code == 401) Gate.NeedLogin(api.info()) else Gate.NeedServer(stored.server, e.message)
+                if (e.code == 401) {
+                    runCatching { api.info() }.map { Gate.NeedLogin(it) }
+                        .getOrElse { Gate.NeedServer(stored.server, "Could not reach the server.") }
+                } else {
+                    Gate.NeedServer(stored.server, e.message)
+                }
             }
             if (_gate.value is Gate.Ready) refresh()
         }
@@ -207,6 +221,65 @@ class VesperViewModel(app: Application) : AndroidViewModel(app) {
                 _recordings.value = list.recordings
                 _storage.value = list.storageUsed to list.storageLimit
                 _schedules.value = api.schedules()
+            }
+        }
+    }
+
+    fun loadStatus() {
+        viewModelScope.launch { guard { _status.value = api.status() } }
+    }
+
+    fun toggleFavorite(channel: Channel) {
+        viewModelScope.launch { settings.toggleFavorite(channel.url) }
+    }
+
+    fun renameRecording(id: String, title: String) {
+        viewModelScope.launch {
+            if (guard { api.renameRecording(id, title) } != null) refresh()
+        }
+    }
+
+    fun clearFailed() {
+        viewModelScope.launch {
+            if (guard { api.clearFailed() } != null) {
+                _messages.tryEmit("Cleared the failed recordings.")
+                refresh()
+            }
+        }
+    }
+
+    fun runSchedule(id: String) {
+        viewModelScope.launch {
+            if (guard { api.runSchedule(id) } != null) {
+                _messages.tryEmit("Recording started.")
+                refresh()
+            }
+        }
+    }
+
+    fun duplicateSchedule(id: String) {
+        viewModelScope.launch {
+            if (guard { api.duplicateSchedule(id) } != null) {
+                _messages.tryEmit("Copied. The copy is paused.")
+                refresh()
+            }
+        }
+    }
+
+    fun pauseAll(paused: Boolean) {
+        viewModelScope.launch {
+            if (guard { api.pauseAll(paused) } != null) {
+                _messages.tryEmit(if (paused) "All schedules paused." else "All schedules resumed.")
+                refresh()
+            }
+        }
+    }
+
+    fun testChannel(channel: Channel) {
+        viewModelScope.launch {
+            val reply = guard { api.testChannel(channel.url) }
+            if (reply != null) {
+                _messages.tryEmit(if (reply.ok) "${channel.name} is answering." else "${channel.name} answered ${reply.status}.")
             }
         }
     }

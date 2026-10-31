@@ -4,6 +4,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -66,11 +67,25 @@ class Api(
             }
         }
 
-    private suspend inline fun <reified T> get(path: String): T =
-        AppJson.decodeFromString(send("GET", path))
+    private fun unexpected(): Nothing = throw ApiException("That does not look like a Vesper server.")
 
-    private suspend inline fun <reified T, reified B> call(method: String, path: String, body: B): T =
-        AppJson.decodeFromString(send(method, path, AppJson.encodeToString(body)))
+    private suspend inline fun <reified T> get(path: String): T {
+        val text = send("GET", path)
+        return try {
+            AppJson.decodeFromString(text)
+        } catch (e: SerializationException) {
+            unexpected()
+        }
+    }
+
+    private suspend inline fun <reified T, reified B> call(method: String, path: String, body: B): T {
+        val text = send(method, path, AppJson.encodeToString(body))
+        return try {
+            AppJson.decodeFromString(text)
+        } catch (e: SerializationException) {
+            unexpected()
+        }
+    }
 
     suspend fun info(): ServerInfo = get("/info")
     suspend fun me(): User = get("/auth/me")
@@ -97,6 +112,30 @@ class Api(
     suspend fun deleteRecording(id: String) {
         send("DELETE", "/recordings/$id")
     }
+
+    suspend fun renameRecording(id: String, title: String) {
+        send("PATCH", "/recordings/$id", AppJson.encodeToString(Rename(title)))
+    }
+
+    suspend fun clearFailed() {
+        send("POST", "/recordings/clear-failed")
+    }
+
+    suspend fun runSchedule(id: String) {
+        send("POST", "/schedules/$id/run")
+    }
+
+    suspend fun duplicateSchedule(id: String) {
+        send("POST", "/schedules/$id/duplicate")
+    }
+
+    suspend fun pauseAll(paused: Boolean) {
+        send("POST", "/schedules/pause", """{"paused":$paused}""")
+    }
+
+    suspend fun status(): Status = get("/status")
+
+    suspend fun testChannel(url: String): ProbeReply = call("POST", "/channels/test", Probe(url))
 
     suspend fun schedules(): List<Schedule> = get<ScheduleList>("/schedules").schedules
 
@@ -132,7 +171,11 @@ class Api(
             .addQueryParameter("offset", offset.toString())
             .addQueryParameter("limit", limit.toString())
             .build()
-        return AppJson.decodeFromString(send("GET", "/channels?${withQuery.encodedQuery}"))
+        return try {
+            AppJson.decodeFromString(send("GET", "/channels?${withQuery.encodedQuery}"))
+        } catch (e: SerializationException) {
+            unexpected()
+        }
     }
 
     /** The recording as an HLS playlist; the server accepts the token in the address for media. */

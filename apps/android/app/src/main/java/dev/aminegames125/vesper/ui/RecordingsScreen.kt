@@ -19,7 +19,10 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,10 +45,12 @@ fun RecordingsScreen(vm: VesperViewModel, onRecordNow: () -> Unit, onPlay: (Reco
     val recordings by vm.recordings.collectAsState()
     val storage by vm.storage.collectAsState()
     var toDelete by remember { mutableStateOf<Recording?>(null) }
+    var toRename by remember { mutableStateOf<Recording?>(null) }
+    var query by remember { mutableStateOf("") }
 
     // Running first, then what starts soonest, then the newest finished ones.
-    val sorted = remember(recordings) {
-        recordings.sortedWith(
+    val sorted = remember(recordings, query) {
+        recordings.filter { query.isBlank() || it.title.contains(query.trim(), ignoreCase = true) || it.channelName.contains(query.trim(), ignoreCase = true) }.sortedWith(
             compareBy<Recording> { if (it.isRunning) 0 else if (it.isScheduled) 1 else 2 }
                 .thenBy { if (it.isScheduled) it.startAt else 0L }
                 .thenByDescending { it.createdAt },
@@ -61,7 +66,7 @@ fun RecordingsScreen(vm: VesperViewModel, onRecordNow: () -> Unit, onPlay: (Reco
             )
         },
     ) { padding ->
-        if (sorted.isEmpty()) {
+        if (sorted.isEmpty() && query.isBlank()) {
             EmptyState(
                 "Nothing recorded yet",
                 "Tap Record now to start recording a channel, or schedule one for later.",
@@ -73,6 +78,22 @@ fun RecordingsScreen(vm: VesperViewModel, onRecordNow: () -> Unit, onPlay: (Reco
                 contentPadding = PaddingValues(start = pageHorizontal(), end = pageHorizontal(), top = 8.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                if (recordings.size > 4 || query.isNotBlank()) {
+                    item {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            label = { Text("Search recordings") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+                if (recordings.any { it.status == "failed" }) {
+                    item {
+                        TextButton(onClick = vm::clearFailed) { Text("Clear failed recordings") }
+                    }
+                }
                 if (storage.second > 0) {
                     item {
                         val (used, limit) = storage
@@ -91,10 +112,30 @@ fun RecordingsScreen(vm: VesperViewModel, onRecordNow: () -> Unit, onPlay: (Reco
                         onPlay = { onPlay(recording) },
                         onStop = { vm.stopRecording(recording.id) },
                         onDelete = { toDelete = recording },
+                        onRename = { toRename = recording },
                     )
                 }
             }
         }
+    }
+
+    toRename?.let { recording ->
+        var name by remember(recording.id) { mutableStateOf(recording.title) }
+        AlertDialog(
+            onDismissRequest = { toRename = null },
+            title = { Text("Rename recording") },
+            text = { OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true) },
+            confirmButton = {
+                TextButton(
+                    enabled = name.isNotBlank(),
+                    onClick = {
+                        vm.renameRecording(recording.id, name.trim())
+                        toRename = null
+                    },
+                ) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { toRename = null }) { Text("Cancel") } },
+        )
     }
 
     toDelete?.let { recording ->
@@ -112,7 +153,7 @@ fun RecordingsScreen(vm: VesperViewModel, onRecordNow: () -> Unit, onPlay: (Reco
 }
 
 @Composable
-private fun RecordingCard(recording: Recording, onPlay: () -> Unit, onStop: () -> Unit, onDelete: () -> Unit) {
+private fun RecordingCard(recording: Recording, onPlay: () -> Unit, onStop: () -> Unit, onDelete: () -> Unit, onRename: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(recording.title, style = MaterialTheme.typography.titleMedium, maxLines = 2)
@@ -144,6 +185,7 @@ private fun RecordingCard(recording: Recording, onPlay: () -> Unit, onStop: () -
                 if (recording.isRunning) OutlinedButton(onClick = onStop) { Text("Stop") }
                 if (recording.isScheduled) OutlinedButton(onClick = onStop) { Text("Cancel") }
                 if (recording.isFinished) OutlinedButton(onClick = onDelete) { Text("Delete") }
+                if (recording.isFinished) TextButton(onClick = onRename) { Text("Rename") }
             }
         }
     }

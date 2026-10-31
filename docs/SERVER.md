@@ -118,6 +118,10 @@ A schedule says "record this channel at 11:00 for 30 minutes on these days". Cre
 
 `POST /api/v1/sources` saves an M3U link (`"kind": "m3u"`) or an Xtream login (`"kind": "xtream"`, with `username` and `password`) and checks it right away. `GET /api/v1/channels?source=ID&q=news&group=News&offset=0&limit=100` returns the channels with their stream addresses, group and logo, so an app can offer a channel picker. Lists are cached for ten minutes.
 
+## Webhook
+
+Set a **webhook address** in the admin panel (Settings, Notifications). When a recording finishes or fails Vesper posts JSON to it: `event`, `id`, `title`, `seconds`, `bytes`, `error`, plus `content` and `text` with a readable sentence so Discord, ntfy and Slack-style hooks show something useful.
+
 ## HTTP API
 
 Base path `/api/v1`. Send `Authorization: Bearer <token>`; media routes also accept `?token=`. In lite mode no token is needed. Errors are `{ "error": "message" }`.
@@ -133,7 +137,14 @@ Base path `/api/v1`. Send `Authorization: Bearer <token>`; media routes also acc
 | `POST /recordings/{id}/stop`, `/keep` | Stop or cancel; change retention. |
 | `GET /recordings/{id}/index.m3u8` | Playlist for any HLS player. |
 | `GET /recordings/{id}/download` | The whole recording as one `.ts` file. |
-| `GET/POST /schedules`, `PUT/PATCH/DELETE /schedules/{id}` | Repeating or one-off schedules. `PATCH` pauses or resumes. |
+| `GET/POST /schedules`, `PUT/PATCH/DELETE /schedules/{id}` | Repeating or one-off schedules. `PATCH` pauses or resumes. `keep_last` keeps only the newest N finished recordings. |
+| `POST /schedules/{id}/run` | Record a schedule's channel right now. |
+| `POST /schedules/{id}/duplicate` | Copy a schedule (the copy starts paused). |
+| `POST /schedules/pause` | `{"paused": true}` pauses every schedule of the account, `false` resumes them. |
+| `PATCH /recordings/{id}` | Rename a recording: `{"title": "..."}`. |
+| `POST /recordings/clear-failed` | Delete all failed recordings of the account. |
+| `GET /status` | Version, mode, disk free and total, counts and the next recording. |
+| `POST /channels/test` | `{"url": "..."}` opens a stream briefly to see whether it answers. |
 | `GET/POST /sources`, `DELETE /sources/{id}`, `GET /channels` | Playlists and their channels. |
 | `GET /sync`, `GET/PUT /sync/{key}` | Small JSON documents shared by your devices. |
 | `GET /proxy?url=` | Fetch an address on your behalf; playlists are rewritten to stay behind the proxy. |

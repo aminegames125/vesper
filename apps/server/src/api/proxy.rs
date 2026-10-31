@@ -101,6 +101,35 @@ pub async fn fetch(
     for (name, value) in forwarded {
         out.headers_mut().insert(name, value);
     }
+    // Whatever the upstream says, it must never run as a page on this server's origin.
+    let headers = out.headers_mut();
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static("sandbox"),
+    );
+    let kind = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if kind.contains("html")
+        || kind.contains("javascript")
+        || kind.contains("xml")
+        || kind.contains("svg")
+    {
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/octet-stream"),
+        );
+        headers.insert(
+            header::CONTENT_DISPOSITION,
+            HeaderValue::from_static("attachment"),
+        );
+    }
     Ok(out)
 }
 

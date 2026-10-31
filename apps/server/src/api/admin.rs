@@ -107,11 +107,14 @@ pub async fn create_user(
     // Work out every value before taking the database lock, which is not re-entrant.
     let (concurrent, hours, storage_gb) = (
         body.max_concurrent
-            .unwrap_or_else(|| num("default_max_concurrent", 1)),
+            .unwrap_or_else(|| num("default_max_concurrent", 1))
+            .max(0),
         body.max_hours
-            .unwrap_or_else(|| num("default_max_hours", 4)),
+            .unwrap_or_else(|| num("default_max_hours", 4))
+            .max(0),
         body.storage_gb
-            .unwrap_or_else(|| num("default_storage_gb", 5)),
+            .unwrap_or_else(|| num("default_storage_gb", 5))
+            .max(0),
     );
     let hash = hash_password(&body.password)?;
     state.db.conn().execute(

@@ -112,7 +112,7 @@ pub async fn create(
         .or_else(|| state.db.setting("default_keep_hours", "").parse().ok());
     let keep_hours = match body.keep_hours {
         Some(0) => None,
-        Some(h) if h > 0 => Some(h),
+        Some(h) if h > 0 => Some(h.min(24 * 365 * 10)),
         _ => default_keep.filter(|h| *h > 0),
     };
     let start_at = body.start_at.unwrap_or(0).max(0);
@@ -158,7 +158,15 @@ pub async fn remove(
     AuthUser(user): AuthUser,
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
-    let (_, owner) = owned(&state, &user, &id)?;
+    let (value, owner) = owned(&state, &user, &id)?;
+    // An occurrence of a repeating schedule is kept as "cancelled" so it is not created again.
+    if value["status"] == "scheduled" && !value["scheduleId"].is_null() {
+        state.db.conn().execute(
+            "UPDATE recordings SET status = 'failed', error = 'Cancelled.', finished_at = ?1 WHERE id = ?2",
+            params![now(), id],
+        )?;
+        return Ok(Json(json!({ "ok": true })));
+    }
     jobs::stop(&state, &id);
     remove_files(&state, &owner, &id);
     state
@@ -182,12 +190,61 @@ pub async fn set_keep(
     Json(body): Json<Keep>,
 ) -> ApiResult<Json<Value>> {
     owned(&state, &user, &id)?;
-    let until = (body.hours > 0).then(|| now() + body.hours * 3600);
+    let hours = body.hours.clamp(0, 24 * 365 * 10);
+    let until = (hours > 0).then(|| now() + hours * 3600);
     state.db.conn().execute(
         "UPDATE recordings SET keep_until = ?1, keep_hours = ?2 WHERE id = ?3",
-        params![until, Some(body.hours).filter(|h| *h > 0), id],
+        params![until, Some(hours).filter(|h| *h > 0), id],
     )?;
     Ok(Json(json!({ "ok": true })))
+}
+
+#[derive(Deserialize)]
+pub struct Rename {
+    title: String,
+}
+
+/// Gives a recording a new title.
+pub async fn rename(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Path(id): Path<String>,
+    Json(body): Json<Rename>,
+) -> ApiResult<Json<Value>> {
+    owned(&state, &user, &id)?;
+    let title: String = body.title.trim().chars().take(120).collect();
+    if title.is_empty() {
+        return Err(ApiError::bad("Give the recording a title."));
+    }
+    state.db.conn().execute(
+        "UPDATE recordings SET title = ?1 WHERE id = ?2",
+        params![title, id],
+    )?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+/// Deletes every failed recording of the account in one go.
+pub async fn clear_failed(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+) -> ApiResult<Json<Value>> {
+    let ids: Vec<String> = {
+        let conn = state.db.conn();
+        let mut stmt =
+            conn.prepare("SELECT id FROM recordings WHERE user_id = ?1 AND status = 'failed'")?;
+        let rows = stmt
+            .query_map([&user.id], |r| r.get(0))?
+            .collect::<Result<_, _>>()?;
+        rows
+    };
+    for id in &ids {
+        remove_files(&state, &user.id, id);
+        let _ = state
+            .db
+            .conn()
+            .execute("DELETE FROM recordings WHERE id = ?1", [id]);
+    }
+    Ok(Json(json!({ "removed": ids.len() })))
 }
 
 /// The recording as an HLS playlist, so any device can play it, even while it is still recording.

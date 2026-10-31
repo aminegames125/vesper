@@ -59,6 +59,17 @@ export function SettingsPage({ client, lite }: { client: CloudClient; lite: bool
         </Card>
       )}
 
+      <Card title="Notifications">
+        <div className="p-5">
+          <Field
+            label="Webhook address"
+            value={form.webhook_url ?? ""}
+            onChange={(e) => set("webhook_url", e.target.value)}
+            hint="Vesper posts here when a recording finishes or fails. Works with Discord, ntfy and Slack-style hooks. Leave empty to turn off."
+          />
+        </div>
+      </Card>
+
       <Card title="Defaults for new accounts">
         <div className="grid grid-cols-2 gap-4 p-5">
           <Field

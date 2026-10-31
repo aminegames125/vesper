@@ -17,6 +17,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,6 +54,8 @@ fun ChannelsScreen(vm: VesperViewModel, onBack: () -> Unit, onSchedule: (Channel
     val sources by vm.sources.collectAsState()
     val browser by vm.browser.collectAsState()
     val busy by vm.busy.collectAsState()
+    val favorites by vm.favorites.collectAsState()
+    var onlyFavorites by remember { mutableStateOf(false) }
     var recordNow by remember { mutableStateOf<Channel?>(null) }
     var addSource by remember { mutableStateOf(false) }
 
@@ -95,19 +100,24 @@ fun ChannelsScreen(vm: VesperViewModel, onBack: () -> Unit, onSchedule: (Channel
                 )
                 if (browser.groups.isNotEmpty()) {
                     LazyRow(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item { FilterChip(selected = onlyFavorites, onClick = { onlyFavorites = !onlyFavorites }, label = { Text("Favorites") }) }
                         item { FilterChip(selected = browser.group.isEmpty(), onClick = { vm.setGroup("") }, label = { Text("All") }) }
                         items(browser.groups, key = { it }) { group ->
                             FilterChip(selected = browser.group == group, onClick = { vm.setGroup(group) }, label = { Text(group) })
                         }
                     }
                 }
+                val shown = remember(browser.channels, favorites, onlyFavorites) {
+                    val base = if (onlyFavorites) browser.channels.filter { it.url in favorites } else browser.channels
+                    base.sortedByDescending { it.url in favorites }
+                }
                 Box(browser.loading && browser.channels.isEmpty()) {
-                    if (browser.channels.isEmpty() && !browser.loading) {
+                    if (shown.isEmpty() && !browser.loading) {
                         EmptyState("No channels found", "Try another search or group.")
                     } else {
                         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-                            itemsIndexed(browser.channels, key = { i, c -> "$i${c.url}" }) { index, channel ->
-                                if (index >= browser.channels.size - 5) LaunchedEffect(browser.channels.size) { vm.loadMore() }
+                            itemsIndexed(shown, key = { i, c -> "$i${c.url}" }) { index, channel ->
+                                if (index >= shown.size - 5) LaunchedEffect(browser.channels.size) { vm.loadMore() }
                                 ListItem(
                                     modifier = Modifier.clickable { onSchedule(channel) },
                                     headlineContent = { Text(channel.name, maxLines = 1) },
@@ -118,6 +128,16 @@ fun ChannelsScreen(vm: VesperViewModel, onBack: () -> Unit, onSchedule: (Channel
                                     },
                                     trailingContent = {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
+                                            val starred = channel.url in favorites
+                                            IconButton(onClick = { vm.toggleFavorite(channel) }) {
+                                                Icon(
+                                                    if (starred) Icons.Filled.Star else Icons.Filled.StarBorder,
+                                                    contentDescription = if (starred) "Remove ${channel.name} from favorites" else "Add ${channel.name} to favorites",
+                                                )
+                                            }
+                                            IconButton(onClick = { vm.testChannel(channel) }) {
+                                                Icon(Icons.Filled.NetworkCheck, contentDescription = "Test ${channel.name}")
+                                            }
                                             IconButton(onClick = { recordNow = channel }) {
                                                 Icon(
                                                     Icons.Filled.FiberManualRecord,

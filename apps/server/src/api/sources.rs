@@ -150,6 +150,18 @@ fn load_source(
 }
 
 async fn channels_of(state: &AppState, user_id: &str, id: &str) -> ApiResult<Arc<Vec<Channel>>> {
+    let owned: bool = state
+        .db
+        .conn()
+        .query_row(
+            "SELECT 1 FROM sources WHERE id = ?1 AND user_id = ?2",
+            params![id, user_id],
+            |_| Ok(true),
+        )
+        .unwrap_or(false);
+    if !owned {
+        return Err(ApiError::not_found("Playlist not found."));
+    }
     if let Some((at, list)) = state
         .playlists
         .lock()

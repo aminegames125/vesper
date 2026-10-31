@@ -130,6 +130,14 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if !has_schedule_id {
         conn.execute("ALTER TABLE recordings ADD COLUMN schedule_id TEXT", [])?;
     }
+    let has_keep_last = conn
+        .prepare("PRAGMA table_info(schedules)")?
+        .query_map([], |r| r.get::<_, String>(1))?
+        .flatten()
+        .any(|name| name == "keep_last");
+    if !has_keep_last {
+        conn.execute("ALTER TABLE schedules ADD COLUMN keep_last INTEGER", [])?;
+    }
     // One row per occurrence of a schedule, so the materialiser can run as often as it likes.
     conn.execute_batch(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_recordings_occurrence

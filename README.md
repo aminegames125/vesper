@@ -40,7 +40,12 @@ Vesper is a **recorder, not a player**. It uses your own IPTV playlist (an M3U l
 | **Watch while it records** | Recordings are HLS, so you can open one on any device **while it is still being recorded**. |
 | **Keep or tidy up** | Keep recordings until you delete them, or for 1, 7 or 30 days. |
 | **Your channels, on the server** | Add an M3U link or an Xtream login once. Your provider login stays on the server, not on every phone. |
-| **Notifications** | The app tells you when a recording finishes or fails. |
+| **Notifications** | The app tells you when a recording finishes or fails, and a webhook (Discord, ntfy, Slack-style) can too. |
+| **Keep only the newest** | A schedule can keep just its last 1, 3, 5 or 10 episodes and tidy the rest. |
+| **Run now, duplicate, pause all** | Start a schedule's channel at once, copy a schedule, or pause every schedule for a holiday. |
+| **Rename, search, clear failed** | Tidy the recordings list from the app. |
+| **Favourite and test channels** | Star the channels you use and check that a stream answers before you schedule it. |
+| **Server status** | Settings shows the server's free disk and what records next. |
 | **Accounts, if you want them** | *Lite* mode is for one home. *Full* mode adds users, quotas, invites and an admin panel. |
 
 ## 🚀 Quick start

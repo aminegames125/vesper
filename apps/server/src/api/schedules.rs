@@ -17,7 +17,7 @@ use crate::{
     state::AppState,
 };
 
-const COLUMNS: &str = "id, user_id, title, channel_name, source_url, tz, start_time, duration_s, days_mask, start_date, end_date, pad_before_s, pad_after_s, keep_hours, enabled, created_at";
+const COLUMNS: &str = "id, user_id, title, channel_name, source_url, tz, start_time, duration_s, days_mask, start_date, end_date, pad_before_s, pad_after_s, keep_hours, enabled, created_at, keep_last";
 
 fn row_json(r: &rusqlite::Row) -> rusqlite::Result<Value> {
     Ok(json!({
@@ -36,6 +36,7 @@ fn row_json(r: &rusqlite::Row) -> rusqlite::Result<Value> {
         "keepHours": r.get::<_, Option<i64>>(13)?,
         "enabled": r.get::<_, i64>(14)? != 0,
         "createdAt": r.get::<_, i64>(15)?,
+        "keepLast": r.get::<_, Option<i64>>(16)?,
     }))
 }
 
@@ -109,6 +110,9 @@ pub struct NewSchedule {
     pad_after: i64,
     #[serde(default)]
     keep_hours: Option<i64>,
+    /// Keep only the newest N finished recordings of this schedule.
+    #[serde(default)]
+    keep_last: Option<i64>,
     #[serde(default = "yes")]
     enabled: bool,
 }
@@ -192,8 +196,8 @@ pub async fn create(
     state.db.conn().execute(
         "INSERT INTO schedules
            (id, user_id, title, channel_name, source_url, tz, start_time, duration_s, days_mask,
-            start_date, end_date, pad_before_s, pad_after_s, keep_hours, enabled, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+            start_date, end_date, pad_before_s, pad_after_s, keep_hours, enabled, created_at, keep_last)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
         params![
             id,
             user.id,
@@ -211,6 +215,7 @@ pub async fn create(
             keep,
             i64::from(body.enabled),
             now(),
+            body.keep_last.filter(|n| *n > 0),
         ],
     )?;
     materialise(&state);
@@ -239,7 +244,7 @@ pub async fn update(
     state.db.conn().execute(
         "UPDATE schedules SET title = ?1, channel_name = ?2, source_url = ?3, tz = ?4, start_time = ?5,
            duration_s = ?6, days_mask = ?7, start_date = ?8, end_date = ?9, pad_before_s = ?10,
-           pad_after_s = ?11, keep_hours = ?12, enabled = ?13 WHERE id = ?14",
+           pad_after_s = ?11, keep_hours = ?12, enabled = ?13, keep_last = ?15 WHERE id = ?14",
         params![
             title,
             channel,
@@ -255,6 +260,7 @@ pub async fn update(
             keep,
             i64::from(body.enabled),
             id,
+            body.keep_last.filter(|n| *n > 0),
         ],
     )?;
     drop_future(&state, &id);
@@ -293,15 +299,101 @@ pub async fn remove(
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
     owned(&state, &user, &id)?;
-    drop_future(&state, &id);
     state
         .db
         .conn()
         .execute("DELETE FROM schedules WHERE id = ?1", [&id])?;
+    drop_future(&state, &id);
     // What was already recorded stays, but no longer belongs to a rule.
     let _ = state.db.conn().execute(
         "UPDATE recordings SET schedule_id = NULL WHERE schedule_id = ?1",
         [&id],
     );
     Ok(Json(json!({ "ok": true })))
+}
+
+/// Records a schedule's channel right now, for the programme length plus the end padding.
+#[allow(clippy::type_complexity)]
+pub async fn run_now(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    owned(&state, &user, &id)?;
+    let (owner, title, channel, url, seconds, after, keep): (String, String, String, String, i64, i64, Option<i64>) =
+        state.db.conn().query_row(
+            "SELECT user_id, title, channel_name, source_url, duration_s, pad_after_s, keep_hours FROM schedules WHERE id = ?1",
+            [&id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)),
+        )?;
+    let seconds = seconds + after;
+    check_quota(&state, &user, seconds)?;
+    check_target(&state, &url).await?;
+    let rec = uuid::Uuid::new_v4().to_string();
+    state.db.conn().execute(
+        "INSERT INTO recordings (id, user_id, title, channel_name, source_url, status, start_at, max_seconds, keep_hours, created_at, schedule_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'queued', ?6, ?7, ?8, ?6, ?9)",
+        params![rec, owner, title, channel, url, now(), seconds, keep, id],
+    )?;
+    crate::jobs::start(&state, &rec);
+    state.db.audit(&user.username, "schedule.run", &title);
+    Ok(Json(json!({ "id": rec })))
+}
+
+/// Makes a copy of a schedule, paused, so it can be tweaked without touching the original.
+pub async fn duplicate(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    owned(&state, &user, &id)?;
+    let copy = uuid::Uuid::new_v4().to_string();
+    let changed = state.db.conn().execute(
+        "INSERT INTO schedules
+           (id, user_id, title, channel_name, source_url, tz, start_time, duration_s, days_mask,
+            start_date, end_date, pad_before_s, pad_after_s, keep_hours, enabled, created_at, keep_last)
+         SELECT ?1, user_id, substr(title, 1, 112) || ' (copy)', channel_name, source_url, tz, start_time, duration_s,
+                days_mask, start_date, end_date, pad_before_s, pad_after_s, keep_hours, 0, ?2, keep_last
+         FROM schedules WHERE id = ?3",
+        params![copy, now(), id],
+    )?;
+    if changed == 0 {
+        return Err(ApiError::not_found("Schedule not found."));
+    }
+    Ok(Json(json!({ "id": copy })))
+}
+
+#[derive(Deserialize)]
+pub struct Pause {
+    paused: bool,
+}
+
+/// Pauses or resumes every schedule of the account at once, for a holiday.
+pub async fn pause_all(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Json(body): Json<Pause>,
+) -> ApiResult<Json<Value>> {
+    let changed = state.db.conn().execute(
+        "UPDATE schedules SET enabled = ?1 WHERE user_id = ?2",
+        params![i64::from(!body.paused), user.id],
+    )?;
+    if body.paused {
+        let _ = state.db.conn().execute(
+            "DELETE FROM recordings WHERE user_id = ?1 AND schedule_id IS NOT NULL AND status = 'scheduled' AND start_at > ?2",
+            params![user.id, now()],
+        );
+    } else {
+        materialise(&state);
+    }
+    state.db.audit(
+        &user.username,
+        if body.paused {
+            "schedule.pause_all"
+        } else {
+            "schedule.resume_all"
+        },
+        "",
+    );
+    Ok(Json(json!({ "changed": changed })))
 }

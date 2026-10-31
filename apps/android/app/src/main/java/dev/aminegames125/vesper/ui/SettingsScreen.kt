@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import dev.aminegames125.vesper.BuildConfig
 import dev.aminegames125.vesper.data.Source
 import dev.aminegames125.vesper.data.formatBytes
+import dev.aminegames125.vesper.data.formatMoment
 import dev.aminegames125.vesper.work.Notifications
 
 @Composable
@@ -51,7 +52,11 @@ fun SettingsScreen(vm: VesperViewModel, gate: Gate.Ready) {
     var canNotify by remember { mutableStateOf(Notifications.canPost(context)) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { canNotify = it }
 
-    LaunchedEffect(Unit) { vm.loadSources() }
+    val status by vm.status.collectAsState()
+    LaunchedEffect(Unit) {
+        vm.loadSources()
+        vm.loadStatus()
+    }
 
     Column(
         Modifier.verticalScroll(rememberScrollState()).padding(horizontal = pageHorizontal(), vertical = 8.dp),
@@ -70,6 +75,21 @@ fun SettingsScreen(vm: VesperViewModel, gate: Gate.Ready) {
             style = MaterialTheme.typography.bodyMedium,
         )
         if (limit > 0) LinearProgressIndicator(progress = { (used.toFloat() / limit).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+
+        status?.let { s ->
+            s.diskFree?.let { free ->
+                Text(
+                    "Server disk: ${formatBytes(free)} free" + (s.diskTotal?.let { " of ${formatBytes(it)}" } ?: ""),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            s.next?.let {
+                Text(
+                    "Next: ${it.title} · ${formatMoment(it.startAt)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
 
         SectionTitle("Playlists")
         if (sources.isEmpty()) Text("No playlists yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -64,6 +64,7 @@ import kotlinx.coroutines.launch
 private val REPEATS = listOf(0 to "Once", EVERY_DAY to "Every day", WEEKDAYS to "Weekdays", WEEKEND to "Weekends")
 private val DURATIONS = listOf(15, 30, 45, 60, 90, 120, 180)
 private val PADS = listOf(0, 1, 2, 5, 10)
+private val KEEP_LAST = listOf<Long?>(null, 1, 3, 5, 10)
 private val KEEPS = listOf<Long?>(null, 24, 24 * 7, 24 * 30)
 
 private fun keepLabel(hours: Long?) = when (hours) {
@@ -81,14 +82,19 @@ internal fun isPast(date: LocalDate, time: LocalTime, zone: ZoneId, now: Instant
 fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel: () -> Unit) {
     val editing = remember { vm.editing }
     val draft = remember { vm.draftChannel }
-    val zone = remember { ZoneId.systemDefault() }
+    val zone = remember { editing?.let { runCatching { ZoneId.of(it.tz) }.getOrNull() } ?: ZoneId.systemDefault() }
     val scope = rememberCoroutineScope()
     val busy by vm.busy.collectAsState()
 
     var title by remember { mutableStateOf(editing?.title ?: draft?.name.orEmpty()) }
     var channelName by remember { mutableStateOf(editing?.channelName ?: draft?.name.orEmpty()) }
     var url by remember { mutableStateOf(editing?.url ?: draft?.url.orEmpty()) }
-    var date by remember { mutableStateOf(editing?.let { LocalDate.parse(it.startDate) } ?: LocalDate.now(zone)) }
+    var date by remember {
+        mutableStateOf(
+            editing?.let { LocalDate.parse(it.startDate) }
+                ?: LocalDate.now(zone).let { today -> if (LocalTime.now(zone).hour == 23) today.plusDays(1) else today },
+        )
+    }
     var time by remember {
         mutableStateOf(editing?.let { LocalTime.parse(it.startTime) } ?: LocalTime.now(zone).plusHours(1).withMinute(0).withSecond(0).withNano(0))
     }
@@ -98,6 +104,7 @@ fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel:
     var padBefore by remember { mutableIntStateOf(((editing?.padBefore ?: 60L) / 60).toInt()) }
     var padAfter by remember { mutableIntStateOf(((editing?.padAfter ?: 120L) / 60).toInt()) }
     var keep by remember { mutableStateOf(editing?.keepHours) }
+    var keepLast by remember { mutableStateOf(editing?.keepLast) }
     var error by remember { mutableStateOf<String?>(null) }
     var warnings by remember { mutableStateOf<List<String>?>(null) }
 
@@ -105,6 +112,7 @@ fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel:
         error = when {
             title.isBlank() -> "Give the schedule a title."
             url.isBlank() -> "Pick a channel."
+            custom && days == 0 -> "Pick at least one day."
             minutes < 1 -> "The recording must be at least a minute long."
             days == 0 && isPast(date, time, zone) -> "That time has already passed."
             else -> null
@@ -122,6 +130,7 @@ fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel:
             padBefore = padBefore * 60L,
             padAfter = padAfter * 60L,
             keepHours = keep,
+            keepLast = keepLast,
             enabled = editing?.enabled ?: true,
         )
         scope.launch {
@@ -202,6 +211,13 @@ fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel:
             Label("Keep recordings")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 KEEPS.forEach { h -> FilterChip(selected = keep == h, onClick = { keep = h }, label = { Text(keepLabel(h)) }) }
+            }
+
+            Label("Keep only the newest")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                KEEP_LAST.forEach { n ->
+                    FilterChip(selected = keepLast == n, onClick = { keepLast = n }, label = { Text(if (n == null) "All of them" else "$n") })
+                }
             }
 
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
