@@ -142,7 +142,6 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - uses: android-actions/setup-android@v3
       - name: Install the NDK
         run: |
           sdkmanager "ndk;27.2.12479018"
