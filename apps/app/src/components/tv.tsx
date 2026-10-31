@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { moviePlayable, useAuth } from "../lib/playable";
 import { useStore, type View } from "../lib/store";
 import type { Movie } from "../lib/types";
@@ -12,12 +12,75 @@ const TABS: { view: View; label: string }[] = [
   { view: "live", label: "Live TV" },
   { view: "movies", label: "Movies" },
   { view: "series", label: "Series" },
+];
+
+/** Everything else, one step behind "More". */
+const MORE: { view: View; label: string }[] = [
   { view: "guide", label: "Guide" },
   { view: "favorites", label: "My list" },
   { view: "recordings", label: "Recordings" },
+  { view: "catchup", label: "Catch-up" },
   { view: "sources", label: "Sources" },
   { view: "settings", label: "Settings" },
 ];
+
+function MoreTab() {
+  const view = useStore((s) => s.view);
+  const setView = useStore((s) => s.setView);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const active = MORE.some((m) => m.view === view);
+
+  useEffect(() => {
+    if (!open) return;
+    // Close when focus leaves the menu, or on Back.
+    const out = (e: Event) => {
+      if (e instanceof KeyboardEvent) {
+        if (e.key === "Escape" || e.key === "GoBack") setOpen(false);
+      } else if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("focusin", out);
+    document.addEventListener("pointerdown", out);
+    document.addEventListener("keydown", out);
+    return () => {
+      document.removeEventListener("focusin", out);
+      document.removeEventListener("pointerdown", out);
+      document.removeEventListener("keydown", out);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-current={active ? "page" : undefined}
+        onClick={() => setOpen(!open)}
+        className="tv-tab"
+      >
+        More
+      </button>
+      {open && (
+        <ul className="glass absolute right-0 top-full z-40 mt-2 flex w-56 flex-col gap-1 rounded-3xl border border-line p-2 shadow-xl">
+          {MORE.map((m) => (
+            <li key={m.view}>
+              <button
+                type="button"
+                onClick={() => {
+                  setView(m.view);
+                  setOpen(false);
+                }}
+                className="tv-tab w-full text-left"
+              >
+                {m.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /**
  * The television layout: a slim top bar instead of a side rail, content that stays inside the
@@ -45,7 +108,7 @@ export function TvShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="tv flex h-full flex-col">
-      <header className="tv-pad flex flex-none items-center gap-8 pt-5 pb-3">
+      <header className="tv-pad flex flex-none items-center justify-center gap-6 pt-5 pb-3">
         <button
           type="button"
           onClick={() => setView("home")}
@@ -56,7 +119,7 @@ export function TvShell({ children }: { children: ReactNode }) {
         </button>
         <nav
           aria-label="Main"
-          className="rail-scroll flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1"
+          className="flex items-center gap-1 rounded-full border border-line bg-panel/70 p-1.5"
         >
           <button
             type="button"
@@ -78,6 +141,7 @@ export function TvShell({ children }: { children: ReactNode }) {
               {t.label}
             </button>
           ))}
+          <MoreTab />
         </nav>
         {view === "search" && (
           <div className="w-72 flex-none">

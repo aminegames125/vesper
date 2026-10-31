@@ -10,11 +10,9 @@ import {
   HistoryIcon,
   HouseIcon,
   IconButton,
-  MoonIcon,
-  RefreshCwIcon,
+  LayoutGridIcon,
   ServerIcon,
   SettingsIcon,
-  SunIcon,
   TvIcon,
   useIconHover,
 } from "./icons";
@@ -26,11 +24,11 @@ const TABS: { view: View; label: string; icon: AnimIcon }[] = [
   { view: "live", label: "Live TV", icon: TvIcon },
   { view: "movies", label: "Movies", icon: FilmIcon },
   { view: "series", label: "Series", icon: ClapperboardIcon },
-  { view: "guide", label: "Guide", icon: CalendarDaysIcon },
 ];
 
-/** Everything that is yours rather than the catalogue, one click behind "Library". */
+/** Everything else, one click behind "More". */
 const LIBRARY: { view: View; label: string; icon: AnimIcon }[] = [
+  { view: "guide", label: "Guide", icon: CalendarDaysIcon },
   { view: "favorites", label: "Favourites", icon: HeartIcon },
   { view: "recordings", label: "Recordings", icon: CircleDotIcon },
   { view: "catchup", label: "Catch-up", icon: HistoryIcon },
@@ -65,7 +63,7 @@ function Tab({ view, label }: { view: View; label: string }) {
   );
 }
 
-function LibraryMenu() {
+function MoreMenu({ up = false }: { up?: boolean }) {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
   const [open, setOpen] = useState(false);
@@ -98,12 +96,27 @@ function LibraryMenu() {
         aria-expanded={open}
         aria-current={active ? "page" : undefined}
         onClick={() => setOpen(!open)}
-        className="fade rounded-full px-4 py-1.5 text-sm font-medium text-muted hover:text-paper aria-[current=page]:bg-paper aria-[current=page]:text-ink"
+        className={
+          up
+            ? "fade flex min-w-[4.25rem] flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium text-muted aria-[current=page]:text-accent"
+            : "fade rounded-full px-4 py-1.5 text-sm font-medium text-muted hover:text-paper aria-[current=page]:bg-paper aria-[current=page]:text-ink"
+        }
       >
-        Library
+        {up ? (
+          <>
+            <LayoutGridIcon size={22} color="currentColor" />
+            More
+          </>
+        ) : (
+          "More"
+        )}
       </button>
       {open && (
-        <ul className="glass absolute left-1/2 top-full z-40 mt-2 w-52 -translate-x-1/2 rounded-2xl border border-line p-1.5 shadow-xl">
+        <ul
+          className={`glass absolute z-40 w-52 rounded-2xl border border-line p-1.5 shadow-xl ${
+            up ? "bottom-full right-0 mb-2" : "left-1/2 top-full mt-2 -translate-x-1/2"
+          }`}
+        >
           {LIBRARY.map(({ view: v, label, icon: Icon }) => (
             <li key={v}>
               <button
@@ -144,7 +157,7 @@ function BottomItem({ view, label, icon: Icon }: { view: View; label: string; ic
 }
 
 /**
- * The top bar: the mark on the left, five places in the middle, search and tools on the right.
+ * The top bar: the mark on the left, four places and "More" in the middle, search and settings on the right.
  * On a phone-width window it becomes a bottom bar instead.
  */
 export function Nav({ solid }: { solid: boolean }) {
@@ -152,10 +165,6 @@ export function Nav({ solid }: { solid: boolean }) {
   const query = useStore((s) => s.query);
   const view = useStore((s) => s.view);
   const status = useStore((s) => s.status);
-  const theme = useStore((s) => s.theme);
-  const setTheme = useStore((s) => s.setTheme);
-  const refresh = useStore((s) => s.refresh);
-  const hasSources = useStore((s) => s.providers.length > 0);
   const inputWrap = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -178,17 +187,11 @@ export function Nav({ solid }: { solid: boolean }) {
     setQuery(value);
   };
 
-  const dark =
-    theme === "dark" ||
-    (theme === "system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
-
   return (
     <>
       <header
-        className={`absolute inset-x-0 top-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-b px-6 py-3 transition-[background-color,border-color] duration-300 max-md:grid-cols-[auto_1fr] max-md:px-4 ${
-          solid
-            ? "border-line bg-ink/85 backdrop-blur-xl"
-            : "scope-dark border-transparent bg-gradient-to-b from-black/70 to-transparent"
+        className={`absolute inset-x-4 top-3 z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-4 rounded-full border px-4 py-1.5 backdrop-blur-xl transition-[background-color,border-color] duration-300 max-md:inset-x-3 max-md:grid-cols-[auto_1fr] max-md:px-3 ${
+          solid ? "border-line bg-ink/85" : "scope-dark border-white/10 bg-black/45"
         }`}
       >
         <button
@@ -205,7 +208,7 @@ export function Nav({ solid }: { solid: boolean }) {
           {TABS.map((t) => (
             <Tab key={t.view} view={t.view} label={t.label} />
           ))}
-          <LibraryMenu />
+          <MoreMenu />
         </nav>
 
         <div className="flex items-center justify-end gap-1.5">
@@ -213,31 +216,18 @@ export function Nav({ solid }: { solid: boolean }) {
             <SearchBox value={query} onChange={onSearch} placeholder="Search  (Ctrl+K)" />
           </div>
           {status === "loading" && <span className="text-xs text-muted">Loading…</span>}
-          <IconButton
-            icon={RefreshCwIcon}
-            label="Refresh sources"
-            disabled={!hasSources || status === "loading"}
-            onClick={() => void refresh()}
-          />
-          <IconButton
-            icon={dark ? SunIcon : MoonIcon}
-            label={dark ? "Switch to light theme" : "Switch to dark theme"}
-            onClick={() => setTheme(dark ? "light" : "dark")}
-          />
           <IconButton icon={SettingsIcon} label="Settings" onClick={() => setView("settings")} />
         </div>
       </header>
 
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-30 hidden gap-1 overflow-x-auto border-t border-line bg-panel px-1 py-1 max-md:flex"
+        className="fixed inset-x-3 bottom-3 z-30 hidden justify-around gap-1 rounded-3xl border border-line bg-panel/95 px-1 py-1 backdrop-blur-xl max-md:flex"
       >
         {TABS.map((t) => (
           <BottomItem key={t.view} {...t} />
         ))}
-        {LIBRARY.map((l) => (
-          <BottomItem key={l.view} {...l} />
-        ))}
+        <MoreMenu up />
       </nav>
     </>
   );
