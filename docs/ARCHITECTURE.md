@@ -1,19 +1,17 @@
 # Architecture
 
-Vesper is a pnpm + Turborepo monorepo with a Cargo workspace. JavaScript and Rust live side by side and meet in three places: the Tauri shell, the embedded admin panel, and the HTTP API.
+Vesper is a pnpm + Turborepo monorepo with a Cargo workspace. JavaScript and Rust meet in two places: the embedded admin panel and the HTTP API. The native Android and Android TV apps are planned and will talk to that API.
 
 ## Packages
 
 | Path | Language | What it is |
 | --- | --- | --- |
-| `apps/app` | TypeScript (React 19, Vite, Tailwind 4) | The player UI. Runs in a browser, in Tauri on desktop, and in Tauri on Android. |
-| `apps/app/src-tauri` | Rust | Tauri shell. Commands for local recording, folder access and starting the bundled server. |
 | `apps/admin` | TypeScript (React) | Admin panel. Built to static files and **embedded into the server binary** with `rust-embed`. |
 | `apps/server` | Rust (axum, rusqlite) | `vesper-server`. API, recorder jobs, scheduler, retention, admin panel hosting. |
-| `crates/vesper-recorder` | Rust | Records HLS and raw streams to a file or a segment folder. Used by the shell and the server. |
-| `packages/cloud-client` | TypeScript | Typed client for the server API, used by the app and the admin panel. |
+| `crates/vesper-recorder` | Rust | Records HLS and raw streams to a file or a segment folder. Used by the server. |
+| `packages/cloud-client` | TypeScript | Typed client for the server API, used by the admin panel. |
 
-Turborepo orders the JavaScript tasks (`build`, `typecheck`, `test`); the admin panel builds before the server so the panel can be embedded. Cargo handles the Rust side. `scripts/prepare-sidecar.mjs` ties them together: admin panel, server build, then copy into the place Tauri bundles sidecars from.
+Turborepo orders the JavaScript tasks (`build`, `typecheck`, `test`); the admin panel builds before the server so the panel can be embedded. Cargo handles the Rust side.
 
 ## One recorder, everywhere
 
@@ -45,14 +43,6 @@ background task: every 5 s start due recordings; every 60 s delete expired ones
 - **Jobs:** each recording runs `vesper-recorder` on its own OS thread and writes progress and the final status to the database. Stop is an atomic flag.
 - **Network safety:** `net::check_target` resolves hosts and refuses private ranges unless allowed; the proxy follows redirects manually and checks each hop.
 
-## App
-
-- **State:** Zustand with persistence. Library data (channels, movies, shows) is session-only; favourites, history, sources, recordings, theme and cloud connection persist.
-- **Playback:** hls.js for HLS, the native element for MP4. Quality, fit, speed and zapping are player features.
-- **Cloud sync:** `useCloudSync` pulls on connect and every minute and pushes changes after a short debounce; each key is a small JSON document and the newest write wins.
-- **Responsive:** a left rail on desktop, a bottom bar on small screens. TV mode adds arrow-key spatial navigation.
-- **Icons:** AnimateIcons, imported per icon so unused ones are tree-shaken. A shared hook starts an icon's animation when its whole button is hovered or focused.
-
 ## Releases
 
-`ci.yml` checks every push: Biome, TypeScript, tests, builds, `cargo fmt`, `clippy`, tests, and that the Tauri shell compiles on Linux and Windows. `release.yml` runs on a version tag and publishes installers, APK, server archives and a Docker image to one GitHub release.
+`ci.yml` checks every push: Biome, TypeScript, tests, builds, `cargo fmt`, `clippy`, tests. `release.yml` runs on a version tag and publishes the server archives and a Docker image to one GitHub release.

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/vesper-recorder", "apps/server", "apps/app/src-tauri"]
+members = ["crates/vesper-recorder", "apps/server"]
 
 [workspace.package]
 version = "0.11.1"

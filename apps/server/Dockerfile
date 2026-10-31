@@ -9,7 +9,6 @@ WORKDIR /repo
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY scripts ./scripts
 COPY apps/admin ./apps/admin
-COPY apps/app/package.json ./apps/app/package.json
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile --filter @vesper/admin...
 RUN pnpm --filter @vesper/admin build
@@ -20,8 +19,6 @@ WORKDIR /repo
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY apps/server ./apps/server
-COPY apps/app/src-tauri/Cargo.toml ./apps/app/src-tauri/Cargo.toml
-RUN mkdir -p apps/app/src-tauri/src && echo "" > apps/app/src-tauri/src/lib.rs
 COPY --from=admin /repo/apps/admin/dist ./apps/admin/dist
 RUN cargo build --release -p vesper-server
 

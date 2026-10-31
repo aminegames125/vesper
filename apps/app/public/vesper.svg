@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Vesper">
-  <rect width="64" height="64" rx="14" fill="#0D0D0F"/>
-  <rect x="8" y="10" width="48" height="7" rx="3.5" fill="#FF5C7A"/>
-  <rect x="14" y="21" width="36" height="7" rx="3.5" fill="#F4F1EA"/>
-  <rect x="20" y="32" width="24" height="7" rx="3.5" fill="#F4F1EA"/>
-  <rect x="26" y="43" width="12" height="7" rx="3.5" fill="#F4F1EA"/>
-</svg>

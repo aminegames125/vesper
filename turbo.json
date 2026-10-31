@@ -12,10 +12,6 @@
     "dev": {
       "cache": false,
       "persistent": true
-    },
-    "desktop": {
-      "cache": false,
-      "persistent": true
     }
   }
 }

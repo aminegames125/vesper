@@ -16,7 +16,7 @@
 // `push` is the running number of pushes to main that produced a release (one tag per push) and
 // `changes` is how many commits that push carried.
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,10 +25,9 @@ const file = (p) => join(root, p);
 const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 
 const SEMVER = /^\d+\.\d+\.\d+$/;
-const WORKSPACE_CRATES = ["vesper", "vesper-recorder", "vesper-server"];
+const WORKSPACE_CRATES = ["vesper-recorder", "vesper-server"];
 const JSON_FILES = [
   "package.json",
-  "apps/app/package.json",
   "apps/admin/package.json",
   "packages/cloud-client/package.json",
 ];
@@ -98,11 +97,6 @@ function setJsonVersion(path, version) {
   edit(path, (text) => text.replace(/^(\s*"version":\s*")[^"]+(")/m, `$1${version}$2`));
 }
 
-function versionCode(version) {
-  const [major, minor, patch] = version.split(".").map(Number);
-  return major * 10000 + minor * 100 + patch;
-}
-
 function changelogEntry(version, commits, meta) {
   const date = new Date().toISOString().slice(0, 10);
   const groups = { Added: [], Fixed: [], Changed: [] };
@@ -156,28 +150,16 @@ function setVersion(version) {
   const meta = { type: releaseType(commits), push: pushNumber(), changes: commits.length };
 
   for (const path of JSON_FILES) setJsonVersion(path, version);
-  setJsonVersion("apps/app/src-tauri/tauri.conf.json", version);
 
   edit("Cargo.toml", (text) =>
     text.replace(/(\[workspace\.package\][^[]*?\nversion\s*=\s*")[^"]+(")/, `$1${version}$2`),
   );
   // Cargo.lock lists the workspace crates too; keeping it in step lets `cargo --locked` pass.
-  // The desktop crate keeps its own lockfile too.
-  for (const lock of ["Cargo.lock", "apps/app/src-tauri/Cargo.lock"]) {
-    if (!existsSync(file(lock))) continue;
-    edit(lock, (text) =>
-      WORKSPACE_CRATES.reduce(
-        (acc, name) => acc.replace(new RegExp(`(name = "${name}"\\nversion = ")[^"]+(")`), `$1${version}$2`),
-        text,
-      ),
-    );
-  }
-
-  edit("apps/android/app/build.gradle.kts", (text) =>
-    text
-      .replace(/(\?: )\d+(\s*\n\s*versionName)/, `$1${versionCode(version)}$2`)
-      .replace(/(versionName = \(findProperty\("versionName"\) as String\?\) \?: ")[^"]+(")/, `$1${version}$2`)
-      .replace(/-PversionName=[\d.]+ -PversionCode=\d+/, `-PversionName=${version} -PversionCode=${versionCode(version)}`),
+  edit("Cargo.lock", (text) =>
+    WORKSPACE_CRATES.reduce(
+      (acc, name) => acc.replace(new RegExp(`(name = "${name}"\nversion = ")[^"]+(")`), `$1${version}$2`),
+      text,
+    ),
   );
 
   edit("README.md", (text) =>
@@ -195,10 +177,6 @@ function setVersion(version) {
   });
 
   writeFileSync(file("brand/release-banner.svg"), bannerSvg(version, meta));
-
-  edit("scripts/make-msix.ps1", (text) =>
-    text.replace(/-Version \d+\.\d+\.\d+ -Out Vesper-\d+\.\d+\.\d+-/, `-Version ${version} -Out Vesper-${version}-`),
-  );
 }
 
 const [command, arg] = process.argv.slice(2);

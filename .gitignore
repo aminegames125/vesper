@@ -6,6 +6,4 @@ target
 .turbo
 .env*
 !.env.example
-apps/app/src-tauri/gen
-apps/app/src-tauri/binaries
 /data

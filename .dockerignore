@@ -4,6 +4,4 @@ node_modules
 **/dist
 .git
 data
-apps/app/src-tauri/gen
-apps/app/src-tauri/binaries
 docs/screenshots
