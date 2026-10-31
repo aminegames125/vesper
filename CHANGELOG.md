@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.13.0] - 2026-10-31 <!-- release: minor; push: 17; changes: 2 -->
+
+### Added
+- Native Android and Android TV app with record now and schedules, new README
+- Record until stopped, and a schedules page in the admin panel
+
 ## [0.12.0] - 2026-10-31 <!-- release: minor; push: 16; changes: 1 -->
 
 ### Added
