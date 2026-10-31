@@ -56,7 +56,7 @@ Vesper is a **recorder first**. It uses your own IPTV playlist (an M3U link or a
 | **A real library** | Folders, a watched mark, *continue watching*, bookmarks, thumbnails, share links that work for a day, and (with ffmpeg) MP4 export and cutting. |
 | **Android TV home** | A TV screen with rows of cards for what is recording, what is next and what to carry on watching, made for a remote. |
 | **Phone extras** | A home-screen widget, a quick-settings tile, *share a link to Vesper to record it*, picture in picture, light/dark choice and quiet hours. |
-| **Kodi add-on** | Watch recordings, resume where you stopped, browse your channels and record a channel or programme from any Kodi (Android TV, Fire TV, LibreELEC, Windows, Linux, macOS), made for a remote. Found on your network automatically. See [docs/KODI.md](docs/KODI.md). |
+| **Kodi add-on** | Adds "Record with Vesper" to Kodi's own Live TV channels and guide, using the IPTV providers Kodi already has. Watch recordings and resume where you stopped, on any Kodi (Android TV, Fire TV, LibreELEC, Windows, Linux, macOS), made for a remote. Finds the server and your providers by itself. See [docs/KODI.md](docs/KODI.md). |
 | **Move or back up** | Save all your schedules to a file and add them to another server. |
 | **Accounts, if you want them** | *Lite* mode is for one home. *Full* mode adds users, quotas, invites and an admin panel. |
 
