@@ -1,0 +1,10 @@
+# Gradle and Kotlin build output; nothing here is source.
+.gradle/
+.kotlin/
+build/
+app/build/
+local.properties
+*.apk
+*.aab
+*.jks
+*.keystore
