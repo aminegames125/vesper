@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.28.2] - 2026-11-01 <!-- release: patch; push: 42; changes: 1 -->
+
+### Fixed
+- Kodi sign-in prompt, and CI and releases build only what changed
+
 ## [0.28.1] - 2026-11-01 <!-- release: patch; push: 41; changes: 1 -->
 
 ### Fixed
