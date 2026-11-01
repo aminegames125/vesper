@@ -102,7 +102,29 @@ data class PlayerSource(
     val castMime: String? = null,
     /** True while the recording is still being made; it is never marked as watched. */
     val running: Boolean = false,
+    /** Start of an address that has the server fetch the stream (see [relayed]); null when not signed in. */
+    val relayPrefix: String? = null,
+    /** `auto`, `always` or `off`: whether, and when, the server is used as a go-between. */
+    val relayMode: String = "off",
 )
+
+/** The address that makes the server fetch [address] and hand it on. */
+fun relayed(prefix: String, address: String): String = prefix + java.net.URLEncoder.encode(address, "UTF-8")
+
+/**
+ * Every way to play a live channel, in order. Direct first, then through the server, unless the
+ * person chose to always go through the server (a provider that blocks this country), in which case
+ * that comes first and playing directly is the last resort.
+ */
+fun liveCandidates(url: String, fallbacks: List<String>, prefix: String?, mode: String): List<Pair<String, String?>> {
+    val direct = playbackCandidates(url, fallbacks)
+    if (prefix == null || mode == "off") return direct
+    val viaServer = direct.map { (address, mime) ->
+        val hint = mime ?: if (hasKnownExtension(address)) mimeFor(address) else null
+        relayed(prefix, address) to hint
+    }
+    return (if (mode == "always") viaServer + direct else direct + viaServer).distinct()
+}
 
 private val KNOWN_EXTENSIONS = listOf(".m3u8", ".mp4", ".m4v", ".mkv", ".webm", ".ts", ".avi", ".mov")
 
@@ -151,7 +173,10 @@ fun PlayerScreen(
     // The list refreshes while watching and the saved position changes with it; playback must not
     // restart each time. Take the details once per address (and again when the title arrives).
     val source = remember(incoming.url, incoming.title.isEmpty()) { incoming }
-    val candidates = remember(source) { playbackCandidates(source.url, source.fallbacks) }
+    val candidates = remember(source) {
+        if (source.live) liveCandidates(source.url, source.fallbacks, source.relayPrefix, source.relayMode)
+        else playbackCandidates(source.url, source.fallbacks)
+    }
     var attempt by remember(source) { mutableIntStateOf(0) }
     var failed by remember(source) { mutableStateOf(false) }
     var failure by remember(source) { mutableStateOf("") }
@@ -260,7 +285,7 @@ fun PlayerScreen(
                 }
                 failure = error.errorCodeName
                 val network = error.errorCode in 2000..2999
-                if (network && retry < 2) {
+                if (network && retry < 2 && attempt == candidates.lastIndex) {
                     retry += 1
                 } else if (attempt < candidates.lastIndex) {
                     retry = 0

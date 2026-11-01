@@ -153,6 +153,12 @@ class VesperViewModel(app: Application, private val saved: SavedStateHandle) : A
     private val _storageUse = MutableStateFlow<StorageUse?>(null)
     val storageUse: StateFlow<StorageUse?> = _storageUse.asStateFlow()
 
+    val relay: StateFlow<String> = settings.relay.stateIn(viewModelScope, SharingStarted.Eagerly, "auto")
+
+    fun setRelay(value: String) {
+        viewModelScope.launch { settings.setRelay(value) }
+    }
+
     val theme: StateFlow<String> = settings.theme.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
     val quietStart: StateFlow<String> = settings.quietStart.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     val quietEnd: StateFlow<String> = settings.quietEnd.stateIn(viewModelScope, SharingStarted.Eagerly, "")
@@ -179,14 +185,21 @@ class VesperViewModel(app: Application, private val saved: SavedStateHandle) : A
     }
 
     /** What to play for a live channel: the channel's own address, then its backups. */
-    fun playerFor(channel: Channel): PlayerSource =
-        PlayerSource(
+    fun playerFor(channel: Channel): PlayerSource {
+        val prefix = api.relayPrefix()
+        val mode = if (prefix == null) "off" else relay.value
+        val cast = castUrlFor(channel.url)
+        return PlayerSource(
             title = channel.name,
             url = channel.url,
             fallbacks = channel.alt,
-            castUrl = castUrlFor(channel.url),
+            // A Chromecast is in the same country as the viewer, so it gets the relayed address too.
+            castUrl = if (mode == "always" && prefix != null) relayed(prefix, cast) else cast,
             live = true,
+            relayPrefix = prefix,
+            relayMode = mode,
         )
+    }
 
     fun saveProgress(id: String, seconds: Long, finished: Boolean) {
         viewModelScope.launch {

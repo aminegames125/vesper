@@ -159,6 +159,32 @@ fun SettingsScreen(vm: VesperViewModel, gate: Gate.Ready) {
             }
         }
 
+        SectionTitle("Live TV")
+        VCard(Modifier.fillMaxWidth()) {
+            val relay by vm.relay.collectAsState()
+            VText(
+                "Some providers only allow one country. Through your server, a channel is fetched from the server's own internet connection, so it works wherever you watch from.",
+                style = small,
+                color = c.textDim,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+            VFlow {
+                listOf("auto" to "Automatic", "always" to "Always via server", "off" to "Direct only").forEach { (value, label) ->
+                    VChip(label, selected = relay == value, onClick = { vm.setRelay(value) })
+                }
+            }
+            VText(
+                when (relay) {
+                    "always" -> "Every channel goes through the server first. Uses the server's bandwidth."
+                    "off" -> "The device connects to the provider itself."
+                    else -> "Tries the provider directly, and goes through the server if that fails."
+                },
+                style = small,
+                color = c.textFaint,
+                modifier = Modifier.padding(top = 10.dp),
+            )
+        }
+
         SectionTitle("Look")
         VCard(Modifier.fillMaxWidth()) {
             val theme by vm.theme.collectAsState()

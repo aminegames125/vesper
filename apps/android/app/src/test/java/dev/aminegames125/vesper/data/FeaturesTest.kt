@@ -6,7 +6,9 @@ import dev.aminegames125.vesper.cast.parseVariants
 import dev.aminegames125.vesper.cast.pickVariant
 import dev.aminegames125.vesper.cast.isLocalOnly
 import dev.aminegames125.vesper.cast.mimeFor
+import dev.aminegames125.vesper.ui.liveCandidates
 import dev.aminegames125.vesper.ui.playbackCandidates
+import dev.aminegames125.vesper.ui.relayed
 import java.time.LocalTime
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -63,6 +65,20 @@ class FeaturesTest {
     fun aRawXtreamLiveLinkIsAlsoTriedAsHls() {
         val tries = playbackCandidates("http://h:80/live/u/p/123.ts", emptyList())
         assertEquals(listOf("http://h:80/live/u/p/123.ts" to null, "http://h:80/live/u/p/123.m3u8" to null), tries)
+    }
+
+    @Test
+    fun aGeoBlockedChannelCanGoThroughTheServer() {
+        val prefix = "http://srv/api/v1/proxy?token=t&url="
+        val url = "http://h:80/live/u/p/123.ts"
+        val direct = playbackCandidates(url, emptyList())
+        val via = direct.map { relayed(prefix, it.first) to null }
+
+        assertEquals(direct, liveCandidates(url, emptyList(), prefix, "off"))
+        assertEquals(direct, liveCandidates(url, emptyList(), null, "always"))
+        assertEquals(direct.map { it.first } + via.map { it.first }, liveCandidates(url, emptyList(), prefix, "auto").map { it.first })
+        assertEquals(via.map { it.first } + direct.map { it.first }, liveCandidates(url, emptyList(), prefix, "always").map { it.first })
+        assertTrue(relayed(prefix, url).startsWith(prefix + "http%3A%2F%2Fh%3A80"))
     }
 
     @Test
