@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/vesper-recorder", "apps/server"]
 
 [workspace.package]
-version = "0.22.1"
+version = "0.22.2"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/aminegames125/vesper"

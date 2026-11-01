@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.22.2] - 2026-11-01 <!-- release: patch; push: 30; changes: 1 -->
+
+### Fixed
+- Join demuxed HLS audio renditions and fix Docker full mode
+
 ## [0.22.1] - 2026-10-31 <!-- release: patch; push: 29; changes: 1 -->
 
 ### Changed
