@@ -1,0 +1,45 @@
+name: Release doctor
+
+# A failed Release run leaves a draft release that is empty or missing files, and every push to main
+# makes a new version, so drafts pile up. This checks them every few hours: it publishes complete
+# drafts, starts the Release workflow again for the newest broken one, and deletes older broken
+# ones (their tags stay). Run it by hand with "dry run" to see what it would do.
+on:
+  schedule:
+    - cron: "17 */4 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only report, change nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+  packages: read
+
+# Never two at once, and never while the Release workflow could be mid-way through a draft.
+concurrency:
+  group: release-doctor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check draft releases
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test the rules
+        run: node --test scripts/release-doctor.test.mjs
+      - name: Check and fix
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DRY: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >/dev/null
+          node scripts/release-doctor.mjs $DRY
