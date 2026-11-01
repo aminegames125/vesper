@@ -43,7 +43,7 @@ jobs:
       - run: pnpm --filter @vesper/site build
       - name: Kodi repository (served at /kodi/)
         run: python apps/kodi/make_repo.py --version "$(node scripts/changes.mjs kodi-version)" --out apps/site/dist/kodi
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/site/dist
