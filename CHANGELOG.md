@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.27.3] - 2026-11-01 <!-- release: patch; push: 39; changes: 1 -->
+
+### Changed
+- Release doctor that publishes, retries or deletes stale draft releases
+
 ## [0.27.2] - 2026-11-01 <!-- release: patch; push: 38; changes: 1 -->
 
 ### Fixed
