@@ -2,6 +2,11 @@ name: Bug report
 description: Something does not work the way it should
 labels: [bug]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please check the [Kodi guide troubleshooting](https://github.com/aminegames125/vesper/blob/main/docs/KODI.md#troubleshooting) first.
+        For a security problem, do not open an issue: use the Security tab.
   - type: textarea
     id: what
     attributes:
@@ -14,7 +19,7 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Open Settings
+        1. In Kodi, open TV > Guide
         2. ...
     validations:
       required: true
@@ -23,29 +28,53 @@ body:
     attributes:
       label: Where does it happen?
       options:
-        - App (desktop)
-        - App (Android)
-        - App (Android TV)
+        - Kodi add-on
         - Server
         - Admin panel
-        - Recording
+        - Recording or playback
+        - Docker or install
         - Something else
     validations:
       required: true
   - type: input
-    id: version
+    id: kodi
     attributes:
-      label: Version
-      description: Shown in Settings under About, or `vesper-server --version`.
-    validations:
-      required: true
+      label: Kodi version
+      description: Settings > System > System information, for example 21.1 Omega.
+      placeholder: "21.1 (Omega)"
   - type: input
     id: system
     attributes:
-      label: Device and system
-      placeholder: Windows 11, Pixel 8 (Android 15), Ubuntu 24.04 ...
+      label: Device and operating system
+      description: Where Kodi runs, and where the server runs if different.
+      placeholder: "Kodi on Fire TV Stick 4K Max; server in Docker on Ubuntu 24.04"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Server mode
+      options:
+        - Lite
+        - Full
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: addon_version
+    attributes:
+      label: Add-on version
+      description: Add-ons > My add-ons > Video add-ons > Vesper > Information.
+    validations:
+      required: true
+  - type: input
+    id: server_version
+    attributes:
+      label: Server version
+      description: Shown in the admin panel sidebar, or `vesper-server --version`.
   - type: textarea
     id: logs
     attributes:
-      label: Logs or screenshots
-      description: Remove passwords and provider addresses first.
+      label: Logs
+      description: The relevant lines of `kodi.log` (enable debug logging) and of the server output. Remove passwords and provider addresses first.
+      render: text

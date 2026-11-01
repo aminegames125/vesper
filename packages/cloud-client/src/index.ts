@@ -593,15 +593,6 @@ export class CloudClient {
   downloadUrl = (id: string) =>
     `${this.baseUrl}/api/v1/recordings/${id}/download${this.token ? `?token=${this.token}` : ""}`;
 
-  // ---- sync ----
-  getSync = <T>(key: string) => this.get<{ value: T | null; updatedAt: number }>(`/sync/${key}`);
-  putSync = (key: string, value: unknown) =>
-    this.request<{ updatedAt: number }>("PUT", `/sync/${key}`, value);
-
-  // ---- proxy ----
-  proxyUrl = (target: string) =>
-    `${this.baseUrl}/api/v1/proxy?url=${encodeURIComponent(target)}${this.token ? `&token=${this.token}` : ""}`;
-
   // ---- admin ----
   admin = {
     stats: () => this.get<Stats>("/admin/stats"),

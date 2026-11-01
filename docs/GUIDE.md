@@ -1,96 +1,58 @@
-# Using Vesper
+# Walkthrough
 
-A walk through setting Vesper up and the things people ask for most. For every option and endpoint see the [server guide](SERVER.md).
+An end-to-end path from nothing to your first recording, with pointers to the detailed guides.
+
+| Guide | Read it for |
+| --- | --- |
+| [Kodi guide](KODI.md) | Installing the add-on, recording from Live TV, watching, settings, troubleshooting |
+| [Server guide](SERVER.md) | Options, Docker Compose, systemd, reverse proxy, lite and full mode, API |
+| [Architecture](ARCHITECTURE.md) | How the add-on, server and recorder fit together |
 
 ## 1. Put the server somewhere that stays on
 
-Anything that is on while you are out will do: a spare PC, a NAS, a mini PC, a Raspberry Pi 4 or newer.
+Anything that is on while you are out will do: a spare PC, a NAS, a mini PC, a Raspberry Pi 4 or newer (use the Linux arm64 build). It needs disk space for the recordings.
 
-**Windows.** Download `vesper-server-windows-x64.exe` from the [latest release](https://github.com/aminegames125/vesper/releases/latest), put it in a folder of its own and run it. To start it with Windows, press `Win + R`, type `shell:startup` and drop a shortcut to the file there. Allow it through the firewall when Windows asks (private networks only).
+- **Docker Compose** is the least work. See [Docker Compose](SERVER.md#docker-compose).
+- **A binary** from the [latest release](https://github.com/aminegames125/vesper/releases/latest): Windows x64, Linux x64, Linux arm64. See [Run it](SERVER.md#run-it), [systemd](SERVER.md#systemd) and [Windows](SERVER.md#windows).
 
-**Linux.** Download the build for your CPU, make it executable and run it. The [systemd unit](SERVER.md#systemd) keeps it running.
+Choose a mode now:
 
-**Docker, with Compose.** Save this as `docker-compose.yml` and run `docker compose up -d`:
+- **Lite** for one home network. No login. Never expose it to the internet.
+- **Full** if the server is shared or reachable from outside. Users, quotas, HTTPS behind a reverse proxy. See [Full mode setup](SERVER.md#full-mode-setup).
 
-```yaml
-services:
-  vesper:
-    image: ghcr.io/aminegames125/vesper-server:latest
-    restart: unless-stopped
-    ports:
-      - "8484:8484"
-    volumes:
-      - ./vesper-data:/data
-    environment:
-      VESPER_MODE: lite   # no accounts; use "full" for several people
-```
+Open `http://<the machine's address>:8484/admin/` to check that it runs. Use the machine's network address, not `localhost`, from other devices.
 
-**A NAS.** Most NAS systems (Synology, QNAP, Unraid, TrueNAS) can run the Docker image: map port `8484` and a folder for `/data`, and pick a folder on the big disk. Back that folder up.
+## 2. Set up Live TV in Kodi
 
-Open `http://<the machine's address>:8484/admin/` to see the admin panel.
+Vesper uses the IPTV providers Kodi already has. In Kodi, set up **PVR IPTV Simple Client** with your provider's remote M3U link. If you already watch live TV in Kodi, you are done.
 
-## 2. Install the app
+## 3. Install the add-on
 
-Download the APK from the release page and install it on your phone, tablet or Android TV. In the app, type the server's address (for example `192.168.1.20:8484`). Use the machine's **network address**, not `localhost`: a TV or Chromecast cannot reach `localhost`.
-
-## 3. Add your channels
-
-Settings, **Add a playlist**: paste your M3U link or Xtream login. The server reads it, so the login stays on the server. With more than one playlist, same-named channels are joined and the other address becomes an automatic backup.
+Install the Vesper repository zip, then the add-on from it. Step by step in the [Kodi guide](KODI.md#install). Within about 20 seconds of Kodi starting, the add-on finds the server and connects your providers. For a full-mode server, enter the username and password in the add-on settings first ([sign-in](KODI.md#full-mode-sign-in)).
 
 ## 4. Record
 
-- **Record now**: Recordings, **Record now**, pick a channel and a length.
-- **Schedule**: Schedule, **New schedule**. Pick the channel, the day and time, how long, and the repeat.
-- **From the TV guide**: add your provider's XMLTV link in the admin panel (Settings, TV guide). Then Schedule, **TV guide** finds a programme by name and records it once or **every time** it is on.
-- **Share a link** to a stream from another app (Share, Vesper) to record it straight away.
+- **A channel now:** TV > Channels, context menu on a channel, **Record with Vesper**, pick a length.
+- **A programme:** TV > Guide, context menu on a programme, **Record with Vesper**. A future programme is scheduled; one that is on now records from now until it ends.
+- **Repeating:** on a programme choose *Record every day*, *Record every week* or *Record every episode*. Other day patterns go through the [HTTP API](SERVER.md#schedules). **Schedules** in the add-on lists, edits and pauses them.
 
-## 5. How long things are kept
+Details: [Record](KODI.md#record).
 
-Recordings and downloads are deleted from the server after a while so the disk never fills up. The default is **a week**. You can:
+## 5. Watch
 
-- change the default: Settings, **Deleting old recordings** (as an admin);
-- change it for one schedule while you create it ("Delete recordings after");
-- change it for one recording any time: its menu, **Delete after…** (1 day, 1 week, 1 month, or forever);
-- have watched recordings go sooner: admin panel, Settings, Storage.
+Add-ons > Video add-ons > Vesper. **Continue watching** has what you left part way, **Recording now and coming up** shows live captures (open one to watch from the start) and **Recordings** holds the finished ones. See [Watch and manage recordings](KODI.md#watch-and-manage-recordings).
 
-The app warns you the day before something is deleted.
+## 6. How long things are kept
 
-## 6. Movies and series
+Recordings are deleted from the server after a while so the disk never fills up. The default is **a week**. Change the default in the admin panel (Settings, Defaults for new accounts), set a timer for one recording through the API (`keep_hours`), or use **Keep forever** in the add-on. Watched recordings can be deleted sooner (admin panel, Settings, Storage). A recording is refused when the disk has less than 512 MB free. More in [Recording and retention](SERVER.md#recording-and-retention).
 
-In the channel list, switch to **Movies** or **Series**. The download button saves the file on the server. When it is done, it shows in Recordings and plays like any recording; from there, **Save to this phone** copies it to the phone.
+## 7. The extras
 
-## 7. Chromecast
+- **ffmpeg (optional):** install it on the server for thumbnails, MP4 export and cutting.
+- **Webhook:** the admin panel can post to Discord, ntfy or a Slack-style hook when a recording finishes or fails. See [Webhook](SERVER.md#webhook).
+- **TV guide on the server:** an XMLTV address in the admin panel lets a schedule follow the guide when a programme runs over. Kodi's own guide is used for recording from Kodi.
+- **Waking a sleeping PC:** a machine that is off cannot record. Use `--wake-command` ([Options](SERVER.md#options)).
 
-If a stream does not play on your Android TV app, play it on your phone and cast it: open a channel (the play button), press the cast icon, choose the TV. The phone hands the stream's address to the Chromecast, which then plays it by itself.
+## 8. Updates
 
-Notes:
-
-- The phone needs Google Play services (the TV does not).
-- Chromecast plays HLS and MP4 well. A raw `.ts` Xtream channel is automatically offered as `.m3u8`, which most providers also serve.
-- The phone and the Chromecast must be on the same network, and the app must use the server's network address (not `localhost`).
-
-## 8. The things in the background
-
-- **Backup address**: if a channel keeps failing, the recorder switches to its backup and back.
-- **Channel checks**: once a day the server opens every channel your schedules use. A channel that stops answering is shown in Settings, and sent to your webhook.
-- **Quiet hours**: set them in the admin panel for the webhook, and in the app for its own notifications.
-- **Disk forecast**: Settings shows how many days of room are left at the recent pace.
-- **ffmpeg (optional)**: install it on the server and thumbnails, *Convert to MP4* and *Cut a part* appear.
-
-## 9. Waking a sleeping PC
-
-A server cannot wake itself from being off. If the PC sleeps, give it a wake timer for the next recording:
-
-```bash
-vesper-server --wake-command "sudo rtcwake -m no -t \$VESPER_NEXT_START"
-```
-
-On Windows, a small script run through `--wake-command` can create a scheduled task with *Wake the computer to run this task* for the time in `%VESPER_NEXT_START%`.
-
-## 10. HTTPS and the internet
-
-Lite mode is for your home network only. To reach the server from outside, use `--mode full`, put it behind a reverse proxy with HTTPS (for example Caddy: `vesper.example.com { reverse_proxy 127.0.0.1:8484 }`), and add `--trust-proxy`.
-
-## 11. Updates
-
-Download the new release and replace the file (or `docker compose pull && docker compose up -d`). Your data folder is kept. Once a week the server tells the app if a newer version exists; turn that off in the admin panel (Settings, Updates).
+The add-on updates through its repository. For the server, replace the binary or run `docker compose pull && docker compose up -d`; your data folder is kept. See [Upgrading](SERVER.md#upgrading).

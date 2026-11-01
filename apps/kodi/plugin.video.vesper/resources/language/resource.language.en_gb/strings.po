@@ -46,3 +46,35 @@ msgstr ""
 msgctxt "#30010"
 msgid "Record with Vesper"
 msgstr ""
+
+msgctxt "#30011"
+msgid "Check the HTTPS certificate"
+msgstr ""
+
+msgctxt "#30012"
+msgid "Test the connection"
+msgstr ""
+
+msgctxt "#30013"
+msgid "Create an account (invite code)"
+msgstr ""
+
+msgctxt "#30014"
+msgid "Sign out"
+msgstr ""
+
+msgctxt "#30015"
+msgid "Notifications"
+msgstr ""
+
+msgctxt "#30016"
+msgid "Tell me when a recording starts, ends or fails"
+msgstr ""
+
+msgctxt "#30017"
+msgid "Time zone for repeating recordings (for example Europe/Paris)"
+msgstr ""
+
+msgctxt "#30018"
+msgid "Advanced"
+msgstr ""

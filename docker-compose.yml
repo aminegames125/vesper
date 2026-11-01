@@ -1,0 +1,65 @@
+# Vesper server. Copy .env.example to .env, set the administrator password, then:
+#   docker compose up -d
+# Open http://<this machine>:8484/admin/ to create users; point the Kodi add-on at the same address.
+#
+# FULL mode (default): accounts, quotas and an admin panel. Works on a home network and, behind an
+# HTTPS reverse proxy, over the internet.
+services:
+  vesper:
+    image: ghcr.io/aminegames125/vesper-server:latest
+    # To build it from this checkout instead of pulling it:
+    # build:
+    #   context: .
+    #   dockerfile: apps/server/Dockerfile
+    container_name: vesper
+    restart: unless-stopped
+    ports:
+      # Behind a reverse proxy on the same machine, set VESPER_PUBLISH=127.0.0.1 in .env.
+      - "${VESPER_PUBLISH:-0.0.0.0}:${VESPER_PORT:-8484}:8484"
+    volumes:
+      - vesper-data:/data
+      # To keep recordings on a big disk, replace the line above with a folder:
+      # - /mnt/disk/vesper:/data
+    environment:
+      VESPER_MODE: full
+      VESPER_ADMIN_USER: ${VESPER_ADMIN_USER:-admin}
+      VESPER_ADMIN_PASSWORD: ${VESPER_ADMIN_PASSWORD:?set VESPER_ADMIN_PASSWORD in .env}
+      # Set to "true" only when a reverse proxy in front adds X-Forwarded-For.
+      VESPER_TRUST_PROXY: ${VESPER_TRUST_PROXY:-false}
+      # mDNS does not cross Docker's bridge network; type the address in Kodi instead.
+      VESPER_NO_DISCOVERY: "true"
+      TZ: ${TZ:-UTC}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8484/api/v1/info"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  vesper-data:
+
+# ---------------------------------------------------------------------------------------------
+# LITE variant: no accounts, anyone on your home network can use it. Replace the service above
+# with this one (and delete VESPER_ADMIN_* from .env). A lite server refuses requests for
+# non-home host names; add yours with VESPER_ALLOWED_HOSTS if you reach it by a DNS name.
+#
+# services:
+#   vesper:
+#     image: ghcr.io/aminegames125/vesper-server:latest
+#     restart: unless-stopped
+#     # With host networking Kodi finds the server by itself (mDNS); drop "ports" then.
+#     # network_mode: host
+#     ports:
+#       - "8484:8484"
+#     volumes:
+#       - vesper-data:/data
+#     environment:
+#       VESPER_MODE: lite
+#     healthcheck:
+#       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8484/api/v1/info"]
+#       interval: 30s
+#       timeout: 5s
+#       retries: 3
+# volumes:
+#   vesper-data:

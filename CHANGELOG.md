@@ -2,6 +2,17 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+- Vesper is now only a Kodi extension plus a self-hosted recording server. The Android and Android TV app is removed from this branch; the full earlier project, app included, is kept on the `old-full-app` branch.
+- Rewrote the README and the guides around recording from Kodi's own Live TV and guide: install the add-on through the Vesper repository, record, and watch recordings in Kodi with resume, including while they are still recording.
+- Documented the server's lite mode (home network, no login) and full mode (users, bearer tokens, quotas, HTTPS behind a reverse proxy) as equal paths, with Docker Compose, systemd, Windows service, Caddy and nginx examples.
+- Added a code of conduct and a support page, and reworked the contributing guide, security policy, issue templates and pull request template for the Kodi add-on and the server.
+
+### Removed
+- The Android and Android TV app documentation and the old app screenshots.
+
 ## [0.23.1] - 2026-11-01 <!-- release: patch; push: 32; changes: 1 -->
 
 ### Changed

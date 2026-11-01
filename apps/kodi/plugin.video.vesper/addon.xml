@@ -16,8 +16,8 @@
     </menu>
   </extension>
   <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Record and schedule from Kodi's own Live TV</summary>
-    <description lang="en_GB">Adds recording to the Live TV you already have. It finds your Vesper server and your IPTV providers on its own; press the menu button on a channel or a programme and choose Record with Vesper. Watch your recordings and resume where you stopped. Recordings are made and kept by your Vesper server.</description>
+    <summary lang="en_GB">Record and schedule from Kodi's own Live TV, on your own Vesper server</summary>
+    <description lang="en_GB">Adds recording to the Live TV you already have. It finds your Vesper server and your IPTV providers on its own; press the menu button on a channel or a programme and choose Record with Vesper. Record now, schedule a programme, repeat it every week or record every episode; manage schedules, watch your recordings and resume where you stopped. Works with a Vesper server in lite mode (home network) or full mode (accounts, HTTPS, remote access). Recordings are made and kept by your Vesper server.</description>
     <disclaimer lang="en_GB">Vesper records only the sources you add yourself. Use it for content you have the right to record.</disclaimer>
     <platform>all</platform>
     <license>MIT</license>

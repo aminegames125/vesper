@@ -20,7 +20,7 @@ use crate::{
     state::AppState,
 };
 
-/// Public description of the server, so an app can tell what it is talking to.
+/// Public description of the server, so a client can tell what it is talking to.
 pub async fn info(State(state): State<AppState>) -> Json<Value> {
     Json(json!({
         "name": "Vesper Cloud",
@@ -28,7 +28,7 @@ pub async fn info(State(state): State<AppState>) -> Json<Value> {
         "mode": state.config.mode.as_str(),
         "registration": if state.config.is_lite() { "closed".to_string() } else { state.db.setting("registration", "closed") },
         "needsSetup": !state.config.is_lite() && state.db.user_count() == 0,
-        "features": ["recordings", "sync", "proxy", "retention", "schedule"],
+        "features": ["recordings", "retention", "schedule"],
     }))
 }
 

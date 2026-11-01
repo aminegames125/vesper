@@ -100,21 +100,37 @@ def record_from_kodi():
         return say("That programme is over.", error=True)
     if when_:
         start, stop, state = when_
-        if state == "airing":
-            ask, begin = "Record \"%s\" from now until it ends?" % title, now
-        else:
-            ask, begin = "Record \"%s\" on %s, %s?" % (title, match["name"], when(start)), max(start - 60, now)
-        if not xbmcgui.Dialog().yesno("Record with Vesper", ask):
-            return
-        seconds, start_at = stop + PAD - begin, (begin if state == "later" else None)
-        title_ = title
-    else:
-        pick = xbmcgui.Dialog().select("Record " + match["name"], [label for label, _ in LENGTHS])
+        zone = pvr.timezone_name(common.setting("timezone"))
+        options = [("now" if state == "airing" else "once", "Record from now until it ends" if state == "airing" else "Record this programme (%s)" % when(start))]
+        if zone:
+            options.append(("weekly", "Record every week at this time"))
+            options.append(("daily", "Record every day at this time"))
+        if match.get("id"):
+            options.append(("series", 'Record every episode of "%s"' % title))
+        pick = xbmcgui.Dialog().select("Record with Vesper", [label for _, label in options])
         if pick < 0:
             return
-        seconds, start_at, title_ = LENGTHS[pick][1], None, match["name"]
+        choice = options[pick][0]
+        begin = now if state == "airing" else max(start - 60, now)
+        try:
+            if choice in ("now", "once"):
+                c.record(title, match["url"], stop + PAD - begin, channel_name=match["name"], start_at=(begin if state == "later" else None), backup_url=alt)
+                return say(("Recording " if choice == "now" else "Will record ") + title)
+            if choice == "series":
+                c.create_rule(title, match["id"], match["url"], channel_name=match["name"], backup_url=alt)
+                return say('Every episode of "%s" will be recorded.' % title)
+            time_, date_, days = pvr.repeat_fields(start, choice)
+            c.create_schedule(title, match["url"], zone, time_, date_, stop - start, days=days, channel_name=match["name"], backup_url=alt, epg_id=match.get("id", ""))
+            if state == "airing":
+                c.record(title, match["url"], stop + PAD - now, channel_name=match["name"], backup_url=alt)
+        except api.VesperError as e:
+            return say(str(e), error=True)
+        return say("%s: %s" % ("Every week" if choice == "weekly" else "Every day", title))
+    pick = xbmcgui.Dialog().select("Record " + match["name"], [label for label, _ in LENGTHS])
+    if pick < 0:
+        return
     try:
-        c.record(title_, match["url"], seconds, channel_name=match["name"], start_at=start_at, backup_url=alt)
+        c.record(match["name"], match["url"], LENGTHS[pick][1], channel_name=match["name"], start_at=None, backup_url=alt)
     except api.VesperError as e:
         return say(str(e), error=True)
-    say(("Will record " if start_at else "Recording ") + title_)
+    say("Recording " + match["name"])

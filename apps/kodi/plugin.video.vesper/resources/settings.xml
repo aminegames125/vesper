@@ -39,6 +39,48 @@
             <hidden>true</hidden>
           </control>
         </setting>
+        <setting id="verify_tls" type="boolean" label="30011" help="">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle"/>
+        </setting>
+        <setting id="test" type="action" label="30012" help="">
+          <level>0</level>
+          <data>RunPlugin(plugin://plugin.video.vesper/?action=test)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
+        <setting id="register" type="action" label="30013" help="">
+          <level>0</level>
+          <data>RunPlugin(plugin://plugin.video.vesper/?action=register)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
+        <setting id="signout" type="action" label="30014" help="">
+          <level>0</level>
+          <data>RunPlugin(plugin://plugin.video.vesper/?action=signout)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
+      </group>
+    </category>
+    <category id="notifications" label="30015" help="">
+      <group id="1" label="30015">
+        <setting id="notify" type="boolean" label="30016" help="">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle"/>
+        </setting>
+        <setting id="timezone" type="string" label="30017" help="">
+          <level>1</level>
+          <default></default>
+          <control type="edit" format="string">
+            <heading>30017</heading>
+          </control>
+        </setting>
       </group>
     </category>
     <category id="playback" label="30006" help="">

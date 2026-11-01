@@ -11,7 +11,7 @@
 //   anything else                                         -> patch
 //
 // Each changelog entry also records what kind of release it is and how big it was, in a comment
-// the app reads to draw its banner:
+// the release banner and notes read:
 //   ## [0.9.0] - 2026-10-31 <!-- release: minor; push: 12; changes: 7 -->
 // `push` is the running number of pushes to main that produced a release (one tag per push) and
 // `changes` is how many commits that push carried.
@@ -97,11 +97,6 @@ function setJsonVersion(path, version) {
   edit(path, (text) => text.replace(/^(\s*"version":\s*")[^"]+(")/m, `$1${version}$2`));
 }
 
-function versionCode(version) {
-  const [major, minor, patch] = version.split(".").map(Number);
-  return major * 10000 + minor * 100 + patch;
-}
-
 function changelogEntry(version, commits, meta) {
   const date = new Date().toISOString().slice(0, 10);
   const groups = { Added: [], Fixed: [], Changed: [] };
@@ -167,13 +162,6 @@ function setVersion(version) {
     ),
   );
 
-  edit("apps/android/app/build.gradle.kts", (text) =>
-    text
-      .replace(/(\?: )\d+(\s*\n\s*versionName)/, `$1${versionCode(version)}$2`)
-      .replace(/(versionName = \(findProperty\("versionName"\) as String\?\) \?: ")[^"]+(")/, `$1${version}$2`)
-      .replace(/-PversionName=[\d.]+ -PversionCode=\d+/, `-PversionName=${version} -PversionCode=${versionCode(version)}`),
-  );
-
   // The Kodi add-on manifest carries the add-on's own version; Kodi only offers an update when it
   // grows, so a change under apps/kodi/ has to move it. Only the add-on is bumped, never the
   // repository add-on, which stays at its install-time version.
@@ -192,6 +180,13 @@ function setVersion(version) {
 
   edit("CHANGELOG.md", (text) => {
     if (text.includes(`## [${version}]`)) return text;
+    // Hand-written notes under "## [Unreleased]" become this release: rename the heading, keep the text.
+    const unreleased = /^## \[Unreleased\][^\n]*\n/im;
+    if (unreleased.test(text)) {
+      const date = new Date().toISOString().slice(0, 10);
+      const marker = `<!-- release: ${meta.type}; push: ${meta.push}; changes: ${meta.changes} -->`;
+      return text.replace(unreleased, `## [${version}] - ${date} ${marker}\n`);
+    }
     return text.replace(/(^## \[)/m, `${changelogEntry(version, commits, meta)}$1`);
   });
 

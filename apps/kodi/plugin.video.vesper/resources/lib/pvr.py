@@ -78,3 +78,48 @@ def programme(details, now):
     if stop <= now:
         return start, stop, "over"
     return start, stop, "airing" if start <= now else "later"
+
+
+# -- repeating recordings ---------------------------------------------------------------------
+
+DAY_BITS = {"daily": 127, "weekdays": 31, "weekends": 96}
+
+
+def timezone_name(configured="", environ=None, root="/"):
+    """The IANA name of this computer's time zone (`Europe/Paris`), or "" when it cannot be told.
+
+    The server repeats a schedule on the wall clock of a named zone, and Python alone only knows
+    abbreviations. A zone typed in the settings wins; then TZ, /etc/timezone and /etc/localtime.
+    """
+    environ = os.environ if environ is None else environ
+    for name in (configured.strip(), (environ.get("TZ") or "").lstrip(":")):
+        if re.match(r"^[A-Za-z_+\-]+(/[A-Za-z0-9_+\-]+)+$", name or "") or name == "UTC":
+            return name
+    try:
+        with open(os.path.join(root, "etc", "timezone"), encoding="utf-8") as f:
+            name = f.read().strip()
+        if name:
+            return name
+    except OSError:
+        pass
+    try:
+        target = os.path.realpath(os.path.join(root, "etc", "localtime")).replace("\\", "/")
+        if "/zoneinfo/" in target:
+            return target.split("/zoneinfo/", 1)[1]
+    except OSError:
+        pass
+    return ""
+
+
+def repeat_fields(start, repeat):
+    """The wall-clock fields of a repeating schedule for a programme that starts at epoch `start`,
+    in this computer's local time: `(start_time, start_date, days_mask)`.
+
+    `repeat` is `once`, `daily` or `weekly` (the same weekday as the programme).
+    """
+    local = time.localtime(start)
+    if repeat == "weekly":
+        days = 1 << local.tm_wday
+    else:
+        days = DAY_BITS.get(repeat, 0)
+    return time.strftime("%H:%M", local), time.strftime("%Y-%m-%d", local), days

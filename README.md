@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="brand/banner.svg" alt="Vesper: schedule your IPTV recordings" width="100%" />
+  <img src="brand/banner.svg" alt="Vesper: record IPTV from Kodi" width="100%" />
 </p>
 
 <p align="center">
@@ -9,230 +9,205 @@
 </p>
 
 <p align="center">
-  <a href="https://aminegames125.github.io/vesper/">Website</a> ·
-  <a href="#-what-it-does">What it does</a> ·
-  <a href="#-quick-start">Quick start</a> ·
-  <a href="#-the-android-app">Android app</a> ·
-  <a href="#-the-server">Server</a> ·
-  <a href="#-api">API</a> ·
-  <a href="#-how-it-fits-together">Architecture</a> ·
-  <a href="docs/GUIDE.md">User guide</a> ·
-  <a href="#-develop">Develop</a>
+  <a href="https://amineos.dev/vesper/">Website</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#lite-or-full-mode">Lite or full</a> ·
+  <a href="#requirements">Requirements</a> ·
+  <a href="#configuration">Configuration</a> ·
+  <a href="#faq-and-troubleshooting">FAQ</a> ·
+  <a href="docs/KODI.md">Kodi guide</a> ·
+  <a href="docs/SERVER.md">Server guide</a>
 </p>
 
 # Vesper
 
-**Tell it a channel and a time, and it records.** "Channel 7, every weekday, 11:00 to 11:30." Vesper's server does the recording on a machine that stays on, and a native Android or Android TV app is the remote control: set it up on the sofa, watch the recording tonight.
+**Record IPTV from Kodi.** Vesper is a Kodi add-on plus a small self-hosted recording server. In Kodi's own Live TV channel list or TV guide you choose **Record with Vesper**. The server, running on a machine that stays on, captures the stream. Later you watch the recording in Kodi, resume where you stopped, and can even start watching while it is still recording.
 
-Vesper is a **recorder first**. It uses your own IPTV playlist (an M3U link or an Xtream login) and does one job well: record what you chose, keep the disk tidy, and let you watch it later. You can also watch a channel live, pick a lower picture quality on a slow connection, and cast it to a Chromecast. See the [website](https://aminegames125.github.io/vesper/) for a tour.
+It does not bring channels of its own. The add-on reads the IPTV providers you already set up in Kodi (PVR IPTV Simple Client) and hands them to your server, so there is nothing to type twice. The server is one Rust binary with a SQLite database and no other services; it runs on Windows, Linux and in Docker.
 
-- **Record now** or **schedule** it: once, daily, weekdays, weekends or on the days you pick.
-- **Native Android and Android TV app.** Material 3, the system's own colours, no webview. One APK for phone, tablet and TV.
-- **A server for Linux and Windows** (and Docker). One small binary, no database to install, and ffmpeg only if you want thumbnails and MP4 export.
+Website: **[amineos.dev/vesper](https://amineos.dev/vesper/)**
 
-## ✨ What it does
-
-| | |
-| --- | --- |
-| **Record now** | Pick a channel, choose 30 min, 1 h, 2 h, 3 h or *until I stop it*, and it starts at once. |
-| **Schedules** | A start time on a date, with repeats. The time is kept on your wall clock, so 11:00 stays 11:00 when the clocks change. |
-| **Start early, stop late** | Padding of up to an hour on each side, so you never miss the first minutes of a programme that runs over. |
-| **Survives a bad stream** | If the stream drops, the server joins it again and keeps **one** recording you can play start to finish. |
-| **Warns before it fails** | A clash with another recording is flagged when you save, and a nearly full disk stops a recording with a clear reason instead of leaving an empty file. |
-| **Watch while it records** | Recordings are HLS, so you can open one on any device **while it is still being recorded**. |
-| **Deletes itself, on your terms** | A default deletion timer (a week) keeps the disk from filling up. Change it for any recording later, keep one forever, or have watched ones go sooner. The app warns you the day before. |
-| **Your channels, on the server** | Add an M3U link or an Xtream login once. Your provider login stays on the server, not on every phone. |
-| **Notifications** | The app tells you when a recording finishes or fails, and a webhook (Discord, ntfy, Slack-style) can too. |
-| **Keep only the newest** | A schedule can keep just its last 1, 3, 5 or 10 episodes and tidy the rest. |
-| **Run now, duplicate, pause all** | Start a schedule's channel at once, copy a schedule, or pause every schedule for a holiday. |
-| **Rename, search, clear failed** | Tidy the recordings list from the app. |
-| **Favourite and test channels** | Star the channels you use and check that a stream answers before you schedule it. |
-| **Server status** | Settings shows the server's free disk, how many days of room are left, what records next, what is about to be deleted and any channel that stopped answering. |
-| **TV guide** | Add an XMLTV link and pick a programme by name instead of typing a time. Record it once or **every time it is on**, and let a programme that runs over keep recording until the guide says it ended. |
-| **Movies and series** | Save a movie or episode from your playlist onto the server, watch it later (with seeking), and copy it to the phone. |
-| **Share a link to cast** | Share or open any stream link or `.m3u` / `.m3u8` playlist with Vesper and cast a channel from it to a Chromecast, or record it. The phone does not play live channels itself, which would take the provider's connection; a TV does. |
-| **Chromecast and quality** | If a stream will not play on your Android TV app, play it on the phone and cast it; the Chromecast fetches the stream itself. When the stream offers several qualities (an HLS playlist with resolutions), choose 1080p, 720p and so on, or leave it on automatic, both on the phone and when casting. |
-| **Backup address and quality** | A channel's second address takes over when the first keeps failing, and you can record smaller files. |
-| **A real library** | Folders, a watched mark, *continue watching*, bookmarks, thumbnails, share links that work for a day, and (with ffmpeg) MP4 export and cutting. |
-| **Android TV home** | A TV screen with rows of cards for what is recording, what is next and what to carry on watching, made for a remote. |
-| **Phone extras** | A home-screen widget, a quick-settings tile, *share a link to Vesper to record it*, picture in picture, light/dark choice and quiet hours. |
-| **Kodi add-on** | Adds "Record with Vesper" to Kodi's own Live TV channels and guide, using the IPTV providers Kodi already has. Watch recordings and resume where you stopped, on any Kodi (Android TV, Fire TV, LibreELEC, Windows, Linux, macOS), made for a remote. Finds the server and your providers by itself. See [docs/KODI.md](docs/KODI.md). |
-| **Move or back up** | Save all your schedules to a file and add them to another server. |
-| **Accounts, if you want them** | *Lite* mode is for one home. *Full* mode adds users, quotas, invites and an admin panel. |
-
-## 🚀 Quick start
-
-### 1. Run the server
-
-Download a build from the [latest release](https://github.com/aminegames125/vesper/releases/latest) (Windows, Linux x64 or Linux arm64), or use Docker:
-
-```bash
-docker run -d --name vesper --restart unless-stopped \
-  -p 8484:8484 -v vesper-data:/data \
-  ghcr.io/aminegames125/vesper-server:latest
-```
-
-Or run it from source (needs Node 22, pnpm and Rust):
-
-```bash
-pnpm install
-pnpm --filter @vesper/admin build
-cargo run -p vesper-server -- --mode lite
-```
-
-It listens on port `8484`. **Lite mode has no login, so keep it on your home network.** For a server on the internet use `--mode full` behind HTTPS (see the [server guide](docs/SERVER.md)).
-
-### 2. Install the app
-
-Download `Vesper-…-android.apk` from the [latest release](https://github.com/aminegames125/vesper/releases/latest) and install it on your phone, tablet or Android TV. (On a TV, sideload it with *Downloader* or `adb install`.)
-
-### 3. Record something
-
-1. Open the app. A server on the same network shows up under *Found on your network*: tap it. If nothing shows (a guest network or a VPN can block it), enter the address, for example `192.168.1.20:8484`.
-2. **Recordings → Record now** (or **Settings → Add a playlist**): paste your M3U link or Xtream login when asked.
-3. Tap the red dot beside a channel to record it now, or the calendar to schedule it for a time and a repeat.
-4. Watch it under **Recordings** whenever you like, even while it is still recording.
-
-## 📱 The Android app
-
-Everything on screen is a standard Material 3 component, so it looks like part of your phone. On Android 12 and later it picks up your wallpaper colours.
-
-| Screen | What you do there |
-| --- | --- |
-| **Schedule** | See what records next, and the schedules that make it. Pause, edit or delete a schedule. |
-| **Pick a channel** | Search your playlist, filter by group, then tap the red dot to record now or the calendar to schedule. |
-| **New schedule** | Date, start time, length, repeat, padding and how long to keep it. Warnings show before you leave. |
-| **Recordings** | What is recording (with progress), what is coming up, and what is ready to watch. Stop, cancel, delete, play. |
-| **Settings** | Server, storage used, playlists, notifications, sign out. |
-
-**On a TV** the same app switches to a side rail, larger text and a dark screen. Date and time are set with simple steps instead of a calendar, which is hard to drive with a remote. Playback uses the system player, which works with the remote's buttons.
-
-> Notifications come from the app checking in with the server, and Android does that at most every 15 minutes, so a notice can arrive a little after the recording ends.
-
-Build it yourself:
-
-```bash
-cd apps/android
-./gradlew :app:assembleDebug :app:testDebugUnitTest
-```
-
-## 🖥 The server
-
-One binary, one data folder (a SQLite database and your recordings).
-
-```bash
-vesper-server --mode lite                          # no accounts, for a home network
-vesper-server --mode full --bind 127.0.0.1:8484    # accounts, quotas, admin panel
-```
-
-| Option | Environment | Default | Meaning |
-| --- | --- | --- | --- |
-| `--mode` | `VESPER_MODE` | `lite` | `lite` has no logins. `full` has users, roles and quotas. |
-| `--bind` | `VESPER_BIND` | `0.0.0.0:8484` | Address and port to listen on. |
-| `--data-dir` | `VESPER_DATA_DIR` | `data` | Database and recordings. Back this folder up. |
-| `--admin-user` / `--admin-password` | `VESPER_ADMIN_USER` / `VESPER_ADMIN_PASSWORD` | – | Create the first administrator on start (full mode). |
-| `--allow-private` | `VESPER_ALLOW_PRIVATE` | off | Let the server reach private network addresses. Always on in lite mode. |
-| `--trust-proxy` | `VESPER_TRUST_PROXY` | off | Read the client address from a reverse proxy's `X-Forwarded-For`. |
-| `--no-discovery` | `VESPER_NO_DISCOVERY` | off | Stop announcing the server on the local network (mDNS `_vesper._tcp`). |
-| `--allowed-host` | `VESPER_ALLOWED_HOSTS` | – | Lite mode only answers to home-network names (an address, `localhost`, `nas`, `*.local`). List other names here, comma separated. |
-
-In **full** mode each account has limits: recordings at once, the longest recording, storage, and how long recordings are kept. The admin panel at `/admin/` shows users, invites, every recording and schedule, an activity log and settings.
-
-<p align="center">
-  <img src="docs/screenshots/admin-overview.png" alt="The admin panel overview" width="48%" />
-  <img src="docs/screenshots/admin-users.png" alt="The admin panel user list" width="48%" />
-</p>
-
-More in the **[server guide](docs/SERVER.md)**: Docker, systemd, a reverse proxy with HTTPS, modes and security notes.
-
-## 🔌 API
-
-Everything the app does is a plain HTTP call, so you can script it. Record a channel right now until you stop it:
-
-```bash
-curl -X POST http://localhost:8484/api/v1/recordings \
-  -H 'content-type: application/json' \
-  -d '{"title":"Evening news","url":"http://provider.example/live/news.ts","seconds":0}'
-```
-
-Record it every weekday at 11:00 for 30 minutes, starting a minute early and stopping two minutes late:
-
-```bash
-curl -X POST http://localhost:8484/api/v1/schedules \
-  -H 'content-type: application/json' \
-  -d '{
-    "title": "Morning news",
-    "url": "http://provider.example/live/news.ts",
-    "tz": "Europe/Paris",
-    "start_time": "11:00",
-    "seconds": 1800,
-    "days": 31,
-    "start_date": "2026-11-02",
-    "pad_before": 60,
-    "pad_after": 120
-  }'
-```
-
-`days` is a bit mask (Monday is 1, Sunday is 64): `31` is weekdays, `127` every day, `0` once. In full mode add `-H 'Authorization: Bearer <token>'`. The reply to a schedule includes `warnings` if it clashes with something. The [server guide](docs/SERVER.md#http-api) lists every endpoint, and `packages/cloud-client` is a typed TypeScript client for it.
-
-## 🧩 How it fits together
+## How it works
 
 ```mermaid
 flowchart LR
-  subgraph You
-    A["Android / Android TV app<br/>(Kotlin, Compose, Material 3)"]
+  subgraph kodi ["Kodi, on any device"]
+    live["Live TV<br/>channels and guide"]
+    addon["Vesper add-on"]
+    player["Kodi player"]
   end
-  subgraph "A machine that stays on"
-    S["vesper-server (Rust)<br/>schedules · recorder · API"]
-    D[("SQLite + recordings<br/>(HLS segments)")]
-    P["Admin panel<br/>(embedded)"]
+  subgraph box ["A machine that stays on"]
+    server["vesper-server<br/>API, scheduler, recorder"]
+    disk[("SQLite and<br/>HLS recordings")]
   end
-  I["Your IPTV provider"]
-  A -- "HTTP API" --> S
-  S --> D
-  S -- "pulls the stream" --> I
-  P -. "served by" .-> S
-  A -- "plays HLS while it records" --> S
+  iptv["Your IPTV provider"]
+  live -- "Record with Vesper" --> addon
+  addon -- "HTTP API" --> server
+  server -- "pulls the stream" --> iptv
+  server --> disk
+  player -- "plays HLS, even while recording" --> server
 ```
 
-| Path | What it is |
+1. The add-on finds your server on the network and passes along the playlists from Kodi's Live TV.
+2. You pick a channel or a programme and choose **Record with Vesper**.
+3. The server pulls the stream and saves it as HLS segments, joining the stream again if it drops.
+4. You open **Vesper** under Add-ons in Kodi, pick the recording and play it. Where you stop is saved on the server.
+
+## What you get
+
+| | |
 | --- | --- |
-| `apps/server` | The server: API, scheduler, recorder jobs, retention, accounts (Rust, axum, SQLite). |
-| `crates/vesper-recorder` | Records HLS and raw streams to disk. No ffmpeg, no platform code. |
-| `apps/android` | The native Android and Android TV app (Kotlin, Jetpack Compose). |
-| `apps/admin` | The admin panel, built into the server binary (React, Tailwind). |
-| `packages/cloud-client` | A typed TypeScript client for the server API. |
+| **Record from Kodi's own Live TV** | A **Record with Vesper** entry in the context menu of the channel list, the guide and guide search. A channel records now for 30 min, 1 h, 2 h or until you stop it. A programme records from the guide's times, a minute early and three minutes late, once, every day, every week, or every episode. |
+| **Providers connected for you** | Playlists set up in PVR IPTV Simple Client are sent to the server once and re-checked every 6 hours. Channels are matched by name. |
+| **Watch and resume in Kodi** | Continue watching, recording now and coming up, all recordings with folders, your schedules (edit, pause, run now) and a server status screen. Kodi offers to resume; the position is kept on the server. Notifications tell you when a recording starts, finishes or fails. |
+| **Plays while it records** | Recordings are HLS, so an item that is still recording can be opened from the start. |
+| **Survives a bad stream** | The server rejoins a dropped stream and keeps one recording. A backup address for a channel takes over when the first keeps failing. |
+| **Keeps the disk tidy** | Recordings delete themselves after a week by default; change it per recording or keep one forever. Recording is refused when less than 512 MB of disk is free. |
+| **Self-hosted** | One binary or one Docker image. No database server. ffmpeg is optional and only adds thumbnails, MP4 export and cutting. |
+| **Lite or full** | Lite is for one home network with no login. Full adds users, bearer tokens, quotas, invites and an admin panel for shared or internet-facing servers. |
+| **HTTP API** | Everything is a plain HTTP call, so you can script it, for example to make a schedule with a custom set of days (see the [server guide](docs/SERVER.md#http-api)). |
 
-The scheduler keeps the next two weeks of every repeating schedule as ordinary recordings, so each one can be cancelled on its own. [Architecture notes](docs/ARCHITECTURE.md).
+## Quick start
 
-## 🔒 Security
+### 1. Start the server
 
-- **Lite mode has no login.** Use it on a home network and never expose it to the internet.
-- **Full mode** hashes passwords with Argon2id, stores only a hash of each session token, and rate limits failed sign-ins.
-- **Your provider login lives on the server** (in the playlist source and in stream addresses). Run the server yourself and protect its data folder.
-- The server refuses private network addresses unless you allow them, and re-checks every redirect, so a public server cannot be used to probe your network.
+Pick one. The server listens on port `8484`.
 
-## 🛠 Develop
+**Docker Compose** (recommended):
 
-You need Node 22+, pnpm 10+ (pnpm only), a recent stable Rust and, for the app, JDK 17 with the Android SDK.
+```yaml
+# docker-compose.yml
+services:
+  vesper:
+    image: ghcr.io/aminegames125/vesper-server:latest
+    restart: unless-stopped
+    ports:
+      - "8484:8484"
+    volumes:
+      - vesper-data:/data
+    environment:
+      VESPER_MODE: lite
+
+volumes:
+  vesper-data:
+```
+
+Save it and run `docker compose up -d`. A full-mode version with an administrator and a reverse proxy is in the [server guide](docs/SERVER.md#docker-compose).
+
+**Binary**: download the archive for your system from the [latest release](https://github.com/aminegames125/vesper/releases/latest) (Windows x64, Linux x64, Linux arm64), unpack it and run:
 
 ```bash
-pnpm install
-pnpm lint          # Biome and clippy
-pnpm test          # Turborepo and cargo tests
-cd apps/android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
+./vesper-server --mode lite
 ```
 
-Commits follow [Conventional Commits](https://www.conventionalcommits.org). Every push to `main` that passes the checks is released automatically: `feat:` makes a minor release, `fix:` and the rest a patch, and a `!` or `BREAKING CHANGE` a major one. The [changelog](CHANGELOG.md) records what is in each.
+Open `http://<that machine>:8484/admin/` to check that it is up.
 
-## 🗺 Not built yet
+> Lite mode has no login. Keep it on your home network. For anything shared or reachable from outside, use `--mode full` behind HTTPS; see [lite or full](#lite-or-full-mode).
 
-- A programme guide (XMLTV), so you can pick a show instead of a time.
-- Push notifications that arrive the moment a recording ends.
-- Recording the same programme only once when two people ask for it.
+### 2. Install the add-on in Kodi
 
-The earlier IPTV **player** (desktop, web and Android) is kept on the [`old-vesper`](https://github.com/aminegames125/vesper/tree/old-vesper) branch.
+1. Download [`repository.vesper-1.0.0.zip`](https://amineos.dev/vesper/kodi/repository.vesper/repository.vesper-1.0.0.zip) (on a TV box, open the address in its browser or copy the file over with a USB stick).
+2. In Kodi: **Settings > System > Add-ons**, turn on **Unknown sources**.
+3. **Add-ons > Install from zip file**, pick the zip.
+4. **Add-ons > Install from repository > Vesper repository > Video add-ons > Vesper > Install.**
+
+The repository keeps the add-on up to date. You can also install `plugin.video.vesper-<version>.zip` from the [latest release](https://github.com/aminegames125/vesper/releases/latest) the same way, without automatic updates. Details and a no-network option are in the [Kodi guide](docs/KODI.md#install).
+
+About 20 seconds after Kodi starts, the add-on looks for your server and connects the IPTV providers from Kodi's Live TV. If you run a full-mode server, enter the username and password in the add-on settings (or create an account there with an invite code).
+
+### 3. Record
+
+Open **TV > Channels** or **TV > Guide**, open the context menu on a channel or programme (hold OK, or `C` on a keyboard) and choose **Record with Vesper**. Watch it under **Add-ons > Video add-ons > Vesper**.
+
+## Lite or full mode
+
+| | Lite (`--mode lite`, default) | Full (`--mode full`) |
+| --- | --- | --- |
+| Meant for | One household on a trusted network | Several people, a shared box, or anything reachable from outside |
+| Login | None. Anyone who can reach the port can record, sync and open the admin panel. | Username and password; bearer tokens (30 days by default) |
+| Accounts | One implicit owner | Roles `admin`, `user`, `guest` (guests cannot record) |
+| Limits | None | Per account: recordings at once, longest recording, storage, retention |
+| Joining | n/a | `closed`, `invite` or `open`, set in the admin panel |
+| Admin panel | Open to the network | Administrator sign-in |
+| Network guard | Answers only to home-network host names and refuses requests from other websites | Normal; private addresses refused for the recorder unless an admin allows them |
+| HTTPS | Not needed on a LAN. Never expose it publicly. | Put Caddy, nginx or similar in front and add `--trust-proxy` |
+| Kodi settings | Nothing to enter | Server address (or discovery), username and password |
+
+Full mode is the supported way to run Vesper outside a home network. Setup is in the [server guide](docs/SERVER.md#full-mode-setup) and the add-on side in the [Kodi guide](docs/KODI.md#full-mode-sign-in).
+
+## Requirements
+
+| Part | Supported | Notes |
+| --- | --- | --- |
+| Kodi | 19 (Matrix), 20 (Nexus), 21 (Omega) | Plain Python add-on (`xbmc.python` 3.0.0), so it should work on Android TV, Fire TV, LibreELEC, CoreELEC, Windows, Linux and macOS. See [what is tested](docs/KODI.md#what-is-tested-and-what-is-not). |
+| IPTV in Kodi | PVR IPTV Simple Client with a remote M3U link | Local-file playlists and other PVR add-ons cannot be read by the server. |
+| Server, binary | Windows x64, Linux x64, Linux arm64 | Built by the release workflow. macOS is not built. |
+| Server, Docker | `ghcr.io/aminegames125/vesper-server` | Multi-arch image (amd64 and arm64, so Raspberry Pi and ARM NAS boxes work), with ffmpeg and a health check. A ready-made full-mode [`docker-compose.yml`](docker-compose.yml) is in the repository root; see the [server guide](docs/SERVER.md#docker-compose). |
+| Disk | Space for your recordings | Streams are saved as they arrive, without re-encoding, so size follows your provider's bitrate. |
+| Optional | ffmpeg on the server's `PATH` | Adds thumbnails, MP4 export and cutting. |
+
+To build from source you need Node 22+, pnpm 10+ and stable Rust; the Kodi tests need Python 3.
+
+## Configuration
+
+Server options can be given as flags or environment variables. Full list and examples: [server guide](docs/SERVER.md#options).
+
+| Flag | Environment | Default | Meaning |
+| --- | --- | --- | --- |
+| `--mode` | `VESPER_MODE` | `lite` | `lite` has no logins. `full` has users, roles and quotas. |
+| `--bind` | `VESPER_BIND` | `0.0.0.0:8484` | Address and port to listen on. |
+| `--data-dir` | `VESPER_DATA_DIR` | `data` | Database (`vesper.db`) and recordings. Back this folder up. |
+| `--admin-user`, `--admin-password` | `VESPER_ADMIN_USER`, `VESPER_ADMIN_PASSWORD` | none | Create the first administrator on start (full mode). Otherwise `/admin/` shows a setup screen. |
+| `--allow-private` | `VESPER_ALLOW_PRIVATE` | off | Let the recorder and proxy reach private network addresses. Always on in lite mode. |
+| `--trust-proxy` | `VESPER_TRUST_PROXY` | off | Read the client address from a reverse proxy's `X-Forwarded-For`. |
+| `--allowed-host` | `VESPER_ALLOWED_HOSTS` | none | Extra host names a **lite** server answers to (comma separated). |
+| `--no-discovery` | `VESPER_NO_DISCOVERY` | off | Do not announce the server on the network (mDNS `_vesper._tcp`). |
+| `--wake-command` | `VESPER_WAKE_COMMAND` | none | Command run when the next scheduled start changes; the time is in `VESPER_NEXT_START`. |
+
+Add-on settings (in Kodi): server address, username and password (full mode only), ask to resume, and play with InputStream Adaptive. See the [Kodi guide](docs/KODI.md#settings).
+
+## FAQ and troubleshooting
+
+**The add-on says it cannot find a server.** Discovery uses mDNS, which guest Wi-Fi, some VPNs and Docker's default bridge network block. Type the address in the add-on settings (`192.168.1.20:8484`), using the machine's network address, not `localhost`. With Docker, `network_mode: host` on Linux makes discovery work.
+
+**"This server needs a username and password."** The server is in full mode. Enter an account's username and password in the add-on settings. Guests cannot record.
+
+**A channel is "not in a provider Vesper knows".** Vesper matches Kodi's channel name against the playlists on the server. Make sure the provider is an M3U link in PVR IPTV Simple Client, then run **Connect my Kodi IPTV providers now** in the add-on settings.
+
+**Can I record from Tvheadend, Zattoo or another PVR add-on?** No. Those add-ons do not expose stream addresses the server could pull. Add the provider's M3U link to PVR IPTV Simple Client instead.
+
+**A recording stutters in Kodi.** Turn on **Play recordings with InputStream Adaptive** in the add-on settings.
+
+**HTTPS with a self-signed certificate.** The add-on checks the certificate by default. For your own server, turn off **Check the HTTPS certificate** in the add-on settings. A publicly trusted certificate (Caddy gets one automatically) needs no change.
+
+**Can I make a daily or weekly schedule from Kodi?** Yes: on a programme in the guide choose *Record every day* or *Record every week*, or *Record every episode*. The add-on needs your time zone for that (it detects it, or set it in the add-on's advanced settings). Other day patterns go through the [HTTP API](docs/SERVER.md#schedules).
+
+**Where are the recordings?** In `<data dir>/recordings`, as folders of `.ts` segments with an `index.m3u8`. Back up the whole data folder.
+
+More in the [Kodi guide](docs/KODI.md#troubleshooting) and the [server guide](docs/SERVER.md).
+
+## Roadmap
+
+Ideas, none of them started or promised:
+
+- More testing on real Kodi installs: Android TV, Fire TV, LibreELEC, Kodi 19 and 20.
+- A picker for custom repeat days inside Kodi.
+
+Have a use case? Open a [feature request](https://github.com/aminegames125/vesper/issues/new?template=feature_request.yml).
+
+## Contributing
+
+Bug reports with your Kodi version, system, server mode and add-on version are the most useful thing you can send. Code changes: see [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: [SECURITY.md](SECURITY.md). Questions: [SUPPORT.md](SUPPORT.md). Everyone is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org). Every push to `main` that passes the checks is released automatically; the [changelog](CHANGELOG.md) records what is in each release.
+
+Vesper records only what you add yourself and ships no channels or playlists. Use it for content you have the right to record.
 
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+## History
+
+Vesper started as an IPTV player and then grew Android and Android TV apps. It is now only the Kodi add-on and the recording server. The full earlier project, apps included, is kept on the [`old-full-app`](https://github.com/aminegames125/vesper/tree/old-full-app) branch.

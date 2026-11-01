@@ -45,8 +45,5 @@ describe("CloudClient", () => {
   it("builds media urls with the token", () => {
     const client = new CloudClient({ baseUrl: "http://s", token: "t" });
     expect(client.playlistUrl("r1")).toBe("http://s/api/v1/recordings/r1/index.m3u8?token=t");
-    expect(client.proxyUrl("http://a/b?c=1")).toBe(
-      "http://s/api/v1/proxy?url=http%3A%2F%2Fa%2Fb%3Fc%3D1&token=t",
-    );
   });
 });

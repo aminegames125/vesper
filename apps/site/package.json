@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.14.1",
   "type": "module",
-  "description": "The Vesper landing page, published on GitHub Pages.",
+  "description": "The Vesper landing page: record IPTV from Kodi. Published on GitHub Pages at amineos.dev/vesper.",
   "license": "MIT",
   "scripts": {
     "dev": "vite",

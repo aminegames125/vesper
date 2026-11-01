@@ -3,12 +3,10 @@ mod admin;
 mod files;
 mod guide;
 pub mod library;
-mod proxy;
 mod recordings;
 mod schedules;
 pub mod sources;
 mod status;
-mod sync;
 
 use axum::{
     routing::{delete, get, post},
@@ -115,9 +113,6 @@ pub fn router() -> Router<AppState> {
         .route("/sources", get(sources::list).post(sources::create))
         .route("/sources/{id}", delete(sources::remove))
         .route("/channels", get(sources::channels))
-        .route("/sync", get(sync::all))
-        .route("/sync/{key}", get(sync::get_one).put(sync::put_one))
-        .route("/proxy", get(proxy::fetch))
         .route("/admin/stats", get(admin::stats))
         .route("/admin/users", get(admin::users).post(admin::create_user))
         .route(

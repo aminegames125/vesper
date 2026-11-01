@@ -1,5 +1,5 @@
-//! Announces the server on the local network (mDNS / Bonjour) as `_vesper._tcp`, so the Android app
-//! can list it instead of asking for an address. Nothing is sent outside the local network.
+//! Announces the server on the local network (mDNS / Bonjour) as `_vesper._tcp`, so the Kodi add-on
+//! can find it instead of asking for an address. Nothing is sent outside the local network.
 
 use mdns_sd::{ServiceDaemon, ServiceInfo};
 use tracing::{info, warn};

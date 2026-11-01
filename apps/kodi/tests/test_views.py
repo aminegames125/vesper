@@ -154,8 +154,41 @@ class Setup(unittest.TestCase):
 class StubClient:
     """Stands in for the server so the Kodi-side behaviour runs without one."""
 
+    mode = "lite"
+    username = ""
+
     def __init__(self, sources=(), channels=()):
         self.saved, self.found, self.recorded = list(sources), list(channels), []
+        self.calls, self.rows, self.rule_rows = [], [], []
+
+    def __getattr__(self, name):
+        # Anything else the add-on asks of the server is just written down.
+        def call(*args, **kwargs):
+            self.calls.append((name, args, kwargs))
+            return {}
+
+        return call
+
+    def schedules(self):
+        return self.rows
+
+    def rules(self):
+        return self.rule_rows
+
+    def status(self):
+        return {
+            "version": "9.9.9",
+            "mode": "full",
+            "diskFree": 5 * 1024**3,
+            "diskTotal": 10 * 1024**3,
+            "recording": 1,
+            "scheduled": 2,
+            "failed": 0,
+            "next": {"title": "Late film", "startAt": 2000000000},
+        }
+
+    def me(self):
+        return {"username": "amine", "role": "user", "storageUsed": 1024**3, "storage_bytes": 5 * 1024**3, "max_concurrent": 2}
 
     def recordings(self, **_):
         return {"recordings": []}
@@ -196,7 +229,7 @@ class OnTopOfKodi(unittest.TestCase):
     def test_the_home_screen_is_only_recordings_and_schedules(self):
         self.stub.saved = [{"id": "s0", "name": "x", "kind": "m3u", "url": "u"}]
         views.route("")
-        self.assertEqual(labels(), ["Continue watching", "Recording now and coming up", "Recordings", "Schedules"])
+        self.assertEqual(labels(), ["Continue watching", "Recording now and coming up", "Recordings", "Schedules", "Server"])
 
     def test_with_no_provider_it_offers_to_read_them_from_kodi(self):
         views.route("")
@@ -231,6 +264,7 @@ class OnTopOfKodi(unittest.TestCase):
         fake.labels.update({"ListItem.ChannelName": "bbc one hd", "ListItem.Title": "Evening News", "ListItem.DBID": "99"})
         fake.visible.add("Window.IsActive(tvguide)")
         fake.rpc = {"result": {"broadcastdetails": {"title": "Evening News", "starttime": iso(start), "endtime": iso(start + 1800)}}}
+        fake.answers["select"] = 0  # record this programme
         views.bridge.record_from_kodi()
         (r,) = self.stub.recorded
         self.assertEqual(r["title"], "Evening News")
@@ -252,6 +286,137 @@ class OnTopOfKodi(unittest.TestCase):
         self.assertTrue(any("PVR IPTV Simple" in n for n in fake.notes), fake.notes)
 
 
+class RepeatAndManage(unittest.TestCase):
+    """Repeating recordings, series, editing, renaming and the server screen."""
+
+    SCHEDULE = {"id": "s1", "title": "News", "startTime": "21:30", "seconds": 1800, "days": 0, "startDate": "2030-01-01"}
+
+    def setUp(self):
+        fake.reset()
+        settings.clear()
+        settings["server"] = "http://127.0.0.1:8484"
+        self.stub = StubClient(channels=[{"name": "BBC One HD", "url": "http://p.example/bbc1.m3u8", "id": "bbc1.uk"}])
+        real = views.common.client
+        self.addCleanup(setattr, views.common, "client", real)
+        views.common.client = lambda ready=True: self.stub
+
+    def guide_entry(self, zone="Europe/Paris"):
+        import time as t
+
+        start = int(t.time()) + 7200
+        iso = lambda e: t.strftime("%Y-%m-%d %H:%M:%S", t.gmtime(e))
+        settings["timezone"] = zone
+        fake.labels.update({"ListItem.ChannelName": "BBC One HD", "ListItem.Title": "Evening News", "ListItem.DBID": "99"})
+        fake.visible.add("Window.IsActive(tvguide)")
+        fake.rpc = {"result": {"broadcastdetails": {"title": "Evening News", "starttime": iso(start), "endtime": iso(start + 1800)}}}
+
+    def test_a_programme_can_repeat_every_week(self):
+        self.guide_entry()
+        fake.answers["select"] = 1  # every week
+        views.bridge.record_from_kodi()
+        name, args, kw = self.stub.calls[-1]
+        self.assertEqual(name, "create_schedule")
+        self.assertEqual((args[0], args[2], args[5]), ("Evening News", "Europe/Paris", 1800))
+        self.assertEqual(kw["epg_id"], "bbc1.uk")
+        self.assertIn(kw["days"], [1 << i for i in range(7)])
+
+    def test_a_programme_can_repeat_every_day(self):
+        self.guide_entry()
+        fake.answers["select"] = 2
+        views.bridge.record_from_kodi()
+        self.assertEqual(self.stub.calls[-1][2]["days"], 127)
+
+    def test_a_programme_can_be_recorded_every_time_it_is_on(self):
+        self.guide_entry()
+        fake.answers["select"] = 3
+        views.bridge.record_from_kodi()
+        name, args, _ = self.stub.calls[-1]
+        self.assertEqual((name, args[:2]), ("create_rule", ("Evening News", "bbc1.uk")))
+
+    def test_a_channel_without_a_guide_id_cannot_be_a_series(self):
+        import xbmcgui
+
+        self.guide_entry()
+        del self.stub.found[0]["id"]
+        shown = []
+        original = xbmcgui.Dialog.select
+        xbmcgui.Dialog.select = lambda self_, heading, options: (shown.extend(options), -1)[1]
+        self.addCleanup(setattr, xbmcgui.Dialog, "select", original)
+        views.bridge.record_from_kodi()
+        self.assertEqual(len(shown), 3)
+        self.assertFalse([x for x in shown if "every episode" in x.lower()])
+
+    def test_a_schedule_can_be_edited(self):
+        self.stub.rows = [self.SCHEDULE]
+        fake.answers["select"] = 1  # the start time
+        fake.typed = ["07:15"]
+        views.edit_schedule("s1")
+        name, args, kw = self.stub.calls[-1]
+        self.assertEqual((name, kw), ("update_schedule", {"start_time": "07:15"}))
+        self.assertEqual(args[0], self.SCHEDULE)
+
+    def test_a_bad_start_time_is_refused(self):
+        self.stub.rows = [self.SCHEDULE]
+        fake.answers["select"] = 1
+        fake.typed = ["25:99"]
+        views.edit_schedule("s1")
+        self.assertFalse([c for c in self.stub.calls if c[0] == "update_schedule"])
+        self.assertTrue(any("21:30" in n for n in fake.notes), fake.notes)
+
+    def test_schedules_and_series_are_listed_and_managed(self):
+        self.stub.rows = [dict(self.SCHEDULE, days=31, channelName="BBC", enabled=False)]
+        self.stub.rule_rows = [{"id": "r1", "title": "Doctor Who", "channelName": "BBC", "enabled": True}]
+        views.route("?action=schedules")
+        self.assertEqual(labels(), ["[COLOR FF9A9AA3]21:30  News (paused)[/COLOR]", "Every episode: Doctor Who"])
+        fake.answers["select"] = 0
+        views.route("?action=rule_menu&id=r1&paused=0&title=Doctor+Who")
+        self.assertEqual(self.stub.calls[-1][:2], ("set_rule_enabled", ("r1", False)))
+        fake.answers["select"] = 1
+        views.route("?action=rule_menu&id=r1&paused=0&title=Doctor+Who")
+        self.assertEqual(self.stub.calls[-1][:2], ("delete_rule", ("r1",)))
+
+    def test_a_recording_can_be_renamed_and_filed(self):
+        fake.typed = ["Better title"]
+        views.route("?action=rename&id=a1&title=Old")
+        self.assertEqual(self.stub.calls[-1][:2], ("rename", ("a1", "Better title")))
+        fake.typed = ["Sport"]
+        views.route("?action=folder&id=a1&tag=")
+        self.assertEqual(self.stub.calls[-1][:2], ("set_folder", ("a1", "Sport")))
+        fake.typed = [""]  # cancelled: nothing changes
+        before = len(self.stub.calls)
+        views.route("?action=rename&id=a1&title=Old")
+        self.assertEqual(len(self.stub.calls), before)
+
+    def test_the_server_screen_shows_disk_next_recording_and_the_account(self):
+        import xbmcgui
+
+        shown = []
+        xbmcgui.Dialog.textviewer = lambda self_, heading, text: shown.append(text)
+        self.stub.mode = "full"
+        views.route("?action=status")
+        self.assertIn("5.0 GB free of 10.0 GB", shown[0])
+        self.assertIn("Late film", shown[0])
+        self.assertIn("Account: amine", shown[0])
+        self.assertIn("2 at a time", shown[0])
+
+    def test_an_address_on_the_internet_without_https_is_questioned(self):
+        settings.pop("server")
+        fake.answers["input"] = "tv.example.com:8484"
+        fake.answers["yesno"] = False
+        views.type_address()
+        self.assertNotIn("server", settings)
+        fake.answers["input"] = "https://tv.example.com"
+        views.type_address()
+        self.assertEqual(settings["server"], "https://tv.example.com")
+
+    def test_a_finished_recording_has_its_menu_and_a_thumbnail_with_the_media_key(self):
+        row = {"id": "a1", "title": "T", "status": "done", "watched": False, "positionS": 0, "seconds": 60, "bytes": 1, "keepUntil": None, "thumb": True}
+        self.stub.thumb_url = lambda rid: "http://h/thumb?token=k"
+        _, li, _ = views.recording_item(self.stub, row)
+        self.assertEqual([m[0] for m in li.menu], ["Keep forever", "Mark as watched", "Rename", "Move to folder", "Delete"])
+        self.assertEqual(li.art["thumb"], "http://h/thumb?token=k")
+
+
 @unittest.skipUnless(LIVE, "set VESPER_URL to a lite-mode server")
 class Screens(unittest.TestCase):
     def setUp(self):
@@ -270,7 +435,7 @@ class Screens(unittest.TestCase):
         views.route("")
         self.assertEqual(
             [x for x in labels() if not x.startswith(("Continue", "Connect"))],
-            ["Recording now and coming up", "Recordings", "Schedules"],
+            ["Recording now and coming up", "Recordings", "Schedules", "Server"],
         )
 
     def test_a_recording_in_progress_is_listed_playable_and_stoppable(self):
