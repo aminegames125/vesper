@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.24.0] - 2026-11-01 <!-- release: minor; push: 33; changes: 2 -->
 
 ### Changed
 - Vesper is now only a Kodi extension plus a self-hosted recording server. The Android and Android TV app is removed from this branch; the full earlier project, app included, is kept on the `old-full-app` branch.
