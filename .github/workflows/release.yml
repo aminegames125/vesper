@@ -111,7 +111,7 @@ jobs:
           VERSION="${VERSION%%-*}"
           python -I apps/kodi/build.py --version "$VERSION" --out out
           # The repository add-on (install this one first; it keeps the add-on up to date).
-          python -I apps/kodi/make_repo.py --version "$VERSION" --out repo >/dev/null
+          python apps/kodi/make_repo.py --version "$VERSION" --out repo >/dev/null
           cp repo/repository.vesper/repository.vesper-*.zip out/
           cd out
           for f in *.zip; do sha256sum "$f" > "$f.sha256"; done
