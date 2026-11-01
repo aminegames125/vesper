@@ -86,7 +86,7 @@ jobs:
     if: ${{ needs.plan.outputs.build_server != 'true' || needs.plan.outputs.build_kodi != 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         if: ${{ needs.plan.outputs.build_server != 'true' }}
         with:
           registry: ghcr.io
@@ -209,7 +209,7 @@ jobs:
           ref: ${{ env.TAG }}
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
