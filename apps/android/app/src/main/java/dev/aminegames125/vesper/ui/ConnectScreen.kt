@@ -80,7 +80,7 @@ private fun Wordmark() {
             val radius = CornerRadius(bar / 2f, bar / 2f)
             drawRoundRect(c.surfaceHi, size = size, cornerRadius = CornerRadius(14f * unit, 14f * unit))
             drawRoundRect(
-                Brush.horizontalGradient(listOf(c.accent, c.accent2), startX = 8f * unit, endX = 56f * unit),
+                androidx.compose.ui.graphics.SolidColor(c.accent),
                 topLeft = Offset(8f * unit, 10f * unit),
                 size = Size(48f * unit, bar),
                 cornerRadius = radius,

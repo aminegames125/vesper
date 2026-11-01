@@ -190,14 +190,13 @@ private fun Hero(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (recording != null) {
-                if (live) {
-                    VPill("Recording now", Tone.Live, pulse = true)
-                } else {
-                    VPill("Up next · ${formatUntil(recording.startAt)}", Tone.Accent)
-                }
                 VText(recording.title, style = Vesper.type.display.copy(fontSize = 40.sp, lineHeight = 44.sp), maxLines = 2)
                 VText(
-                    if (live) "${formatDuration(recording.seconds)} so far · ${formatBytes(recording.bytes)}" else formatMoment(recording.startAt),
+                    if (live) {
+                        "Recording now · ${formatDuration(recording.seconds)} · ${formatBytes(recording.bytes)}"
+                    } else {
+                        "${formatMoment(recording.startAt)} · ${formatUntil(recording.startAt)}"
+                    },
                     style = Vesper.type.heading,
                     color = c.textDim,
                     maxLines = 1,

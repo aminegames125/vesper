@@ -22,11 +22,10 @@ import dev.aminegames125.vesper.ui.theme.LocalIsTv
 /*
  * Vesper's own design language. Nothing in here comes from Material.
  *
- *  - Ink canvas, warm paper text, one coral accent (the brand kit's colours).
- *  - Layered "glass" surfaces: a soft vertical gradient and a hairline that is brighter on top,
- *    the way light catches the upper edge of a pane.
- *  - Pills and big squircles, no elevation shadows except a coloured glow on the one primary thing.
- *  - On a TV the focused thing lifts, grows and lights up; nothing else moves.
+ *  - A near-black canvas, off-white text, one coral accent used only for the thing to press.
+ *  - Flat panels with a hairline. No gradients, no glow, no blur.
+ *  - Lists are rows divided by hairlines, not a card for every row.
+ *  - On a TV the focused thing grows a little and gets a plain white outline.
  */
 
 @Immutable
@@ -61,7 +60,7 @@ val NightColors = VColors(
     lineStrong = Color(0x33FFFFFF),
     text = Color(0xFFF2F2F0),
     textDim = Color(0xFFA1A1A6),
-    textFaint = Color(0xFF6E6E73),
+    textFaint = Color(0xFF8B8B91),
     accent = Color(0xFFFF6B57),
     accent2 = Color(0xFFFF6B57),
     onAccent = Color(0xFF1C0910),
@@ -82,7 +81,7 @@ val PaperColors = VColors(
     lineStrong = Color(0x26000000),
     text = Color(0xFF1B1B1F),
     textDim = Color(0xFF625F68),
-    textFaint = Color(0xFF9A97A0),
+    textFaint = Color(0xFF6B6872),
     accent = Color(0xFFD81B60),
     accent2 = Color(0xFFE8503A),
     onAccent = Color(0xFFFFFFFF),
@@ -109,13 +108,13 @@ class VType(
 private val Sans = FontFamily.SansSerif
 
 val DefaultType = VType(
-    display = TextStyle(fontFamily = Sans, fontWeight = FontWeight.ExtraBold, fontSize = 34.sp, lineHeight = 38.sp, letterSpacing = (-0.9).sp),
+    display = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Bold, fontSize = 34.sp, lineHeight = 40.sp, letterSpacing = (-0.6).sp),
     title = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 27.sp, letterSpacing = (-0.4).sp),
     heading = TextStyle(fontFamily = Sans, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 22.sp, letterSpacing = (-0.1).sp),
     body = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 21.sp),
     bodyStrong = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 21.sp),
     small = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 18.sp),
-    label = TextStyle(fontFamily = Sans, fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp, lineHeight = 16.sp, letterSpacing = 1.1.sp),
+    label = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.2.sp),
     button = TextStyle(fontFamily = Sans, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp),
     numeral = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Bold, fontSize = 26.sp, lineHeight = 30.sp, letterSpacing = (-0.5).sp),
 )

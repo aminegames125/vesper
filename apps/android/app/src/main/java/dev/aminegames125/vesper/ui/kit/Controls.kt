@@ -73,7 +73,7 @@ fun VButton(
     val c = Vesper.colors
     val tv = LocalIsTv.current
     val fill: Brush? = when (kind) {
-        ButtonKind.Primary -> Brush.horizontalGradient(listOf(c.accent, c.accent2))
+        ButtonKind.Primary -> SolidColor(c.accent)
         ButtonKind.Soft -> SolidColor(c.surfaceTop.copy(alpha = if (c.dark) 0.7f else 1f))
         ButtonKind.Ghost -> null
         ButtonKind.Danger -> SolidColor(c.danger.copy(alpha = 0.16f))
@@ -287,7 +287,6 @@ fun VProgress(progress: Float?, modifier: Modifier = Modifier, height: Dp = 6.dp
     val c = Vesper.colors
     val track = c.text.copy(alpha = 0.10f)
     val start = tone.takeIf { it != Color.Unspecified } ?: c.accent
-    val end = tone.takeIf { it != Color.Unspecified } ?: c.accent2
     val sweep = if (progress == null) {
         val transition = rememberInfiniteTransition(label = "sweep")
         val t by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(1300, easing = LinearEasing), RepeatMode.Restart), label = "sweepT")
@@ -298,7 +297,7 @@ fun VProgress(progress: Float?, modifier: Modifier = Modifier, height: Dp = 6.dp
     Canvas(modifier.fillMaxWidth().height(height)) {
         val radius = CornerRadius(size.height / 2f, size.height / 2f)
         drawRoundRect(track, size = size, cornerRadius = radius)
-        val brush = Brush.horizontalGradient(listOf(start, end), startX = 0f, endX = size.width)
+        val brush = SolidColor(start)
         if (progress != null) {
             val width = (size.width * progress.coerceIn(0f, 1f)).coerceAtLeast(if (progress > 0f) size.height else 0f)
             if (width > 0f) drawRoundRect(brush, size = Size(width, size.height), cornerRadius = radius)

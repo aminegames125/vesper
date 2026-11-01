@@ -70,11 +70,11 @@ fun VCard(
     Column(base.glass(shape, strong).padding(padding), content = content)
 }
 
-/** The heading of a group: small, spaced capitals, with an optional control on the right. */
+/** The heading of a group, in sentence case, with an optional control on the right. */
 @Composable
 fun SectionHeader(text: String, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
-    Row(modifier.fillMaxWidth().padding(top = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        VText(text.uppercase(), Modifier.weight(1f), style = Vesper.type.label, color = Vesper.colors.textFaint, maxLines = 1)
+    Row(modifier.fillMaxWidth().padding(top = 28.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        VText(text, Modifier.weight(1f), style = Vesper.type.heading, maxLines = 1)
         trailing?.invoke()
     }
 }
@@ -110,15 +110,14 @@ fun VTopBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifier,
     }
 }
 
-/** The floating action: an accent pill with a glow. */
+/** The one main action of a screen: a solid accent pill. */
 @Composable
 fun VFab(text: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = Vesper.colors
     Row(
         modifier
-            .shadow(6.dp, Shapes.pill, ambientColor = Color.Black, spotColor = Color.Black)
-            .pressable(onClick, Shapes.pill, focusScale = 1.08f)
-            .background(Brush.horizontalGradient(listOf(c.accent, c.accent2)), Shapes.pill)
+            .pressable(onClick, Shapes.pill, focusScale = 1.06f)
+            .background(c.accent, Shapes.pill)
             .heightIn(min = 54.dp)
             .padding(horizontal = 22.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -146,25 +145,28 @@ fun VRow(
 ) {
     val c = Vesper.colors
     val base = if (onClick != null) modifier.pressable(onClick, Shapes.tile, focusScale = 1.02f) else modifier
-    Row(
-        base.fillMaxWidth().glass(Shapes.tile).padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        leading?.invoke()
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            VText(title, style = Vesper.type.bodyStrong, color = titleColor, maxLines = 1)
-            if (subtitle != null) {
-                VText(subtitle, style = Vesper.type.small, color = subtitleColor.takeIf { it != Color.Unspecified } ?: c.textDim, maxLines = subtitleLines)
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            base.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 4.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            leading?.invoke()
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                VText(title, style = Vesper.type.bodyStrong, color = titleColor, maxLines = 1)
+                if (subtitle != null) {
+                    VText(subtitle, style = Vesper.type.small, color = subtitleColor.takeIf { it != Color.Unspecified } ?: c.textDim, maxLines = subtitleLines)
+                }
             }
+            trailing?.invoke()
         }
-        trailing?.invoke()
+        VDivider()
     }
 }
 
 /**
- * A 16:9 picture for a recording or a channel. With no picture it shows a soft gradient and the
- * first letter, so a list of them still looks designed. A [progress] draws a bar along the bottom.
+ * A 16:9 picture for a recording or a channel. With no picture it shows a flat tile and the
+ * first letter. A [progress] draws a bar along the bottom.
  */
 @Composable
 fun Poster(
@@ -180,7 +182,7 @@ fun Poster(
     Box(
         modifier
             .clip(shape)
-            .background(Brush.linearGradient(listOf(c.surfaceTop, c.surfaceHi, c.surface))),
+            .background(c.surfaceHi),
         contentAlignment = Alignment.Center,
     ) {
         if (url == null) {
@@ -334,15 +336,8 @@ fun VEmpty(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(
-            Modifier
-                .size(84.dp)
-                .background(Brush.radialGradient(listOf(c.accent.copy(alpha = 0.30f), Color.Transparent)), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(Modifier.size(56.dp).glass(Shapes.field, strong = true), contentAlignment = Alignment.Center) {
-                VIcon(icon, null, tint = c.accent, size = 26.dp)
-            }
+        Box(Modifier.size(56.dp).glass(Shapes.field, strong = true), contentAlignment = Alignment.Center) {
+            VIcon(icon, null, tint = c.accent, size = 26.dp)
         }
         Spacer(Modifier.size(4.dp))
         VText(title, style = Vesper.type.title, textAlign = TextAlign.Center)

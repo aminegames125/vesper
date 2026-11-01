@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,6 +54,7 @@ import dev.aminegames125.vesper.cast.CastSupport
 import dev.aminegames125.vesper.ui.kit.Ic
 import dev.aminegames125.vesper.ui.kit.LoadingBox
 import dev.aminegames125.vesper.ui.kit.Shapes
+import dev.aminegames125.vesper.ui.kit.VDivider
 import dev.aminegames125.vesper.ui.kit.ToastHost
 import dev.aminegames125.vesper.ui.kit.VIcon
 import dev.aminegames125.vesper.ui.kit.VText
@@ -287,36 +290,27 @@ private fun MainScaffold(vm: VesperViewModel, gate: Gate.Ready, isTv: Boolean) {
     }
 }
 
-/**
- * The phone's navigation: a floating glass pill. The page you are on is a lit capsule with its
- * name; the others are just their icons, so the bar stays small and calm.
- */
+/** The phone's navigation: a flat bar, each destination an icon over its name, the current one in the accent. */
 @Composable
 private fun PhoneNav(tabs: List<Tab>, route: String?, onSelect: (String) -> Unit) {
     val c = Vesper.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 10.dp)
-            .glass(Shapes.pill, strong = true)
-            .padding(6.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        tabs.forEach { tab ->
-            val selected = route == tab.route
-            val weight by animateFloatAsState(if (selected) 1.9f else 1f, spring(dampingRatio = 0.8f, stiffness = 380f), label = "navWeight")
-            Row(
-                Modifier
-                    .weight(weight)
-                    .height(48.dp)
-                    .pressable({ onSelect(tab.route) }, Shapes.pill, role = Role.Tab, focusScale = 1.03f)
-                    .background(if (selected) c.accentSoft else Color.Transparent, Shapes.pill),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                VIcon(tab.icon, if (selected) null else tab.label, tint = if (selected) c.accent else c.textDim, size = 22.dp)
-                if (selected) VText(tab.label, style = Vesper.type.button, color = c.accent, maxLines = 1)
+    Column(Modifier.fillMaxWidth().background(c.bg)) {
+        VDivider()
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            tabs.forEach { tab ->
+                val selected = route == tab.route
+                val ink = if (selected) c.accent else c.textDim
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .heightIn(min = 56.dp)
+                        .pressable({ onSelect(tab.route) }, Shapes.tile, role = Role.Tab, focusScale = 1.02f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
+                ) {
+                    VIcon(tab.icon, null, tint = ink, size = 24.dp)
+                    VText(tab.label, style = Vesper.type.small.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium), color = ink, maxLines = 1)
+                }
             }
         }
     }
