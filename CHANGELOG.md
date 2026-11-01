@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.28.0] - 2026-11-01 <!-- release: minor; push: 40; changes: 1 -->
+
+### Added
+- Server plugins and Kodi extensions
+
 ## [0.27.3] - 2026-11-01 <!-- release: patch; push: 39; changes: 1 -->
 
 ### Changed
