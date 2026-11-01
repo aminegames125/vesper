@@ -13,9 +13,9 @@ android {
         applicationId = "dev.aminegames125.vesper"
         minSdk = 26
         targetSdk = 35
-        // CI overrides these from the release tag (-PversionName=0.23.0 -PversionCode=2300).
-        versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 2300
-        versionName = (findProperty("versionName") as String?) ?: "0.23.0"
+        // CI overrides these from the release tag (-PversionName=0.22.2 -PversionCode=2202).
+        versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 2202
+        versionName = (findProperty("versionName") as String?) ?: "0.22.2"
     }
 
     signingConfigs {
@@ -67,7 +67,8 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.androidx.datastore)
@@ -83,6 +84,7 @@ dependencies {
     implementation(libs.play.services.cast.framework)
     implementation(libs.androidx.mediarouter)
     implementation(libs.coil.compose)
+    implementation(libs.androidx.tv.material)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

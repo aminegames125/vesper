@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/aminegames125/vesper/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/aminegames125/vesper/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white&style=for-the-badge&color=FF5C7A&labelColor=151518" /></a>
-  <!-- version:start --><img alt="Version" src="https://img.shields.io/badge/version-0.23.0-FF5C7A?style=for-the-badge&labelColor=151518" /> <img alt="minor update" src="https://img.shields.io/badge/release-minor-FF5C7A?style=for-the-badge&labelColor=151518" /><!-- version:end -->
+  <!-- version:start --><img alt="Version" src="https://img.shields.io/badge/version-0.22.2-FF5C7A?style=for-the-badge&labelColor=151518" /> <img alt="patch update" src="https://img.shields.io/badge/release-patch-FF5C7A?style=for-the-badge&labelColor=151518" /><!-- version:end -->
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-FF5C7A?style=for-the-badge&labelColor=151518" /></a>
 </p>
 
@@ -27,7 +27,7 @@
 Vesper is a **recorder first**. It uses your own IPTV playlist (an M3U link or an Xtream login) and does one job well: record what you chose, keep the disk tidy, and let you watch it later. You can also watch a channel live, pick a lower picture quality on a slow connection, and cast it to a Chromecast. See the [website](https://aminegames125.github.io/vesper/) for a tour.
 
 - **Record now** or **schedule** it: once, daily, weekdays, weekends or on the days you pick.
-- **Native Android and Android TV app.** A custom Compose design system (ink and coral, glass panes, a floating nav on the phone and a focus rail on TV), no webview. One APK for phone, tablet and TV.
+- **Native Android and Android TV app.** Material 3, the system's own colours, no webview. One APK for phone, tablet and TV.
 - **A server for Linux and Windows** (and Docker). One small binary, no database to install, and ffmpeg only if you want thumbnails and MP4 export.
 
 ## ✨ What it does
@@ -95,7 +95,7 @@ Download `Vesper-…-android.apk` from the [latest release](https://github.com/a
 
 ## 📱 The Android app
 
-Vesper has its own look and does not use Material. The design system lives in `apps/android/app/src/main/java/dev/aminegames125/vesper/ui/kit`: colour and type tokens, line icons drawn as vectors, glass surfaces, pill buttons, dialogs, pickers and the TV focus effects. It always keeps its own colours (dark "Night" or light "Paper"), and a TV is always dark.
+Everything on screen is a standard Material 3 component, so it looks like part of your phone. On Android 12 and later it picks up your wallpaper colours.
 
 | Screen | What you do there |
 | --- | --- |
@@ -180,7 +180,7 @@ curl -X POST http://localhost:8484/api/v1/schedules \
 ```mermaid
 flowchart LR
   subgraph You
-    A["Android / Android TV app<br/>(Kotlin, Compose, own design system)"]
+    A["Android / Android TV app<br/>(Kotlin, Compose, Material 3)"]
   end
   subgraph "A machine that stays on"
     S["vesper-server (Rust)<br/>schedules · recorder · API"]

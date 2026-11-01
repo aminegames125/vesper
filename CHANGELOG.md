@@ -2,11 +2,6 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.23.0] - 2026-11-01 <!-- release: minor; push: 31; changes: 1 -->
-
-### Added
-- Own design system (no Material) and live TV playback fixes (#8)
-
 ## [0.22.2] - 2026-11-01 <!-- release: patch; push: 30; changes: 1 -->
 
 ### Fixed

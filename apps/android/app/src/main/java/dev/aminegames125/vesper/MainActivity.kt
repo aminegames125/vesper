@@ -9,12 +9,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import dev.aminegames125.vesper.ui.VesperRoot
-import dev.aminegames125.vesper.ui.kit.backdrop
 import dev.aminegames125.vesper.ui.VesperViewModel
 import dev.aminegames125.vesper.ui.theme.VesperTheme
 
@@ -47,7 +46,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val theme by vm.theme.collectAsState()
             VesperTheme(isTv, theme) {
-                Box(Modifier.fillMaxSize().backdrop()) { VesperRoot(isTv) }
+                Surface(Modifier.fillMaxSize()) { VesperRoot(isTv) }
             }
         }
     }
