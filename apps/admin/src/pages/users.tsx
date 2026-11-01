@@ -7,7 +7,19 @@ import {
 } from "@vesper/cloud-client";
 import { type FormEvent, useState } from "react";
 import { useAction, useLoad } from "../hooks";
-import { Badge, Button, Card, Empty, Field, Modal, Select, when } from "../ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Empty,
+  Field,
+  Modal,
+  Notice,
+  PageHeader,
+  ROW,
+  Select,
+  when,
+} from "../ui";
 
 const GB = 1024 ** 3;
 const limit = (n: number, unit = "") => (n === 0 ? "no limit" : `${n}${unit}`);
@@ -20,12 +32,8 @@ export function UsersPage({ client, me }: { client: CloudClient; me: CloudUser }
 
   return (
     <div>
-      <h1 className="mb-6 text-3xl font-bold">Users</h1>
-      {(error || message) && (
-        <p role="alert" className="mb-4 text-sm text-accent">
-          {error ?? message}
-        </p>
-      )}
+      <PageHeader title="Users" lead="Accounts on this server, their limits and who is online." />
+      <Notice>{error ?? message}</Notice>
       <Card
         title={`${users?.length ?? 0} accounts`}
         actions={
@@ -39,7 +47,7 @@ export function UsersPage({ client, me }: { client: CloudClient; me: CloudUser }
         )}
         <ul className="divide-y divide-line">
           {users?.map((u) => (
-            <li key={u.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-4">
+            <li key={u.id} className={ROW}>
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 font-semibold">
                   {u.username}
@@ -180,7 +188,7 @@ function UserForm({
           hint="At least 8 characters. Changing it signs the user out everywhere."
         />
         <Select label="Role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-          <option value="user">User: watch, sync and record</option>
+          <option value="user">User: watch, sync, and record from Kodi</option>
           <option value="guest">Guest: watch and sync only</option>
           <option value="admin">Admin: manage everything</option>
         </Select>

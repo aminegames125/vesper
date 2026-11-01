@@ -9,7 +9,7 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 
-from . import api, bridge, common, discovery
+from . import api, bridge, common, discovery, downloads, library, plugins, syncstate, vod
 
 HANDLE = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else -1
 BASE = "plugin://plugin.video.vesper/"
@@ -118,8 +118,15 @@ def root():
         parts.append("%d coming up" % soon)
     add(url(action="recordings", view="continue"), item("Continue watching" + (" (%d)" % resumable if resumable else "")), True)
     add(url(action="recordings", view="active"), item("Recording now and coming up", plot=", ".join(parts)), True)
-    add(url(action="recordings", view="done"), item("Recordings"), True)
+    add(url(action="recordings", view="done", kind="recording"), item("Recordings"), True)
+    add(url(action="vod", kind="movie"), item("Movies", plot="Movies from your providers: play them or save them to the server."), True)
+    add(url(action="vod", kind="series"), item("Series", plot="Shows and seasons from your providers."), True)
+    add(url(action="downloads"), item("Downloads", plot="Movies, episodes and videos saved on your server."), True)
+    add(url(action="favorites"), item("Favourites", plot="Kept in step on all your devices."), True)
     add(url(action="schedules"), item("Schedules", plot="What records on its own: repeating schedules and series."), True)
+    add(url(action="plugins"), item("Add-ons Vesper can save from", plot="YouTube, Twitch, Vimeo and more."), True)
+    add(url(action="download_address"), item("Download from a web address", plot="Paste a link: a video, a YouTube live, a movie file."), False)
+    add(url(action="sync_now"), item("Sync now", plot="Favourites and resume points, and the Kodi library files."), False)
     add(url(action="status"), item("Server", plot="Disk space, what is next, and your account."), False)
     if not providers:
         add(
@@ -222,10 +229,10 @@ def recording_item(c, r):
     return (url(action="play", id=r["id"]) if playable else url(action="noop")), li, False
 
 
-def recordings(view="done", tag=""):
+def recordings(view="done", tag="", kind=""):
     try:
         c = get_client()
-        data = c.recordings(tag=tag)
+        data = c.recordings(tag=tag, kind=kind)
     except api.VesperError as e:
         return failed(e)
     rows = data.get("recordings", [])
@@ -240,7 +247,7 @@ def recordings(view="done", tag=""):
         rows = [r for r in rows if r["status"] in ("done", "failed")]
         if not tag:
             for name in data.get("tags", []):
-                add(url(action="recordings", view="done", tag=name), item(name), True)
+                add(url(action="recordings", view="done", tag=name, kind=kind), item(name), True)
     for r in rows:
         target, li, folder = recording_item(c, r)
         add(target, li, folder)
@@ -408,6 +415,173 @@ def rule_menu(rid, paused, title):
         act(lambda c: c.delete_rule(rid), "Deleted")
 
 
+# -- movies and series ----------------------------------------------------------------------
+
+PAGE = 100
+
+
+def vod_item(entry, kind):
+    """One playable movie or episode, with save and favourite in its menu."""
+    art = {"icon": entry.get("logo", ""), "thumb": entry.get("logo", "")}
+    target = url(action="play_url", url=entry["url"], title=entry["name"])
+    menu = [
+        ("Download with Vesper", "RunPlugin(%s)" % url(action="dl", url=entry["url"], title=entry["name"], group=entry.get("group", ""))),
+        ("Download, choosing the encoder", "RunPlugin(%s)" % url(action="dl", url=entry["url"], title=entry["name"], ask="1")),
+        ("Favourite or unfavourite", "RunPlugin(%s)" % url(action="fav", url=entry["url"], title=entry["name"], kind=kind)),
+    ]
+    return target, item(entry["name"], art, entry.get("group", ""), playable=True, menu=menu), False
+
+
+def vod_view(kind="movie", group="", offset=0):
+    try:
+        c = get_client()
+        data = c.channels("all", group=group, kind=kind, offset=offset, limit=PAGE if kind == "movie" or not group else 500)
+    except api.VesperError as e:
+        return failed(e)
+    entries = data.get("channels", [])
+    if not group:
+        groups = sorted(set(g for g in data.get("groups", []) if g))
+        for name in groups:
+            add(url(action="vod", kind=kind, group=name), item(name), True)
+        if not groups:
+            add(url(action="noop"), item("Nothing here yet. Connect your IPTV providers first."), False)
+        return finish("videos")
+    if kind == "series":
+        for show in sorted(vod.shows(entries)):
+            add(url(action="show", group=group, show=show), item(show), True)
+        return finish("tvshows")
+    for entry in entries:
+        target, li, folder = vod_item(entry, kind)
+        add(target, li, folder)
+    total = data.get("total", 0)
+    if offset + PAGE < total:
+        add(url(action="vod", kind=kind, group=group, offset=offset + PAGE), item("Next page (%d more)" % (total - offset - PAGE)), True)
+    finish("movies")
+
+
+def show(group, name, season=None):
+    try:
+        c = get_client()
+        data = c.channels("all", group=group, kind="series", limit=500)
+    except api.VesperError as e:
+        return failed(e)
+    seasons = vod.shows(data.get("channels", [])).get(name, {})
+    if season is None and len(seasons) > 1:
+        add(url(action="dl_many", group=group, show=name), item("Download every episode"), False)
+        for number in sorted(seasons):
+            label = "Season %d" % number if number else "Episodes"
+            add(url(action="show", group=group, show=name, season=number), item(label, plot="%d episodes" % len(seasons[number])), True)
+        return finish("seasons")
+    picked = [int(season)] if season is not None else list(seasons)
+    for number in sorted(picked):
+        for episode, entry in seasons.get(number, []):
+            target, li, folder = vod_item(entry, "series")
+            add(target, li, folder)
+    add(url(action="dl_many", group=group, show=name, season=season if season is not None else ""), item("Download these episodes"), False)
+    finish("episodes")
+
+
+def download_many(group, name, season=""):
+    try:
+        c = get_client()
+        data = c.channels("all", group=group, kind="series", limit=500)
+    except api.VesperError as e:
+        return say(str(e), error=True)
+    seasons = vod.shows(data.get("channels", [])).get(name, {})
+    numbers = [int(season)] if str(season).isdigit() else sorted(seasons)
+    entries = [entry for n in numbers for _, entry in seasons.get(n, [])]
+    downloads.many(c, entries, name + (" season %s" % season if str(season).isdigit() else ""))
+
+
+def play_url(address, title):
+    """Plays a provider's movie or episode, resuming from a point kept by sync."""
+    offset = 0
+    saved = library.store().get(syncstate.resume_key(address))
+    if isinstance(saved, dict) and saved.get("at", 0) > 30 and not saved.get("done") and common.setting("ask_resume") != "false":
+        pick = xbmcgui.Dialog().select(title, ["Resume from " + clock(saved["at"]), "Start from the beginning"])
+        if pick < 0:
+            return xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
+        offset = saved["at"] if pick == 0 else 0
+    li = xbmcgui.ListItem(label=title, path=address)
+    if offset:
+        li.setProperty("StartOffset", str(offset))
+    xbmcplugin.setResolvedUrl(HANDLE, True, li)
+
+
+def download_one(address, title, group="", ask=False):
+    try:
+        c = get_client()
+    except api.VesperError as e:
+        return say(str(e), error=True)
+    downloads.start(c, title, address, tag=group, ask=ask)
+
+
+# -- downloads, favourites, add-ons ---------------------------------------------------------
+
+
+def download_list():
+    try:
+        c = get_client()
+        data = c.recordings(kind="download")
+    except api.VesperError as e:
+        return failed(e)
+    add(url(action="download_address"), item("Download from a web address", plot="Paste a link: a video, a YouTube live, a movie file."), False)
+    for r in data.get("recordings", []):
+        target, li, folder = recording_item(c, r)
+        if r["status"] == "recording":
+            total = r.get("totalBytes")
+            li.setLabel("[COLOR FFFF5C7A]%s[/COLOR]  %s" % ("%d%%" % (100 * r["bytes"] // total) if total else "...", r["title"]))
+        add(target, li, folder)
+    finish("videos")
+
+
+def favorites():
+    rows = syncstate.favorites(library.store())
+    for r in rows:
+        target = url(action="play_url", url=r["url"], title=r["name"])
+        menu = [
+            ("Download with Vesper", "RunPlugin(%s)" % url(action="dl", url=r["url"], title=r["name"])),
+            ("Remove from favourites", "RunPlugin(%s)" % url(action="fav", url=r["url"], title=r["name"], kind=r.get("kind", "movie"))),
+        ]
+        add(target, item(r["name"], playable=True, menu=menu), False)
+    if not rows:
+        add(url(action="noop"), item("No favourites yet. Press the menu button on a movie or episode."), False)
+    finish("videos")
+
+
+def toggle_favorite(address, title, kind):
+    store = library.store()
+    added = syncstate.toggle_favorite(store, {"name": title, "url": address, "kind": kind or "movie"})
+    store.save()
+    say(("Added to favourites: " if added else "Removed from favourites: ") + title)
+    refresh()
+    try:
+        library.run_sync()
+    except Exception:
+        pass
+
+
+def plugin_list():
+    have = {addon_id for addon_id, _ in plugins.installed(lambda a: xbmc.getCondVisibility("System.HasAddon(%s)" % a))}
+    for addon_id, name, _ in plugins.PLUGINS:
+        label = name if addon_id in have else "[COLOR FF9A9AA3]%s (not installed)[/COLOR]" % name
+        add(url(action="plugin_info", id=addon_id, title=name), item(label, plot=addon_id), False)
+    finish("videos")
+
+
+def plugin_info(addon_id, name):
+    installed = xbmc.getCondVisibility("System.HasAddon(%s)" % addon_id)
+    if installed and xbmcgui.Dialog().yesno(
+        name,
+        "Open %s, highlight a video and press the menu button (or long press), then choose Download with Vesper. YouTube live streams work too." % name,
+        nolabel="OK",
+        yeslabel="Open " + name,
+    ):
+        xbmc.executebuiltin("ActivateWindow(Videos,plugin://%s/,return)" % addon_id)
+    elif not installed:
+        xbmcgui.Dialog().ok(name, "%s is not installed. Install it from Kodi's add-on browser, then come back." % name)
+
+
 # -- server and account ---------------------------------------------------------------------
 
 
@@ -500,7 +674,31 @@ def route(query):
     if action == "":
         root()
     elif action == "recordings":
-        recordings(q.get("view", "done"), q.get("tag", ""))
+        recordings(q.get("view", "done"), q.get("tag", ""), q.get("kind", ""))
+    elif action == "vod":
+        vod_view(q.get("kind", "movie"), q.get("group", ""), int(q.get("offset", 0) or 0))
+    elif action == "show":
+        show(q["group"], q["show"], q.get("season"))
+    elif action == "play_url":
+        play_url(q["url"], q.get("title", ""))
+    elif action == "dl":
+        download_one(q["url"], q.get("title", "Video"), q.get("group", ""), q.get("ask") == "1")
+    elif action == "dl_many":
+        download_many(q["group"], q["show"], q.get("season", ""))
+    elif action == "downloads":
+        download_list()
+    elif action == "download_address":
+        downloads.from_address()
+    elif action == "favorites":
+        favorites()
+    elif action == "fav":
+        toggle_favorite(q["url"], q.get("title", ""), q.get("kind", "movie"))
+    elif action == "plugins":
+        plugin_list()
+    elif action == "plugin_info":
+        plugin_info(q["id"], q.get("title", ""))
+    elif action == "sync_now":
+        library.run_sync(loud=True)
     elif action == "play":
         play(q["id"])
     elif action == "schedules":

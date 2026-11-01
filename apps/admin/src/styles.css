@@ -1,35 +1,11 @@
 @import "tailwindcss";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/bricolage-grotesque";
-
-/* Vesper palette: ink, warm paper, one coral accent. Dark is the default. */
-:root {
-  --ink: #0d0d0f;
-  --panel: #151518;
-  --raised: #1e1e22;
-  --line: #2a2a30;
-  --paper: #f4f1ea;
-  --muted: #9a9aa3;
-  --accent: #ff5c7a;
-  --on-accent: #0d0d0f;
-  --tint: #3a1d27;
-  color-scheme: dark;
-}
-html[data-theme="light"] {
-  --ink: #fbf9f8;
-  --panel: #ffffff;
-  --raised: #f3efee;
-  --line: #e8e2e0;
-  --paper: #1b1b1f;
-  --muted: #6e6a6c;
-  --accent: #d81b60;
-  --on-accent: #ffffff;
-  --tint: #fce4ec;
-  color-scheme: light;
-}
+@import "./tokens.css";
 
 @theme inline {
   --color-ink: var(--ink);
+  --color-sunken: var(--sunken);
   --color-panel: var(--panel);
   --color-raised: var(--raised);
   --color-line: var(--line);
@@ -38,8 +14,13 @@ html[data-theme="light"] {
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
   --color-tint: var(--tint);
+  --color-dusk: var(--dusk);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
   --font-sans: "Geist Variable", system-ui, sans-serif;
   --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
 }
 
 @layer base {
@@ -52,12 +33,15 @@ html[data-theme="light"] {
     background: var(--ink);
     color: var(--paper);
     font-family: var(--font-sans);
+    font-size: var(--text-base);
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
-    user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
   input,
-  textarea {
+  textarea,
+  select,
+  .selectable {
     user-select: text;
   }
   h1,
@@ -89,30 +73,25 @@ html[data-theme="light"] {
     border: 3px solid transparent;
     background-clip: content-box;
   }
+  dialog::backdrop {
+    background: rgb(5 5 8 / 0.72);
+  }
+  input,
+  textarea,
+  select {
+    caret-color: var(--accent);
+    accent-color: var(--accent);
+  }
 }
 
 @layer components {
-  .fade {
-    transition:
-      background-color 120ms ease,
-      color 120ms ease,
-      border-color 120ms ease,
-      opacity 120ms ease,
-      transform 120ms ease;
-  }
   .surface {
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 1rem;
+    border-radius: var(--radius-lg);
   }
-  .lift {
-    transition:
-      transform 160ms ease,
-      border-color 160ms ease;
-  }
-  .lift:hover {
-    transform: translateY(-2px);
-    border-color: color-mix(in oklab, var(--accent) 55%, var(--line));
+  .hairline {
+    border-color: color-mix(in oklab, var(--line) 70%, transparent);
   }
   .rail-scroll {
     scrollbar-width: none;
@@ -123,24 +102,13 @@ html[data-theme="light"] {
   .scrim {
     background: linear-gradient(to top, rgb(0 0 0 / 0.85), rgb(0 0 0 / 0));
   }
-  .glass {
-    background: color-mix(in oklab, var(--panel) 80%, transparent);
-    backdrop-filter: blur(18px) saturate(1.4);
+  /* Keeps the page scrollable on phones without the bottom bar covering the last row. */
+  .safe-bottom {
+    padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   }
-}
-
-/* Surfaces that stay dark in the light theme: the player and detail heroes. */
-.scope-dark {
-  --ink: #0d0d0f;
-  --panel: #151518;
-  --raised: #1e1e22;
-  --line: #2a2a30;
-  --paper: #f4f1ea;
-  --muted: #a3a1ad;
-  --accent: #ff5c7a;
-  --on-accent: #0d0d0f;
-  --tint: #3a1d27;
-  color: var(--paper);
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

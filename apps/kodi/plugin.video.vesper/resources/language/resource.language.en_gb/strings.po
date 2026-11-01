@@ -78,3 +78,119 @@ msgstr ""
 msgctxt "#30018"
 msgid "Advanced"
 msgstr ""
+
+msgctxt "#30020"
+msgid "Download with Vesper"
+msgstr ""
+
+msgctxt "#30021"
+msgid "Downloads"
+msgstr ""
+
+msgctxt "#30022"
+msgid "Encoder for downloads"
+msgstr ""
+
+msgctxt "#30023"
+msgid "Quality for web videos"
+msgstr ""
+
+msgctxt "#30024"
+msgid "Ask me for the encoder every time"
+msgstr ""
+
+msgctxt "#30025"
+msgid "Sync"
+msgstr ""
+
+msgctxt "#30026"
+msgid "Keep favourites and resume points in step with the server"
+msgstr ""
+
+msgctxt "#30027"
+msgid "Add finished downloads to Kodi's video library"
+msgstr ""
+
+msgctxt "#30028"
+msgid "Folder for the library files (empty = the add-on's own)"
+msgstr ""
+
+msgctxt "#30029"
+msgid "Sync now"
+msgstr ""
+
+msgctxt "#30040"
+msgid "Original (no re-encode)"
+msgstr ""
+
+msgctxt "#30041"
+msgid "H.264 (x264)"
+msgstr ""
+
+msgctxt "#30042"
+msgid "H.265 / HEVC (x265)"
+msgstr ""
+
+msgctxt "#30043"
+msgid "AV1 (SVT-AV1)"
+msgstr ""
+
+msgctxt "#30044"
+msgid "VP9"
+msgstr ""
+
+msgctxt "#30045"
+msgid "H.264 (NVIDIA NVENC)"
+msgstr ""
+
+msgctxt "#30046"
+msgid "H.265 (NVIDIA NVENC)"
+msgstr ""
+
+msgctxt "#30047"
+msgid "H.264 (Intel Quick Sync)"
+msgstr ""
+
+msgctxt "#30048"
+msgid "H.265 (Intel Quick Sync)"
+msgstr ""
+
+msgctxt "#30049"
+msgid "H.264 (AMD AMF)"
+msgstr ""
+
+msgctxt "#30050"
+msgid "H.265 (AMD AMF)"
+msgstr ""
+
+msgctxt "#30051"
+msgid "H.264 (Apple VideoToolbox)"
+msgstr ""
+
+msgctxt "#30052"
+msgid "H.265 (Apple VideoToolbox)"
+msgstr ""
+
+msgctxt "#30060"
+msgid "Best available"
+msgstr ""
+
+msgctxt "#30061"
+msgid "Up to 4K"
+msgstr ""
+
+msgctxt "#30062"
+msgid "Up to 1080p"
+msgstr ""
+
+msgctxt "#30063"
+msgid "Up to 720p"
+msgstr ""
+
+msgctxt "#30064"
+msgid "Up to 480p"
+msgstr ""
+
+msgctxt "#30065"
+msgid "Audio only (MP3)"
+msgstr ""

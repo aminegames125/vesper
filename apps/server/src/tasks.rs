@@ -12,6 +12,7 @@ static LAST_WAKE: Mutex<Option<i64>> = Mutex::new(None);
 
 /// Called every 5 seconds with a counter that starts at 1.
 pub fn run(state: &AppState, tick: u64) {
+    start_queued_downloads(state);
     if tick.is_multiple_of(6) {
         retry_failed(state);
         crate::epg::match_series(state);
@@ -42,6 +43,24 @@ pub fn run(state: &AppState, tick: u64) {
     if tick == 90 || tick.is_multiple_of(120_960) {
         let state = state.clone();
         tokio::spawn(async move { check_update(&state).await });
+    }
+}
+
+/// Downloads wait in the queue when too many are running; this starts them as slots free up.
+fn start_queued_downloads(state: &AppState) {
+    let ids: Vec<String> = {
+        let conn = state.db.conn();
+        let Ok(mut stmt) = conn.prepare(
+            "SELECT id FROM recordings WHERE kind = 'download' AND status = 'queued' ORDER BY created_at LIMIT 10",
+        ) else {
+            return;
+        };
+        stmt.query_map([], |r| r.get(0))
+            .map(|rows| rows.flatten().collect())
+            .unwrap_or_default()
+    };
+    for id in ids {
+        jobs::start(state, &id);
     }
 }
 

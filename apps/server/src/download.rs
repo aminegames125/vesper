@@ -15,9 +15,11 @@ use tokio::io::AsyncWriteExt;
 
 use crate::{
     db::now,
+    encode,
     jobs::{free_disk, recording_dir, remove_files, storage_used, MIN_FREE_BYTES},
     net::check_target,
     state::AppState,
+    ytdlp,
 };
 
 /// Extensions a saved file may keep; anything else is stored as `.mp4`.
@@ -36,7 +38,7 @@ pub fn file_name_for(url: &str) -> String {
     format!("file.{ext}")
 }
 
-enum Ended {
+pub enum Ended {
     Complete,
     Stopped,
     /// The account's storage or the disk ran out.
@@ -54,14 +56,61 @@ pub async fn run(
 ) {
     let started = Instant::now();
     let dir = recording_dir(&state, &user_id, &id);
-    let outcome = fetch(&state, &id, &user_id, &url, &dir, &stop, started).await;
+    let (engine, encoder, quality, live): (String, String, String, bool) = state
+        .db
+        .conn()
+        .query_row(
+            "SELECT engine, encoder, dl_quality, live FROM recordings WHERE id = ?1",
+            [&id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get::<_, i64>(3)? != 0)),
+        )
+        .unwrap_or_else(|_| ("direct".into(), "copy".into(), "best".into(), false));
+    let mut outcome = if engine == "ytdlp" {
+        let request = ytdlp::Request {
+            url: &url,
+            quality: &quality,
+            encoder: &encoder,
+            live,
+        };
+        ytdlp::fetch(&state, &id, &user_id, &dir, &request, &stop, started).await
+    } else {
+        fetch(&state, &id, &user_id, &url, &dir, &stop, started).await
+    };
     state
         .jobs
         .lock()
         .unwrap_or_else(|p| p.into_inner())
         .remove(&id);
 
-    let name = file_name_for(&url);
+    let mut name = if engine == "ytdlp" {
+        ytdlp::settled_file(&dir)
+            .await
+            .unwrap_or_else(|| file_name_for(&url))
+    } else {
+        file_name_for(&url)
+    };
+    // A direct file is converted afterwards; yt-dlp already converted while it merged.
+    if engine != "ytdlp" && encoder != "copy" && matches!(outcome, Ok(Ended::Complete)) {
+        match encode::validate(&encoder) {
+            Ok(chosen) => {
+                let input = dir.join(&name);
+                let output = dir.join("encoded.mp4");
+                if encode::transcode(&input, &output, chosen).await {
+                    let _ = tokio::fs::remove_file(&input).await;
+                    let _ = tokio::fs::rename(&output, dir.join("file.mp4")).await;
+                    name = "file.mp4".into();
+                } else {
+                    let _ = tokio::fs::remove_file(&output).await;
+                    outcome = Err("The conversion failed. The original was not kept.".into());
+                }
+            }
+            Err(e) => outcome = Err(e),
+        }
+    }
+    let _ = state.db.conn().execute(
+        "UPDATE recordings SET file_name = ?1 WHERE id = ?2",
+        params![name, id],
+    );
     let size = std::fs::metadata(dir.join(&name))
         .map(|m| m.len() as i64)
         .unwrap_or(0);

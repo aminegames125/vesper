@@ -7,6 +7,7 @@ mod recordings;
 mod schedules;
 pub mod sources;
 mod status;
+mod sync;
 
 use axum::{
     routing::{delete, get, post},
@@ -33,6 +34,7 @@ pub const SETTING_DEFAULTS: &[(&str, &str)] = &[
     ("quiet_start", ""),
     ("quiet_end", ""),
     ("update_check", "true"),
+    ("default_encoder", "copy"),
 ];
 
 pub fn router() -> Router<AppState> {
@@ -81,6 +83,10 @@ pub fn router() -> Router<AppState> {
         .route("/share/{token}/download", get(library::shared_download))
         .route("/recordings/clear-failed", post(recordings::clear_failed))
         .route("/status", get(status::status))
+        .route("/capabilities", get(sync::capabilities))
+        .route("/sync", get(sync::pull).put(sync::push))
+        .route("/sync/{key}", delete(sync::forget))
+        .route("/admin/sync", get(sync::overview))
         .route("/channels/test", post(status::test_channel))
         .route("/schedules/pause", post(schedules::pause_all))
         .route("/schedules/export", get(schedules::export))

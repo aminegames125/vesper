@@ -1,26 +1,31 @@
 import type { CloudClient } from "@vesper/cloud-client";
 import { useLoad } from "../hooks";
-import { Card, Empty, when } from "../ui";
+import { Badge, Card, Empty, Notice, PageHeader, when } from "../ui";
 
 export function AuditPage({ client }: { client: CloudClient }) {
   const { data: entries, error } = useLoad(() => client.admin.audit(200), 10_000);
   return (
     <div>
-      <h1 className="mb-6 text-3xl font-bold">Activity</h1>
-      {error && (
-        <p role="alert" className="mb-4 text-sm text-accent">
-          {error}
-        </p>
-      )}
+      <PageHeader title="Activity" lead="Everything that changed on this server, newest first." />
+      <Notice>{error}</Notice>
       <Card title="Latest events">
         {entries && entries.length === 0 && <Empty>Nothing has happened yet.</Empty>}
-        <ul className="divide-y divide-line font-mono text-xs">
-          {entries?.map((e, i) => (
-            <li key={i} className="flex gap-4 px-5 py-2.5">
-              <span className="w-40 flex-none text-muted">{when(e.at)}</span>
-              <span className="w-32 flex-none truncate">{e.actor}</span>
-              <span className="w-44 flex-none text-accent">{e.action}</span>
-              <span className="min-w-0 flex-1 truncate text-muted">{e.detail}</span>
+        <ul className="divide-y divide-line text-sm">
+          {entries?.map((e) => (
+            <li
+              key={`${e.at}-${e.actor}-${e.action}-${e.detail}`}
+              className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 px-[var(--card-pad)] py-3 md:grid-cols-[10rem_8rem_12rem_1fr]"
+            >
+              <span className="order-2 text-xs text-muted md:order-none md:text-sm">
+                {when(e.at)}
+              </span>
+              <span className="order-1 truncate font-medium md:order-none">{e.actor}</span>
+              <span className="order-3 md:order-none">
+                <Badge tone="dusk">{e.action}</Badge>
+              </span>
+              <span className="order-4 col-span-2 min-w-0 truncate font-mono text-xs text-muted md:order-none md:col-span-1">
+                {e.detail}
+              </span>
             </li>
           ))}
         </ul>

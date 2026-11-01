@@ -1,14 +1,21 @@
 import { CloudClient, type CloudUser, type ServerInfo } from "@vesper/cloud-client";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence } from "framer-motion";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { LogoMark } from "./logo";
 import { AuditPage } from "./pages/audit";
 import { Dashboard } from "./pages/dashboard";
+import { DownloadsPage } from "./pages/downloads";
 import { InvitesPage } from "./pages/invites";
-import { RecordingsPage } from "./pages/recordings";
-import { SchedulesPage } from "./pages/schedules";
+import { LibraryPage } from "./pages/library";
 import { SettingsPage } from "./pages/settings";
+import { SyncPage } from "./pages/sync";
 import { UsersPage } from "./pages/users";
-import { Button, Field } from "./ui";
+import { useRoute } from "./router";
+import { Shell } from "./shell";
+import { Button, Field, Notice } from "./ui";
+import { WatchHome } from "./watch/home";
+import { Library } from "./watch/library";
+import { Player } from "./watch/player";
 
 const TOKEN_KEY = "vesper-admin-token";
 
@@ -28,24 +35,11 @@ const writeToken = (token: string | null) => {
   }
 };
 
-type Page = "dashboard" | "users" | "invites" | "recordings" | "schedules" | "audit" | "settings";
-
-const PAGES: { id: Page; label: string; full?: boolean }[] = [
-  { id: "dashboard", label: "Overview" },
-  { id: "users", label: "Users", full: true },
-  { id: "invites", label: "Invites", full: true },
-  { id: "recordings", label: "Recordings" },
-  { id: "schedules", label: "Schedules" },
-  { id: "audit", label: "Activity" },
-  { id: "settings", label: "Settings" },
-];
-
 export function App() {
   const [info, setInfo] = useState<ServerInfo | null>(null);
   const [user, setUser] = useState<CloudUser | null>(null);
   const [token, setToken] = useState<string | null>(readToken);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState<Page>("dashboard");
 
   const client = useMemo(() => new CloudClient({ token }), [token]);
 
@@ -91,85 +85,92 @@ export function App() {
   if (error)
     return (
       <Centered>
-        <p className="text-accent">{error}</p>
+        <LogoMark size={44} />
+        <p className="mt-4 max-w-sm text-accent">{error}</p>
+        <Button className="mt-4" onClick={() => window.location.reload()}>
+          Try again
+        </Button>
       </Centered>
     );
   if (!info)
     return (
       <Centered>
-        <span className="size-7 animate-spin rounded-full border-2 border-line border-t-accent" />
+        <LogoMark size={52} animate />
       </Centered>
     );
 
   if (!user) return <SignIn client={client} info={info} onSession={signedIn} />;
 
-  if (user.role !== "admin") {
-    return (
-      <Centered>
-        <p className="mb-4">
-          This panel is for administrators. You are signed in as {user.username}.
-        </p>
-        <Button onClick={signOut}>Sign out</Button>
-      </Centered>
-    );
+  return <Workspace client={client} info={info} user={user} onSignOut={signOut} />;
+}
+
+function Workspace({
+  client,
+  info,
+  user,
+  onSignOut,
+}: {
+  client: CloudClient;
+  info: ServerInfo;
+  user: CloudUser;
+  onSignOut: () => void;
+}) {
+  const isAdmin = user.role === "admin";
+  const { route: wanted, go } = useRoute(isAdmin ? "manage" : "watch");
+  // Accounts that are not administrators only ever see the viewer.
+  const route = isAdmin ? wanted : { ...wanted, space: "watch" as const };
+  const lite = info.mode === "lite";
+
+  let content: ReactNode;
+  if (route.space === "manage") {
+    content = {
+      overview: <Dashboard client={client} go={go} />,
+      users: <UsersPage client={client} me={user} />,
+      invites: <InvitesPage client={client} />,
+      library: <LibraryPage client={client} />,
+      downloads: <DownloadsPage client={client} />,
+      sync: <SyncPage client={client} />,
+      activity: <AuditPage client={client} />,
+      settings: <SettingsPage client={client} lite={lite} />,
+    }[route.page] ?? <Dashboard client={client} go={go} />;
+  } else {
+    const open = (id: string) => go("watch", "play", id);
+    content = {
+      home: <WatchHome client={client} user={user} onPlay={open} go={go} />,
+      library: <Library client={client} onPlay={open} />,
+    }[route.page] ?? <WatchHome client={client} user={user} onPlay={open} go={go} />;
   }
 
-  const lite = info.mode === "lite";
-  const content = {
-    dashboard: <Dashboard client={client} />,
-    users: <UsersPage client={client} me={user} />,
-    invites: <InvitesPage client={client} />,
-    recordings: <RecordingsPage client={client} />,
-    schedules: <SchedulesPage client={client} />,
-    audit: <AuditPage client={client} />,
-    settings: <SettingsPage client={client} lite={lite} />,
-  }[page];
+  const playing = route.space === "watch" && route.page === "play" ? route.param : undefined;
 
   return (
-    <div className="flex h-full">
-      <nav className="flex w-56 flex-none flex-col border-r border-line bg-panel p-4">
-        <div className="mb-6 flex items-center gap-3 px-2">
-          <LogoMark size={30} />
-          <div>
-            <p className="font-display text-lg font-bold leading-none">Vesper</p>
-            <p className="text-xs text-muted">
-              Cloud · {info.mode} · v{info.version}
-            </p>
-          </div>
-        </div>
-        <ul className="flex flex-1 flex-col gap-1">
-          {PAGES.filter((p) => !p.full || !lite).map((p) => (
-            <li key={p.id}>
-              <button
-                type="button"
-                onClick={() => setPage(p.id)}
-                aria-current={page === p.id ? "page" : undefined}
-                className="w-full rounded-xl px-3.5 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-raised hover:text-paper aria-[current=page]:bg-tint aria-[current=page]:text-accent"
-              >
-                {p.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-        {lite ? (
-          <p className="rounded-xl bg-raised p-3 text-xs text-muted">
-            Lite server: anyone on your network can use it. Switch to full mode for accounts.
-          </p>
-        ) : (
-          <div className="border-t border-line pt-3 text-sm">
-            <p className="truncate px-2 font-medium">{user.username}</p>
-            <Button variant="ghost" className="mt-1 w-full" onClick={signOut}>
-              Sign out
-            </Button>
-          </div>
+    <>
+      <Shell
+        route={playing ? { ...route, page: "library" } : route}
+        go={go}
+        info={info}
+        user={user}
+        isAdmin={isAdmin}
+        onSignOut={onSignOut}
+      >
+        {playing ? <Library client={client} onPlay={(id) => go("watch", "play", id)} /> : content}
+      </Shell>
+      <AnimatePresence>
+        {playing && (
+          <Player
+            key={playing}
+            client={client}
+            id={playing}
+            onClose={() => go("watch", "library")}
+            onPlay={(id) => go("watch", "play", id)}
+          />
         )}
-      </nav>
-      <main className="min-w-0 flex-1 overflow-y-auto p-8">{content}</main>
-    </div>
+      </AnimatePresence>
+    </>
   );
 }
 
-function Centered({ children }: { children: React.ReactNode }) {
+function Centered({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-full flex-col items-center justify-center p-6 text-center">
       {children}
@@ -208,19 +209,27 @@ function SignIn({
   };
 
   return (
-    <Centered>
-      <form onSubmit={submit} className="surface w-full max-w-sm p-8 text-left">
-        <div className="mb-6 flex flex-col items-center text-center">
-          <LogoMark size={48} />
-          <h1 className="mt-4 text-2xl font-bold">
-            {setup ? "Set up Vesper Cloud" : "Admin sign in"}
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            {setup
-              ? "Create the first administrator. You can add users afterwards."
-              : `Vesper Cloud v${info.version}`}
-          </p>
+    <div className="flex h-full items-center justify-center overflow-y-auto p-6">
+      <form
+        onSubmit={submit}
+        className="w-full max-w-sm rounded-lg border border-line bg-panel p-8 text-left"
+      >
+        <div className="mb-7 flex items-center gap-3">
+          <LogoMark size={36} animate />
+          <div>
+            <h1 className="text-xl font-bold leading-none">
+              {setup ? "Set up Vesper" : "Sign in"}
+            </h1>
+            <p className="mt-1 text-xs text-muted">
+              {info.mode === "lite" ? "Lite" : "Cloud"} {info.version}
+            </p>
+          </div>
         </div>
+        {setup && (
+          <p className="mb-5 text-sm text-muted">
+            Create the first administrator. You can add other users afterwards.
+          </p>
+        )}
         <div className="flex flex-col gap-4">
           <Field
             label="Username"
@@ -238,16 +247,12 @@ function SignIn({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {error && (
-            <p role="alert" className="text-sm text-accent">
-              {error}
-            </p>
-          )}
+          <Notice>{error}</Notice>
           <Button type="submit" variant="primary" disabled={busy}>
             {busy ? "Please wait…" : setup ? "Create administrator" : "Sign in"}
           </Button>
         </div>
       </form>
-    </Centered>
+    </div>
   );
 }

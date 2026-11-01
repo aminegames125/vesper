@@ -1,19 +1,20 @@
 import type { CloudClient, ServerSettings } from "@vesper/cloud-client";
 import { type FormEvent, useEffect, useState } from "react";
 import { useLoad } from "../hooks";
-import { Button, Card, Field, Select } from "../ui";
+import { Badge, Button, Card, Field, Notice, PageHeader, Select, Toggle } from "../ui";
 
 export function SettingsPage({ client, lite }: { client: CloudClient; lite: boolean }) {
   const { data, error } = useLoad(() => client.admin.settings());
   const [form, setForm] = useState<ServerSettings | null>(null);
   const [saved, setSaved] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const { data: caps } = useLoad(() => client.capabilities());
 
   useEffect(() => {
     if (data) setForm(data);
   }, [data]);
 
-  if (error) return <p className="text-accent">{error}</p>;
+  if (error) return <Notice>{error}</Notice>;
   if (!form) return null;
 
   const set = (key: keyof ServerSettings, value: string) => {
@@ -33,12 +34,15 @@ export function SettingsPage({ client, lite }: { client: CloudClient; lite: bool
   };
 
   return (
-    <form onSubmit={submit} className="max-w-2xl">
-      <h1 className="mb-6 text-3xl font-bold">Settings</h1>
+    <form onSubmit={submit} className="max-w-3xl">
+      <PageHeader
+        title="Settings"
+        lead="How this server behaves. Changes apply as soon as you save."
+      />
 
       {!lite && (
         <Card title="Joining">
-          <div className="flex flex-col gap-4 p-5">
+          <div className="flex flex-col gap-4 p-[var(--card-pad)]">
             <Select
               label="Who can create an account"
               value={form.registration}
@@ -60,14 +64,14 @@ export function SettingsPage({ client, lite }: { client: CloudClient; lite: bool
       )}
 
       <Card title="Notifications">
-        <div className="flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-4 p-[var(--card-pad)]">
           <Field
             label="Webhook address"
             value={form.webhook_url ?? ""}
             onChange={(e) => set("webhook_url", e.target.value)}
             hint="Vesper posts here when a recording finishes or fails, or a channel stops answering. Works with Discord, ntfy and Slack-style hooks. Leave empty to turn off."
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field
               label="Quiet from"
               type="time"
@@ -86,7 +90,7 @@ export function SettingsPage({ client, lite }: { client: CloudClient; lite: bool
       </Card>
 
       <Card title="TV guide">
-        <div className="p-5">
+        <div className="p-[var(--card-pad)]">
           <Field
             label="Guide address (XMLTV)"
             value={form.epg_url ?? ""}
@@ -97,7 +101,7 @@ export function SettingsPage({ client, lite }: { client: CloudClient; lite: bool
       </Card>
 
       <Card title="Defaults for new accounts">
-        <div className="grid grid-cols-2 gap-4 p-5">
+        <div className="grid gap-4 p-[var(--card-pad)] sm:grid-cols-2">
           <Field
             label="Recordings at once"
             type="number"
@@ -131,8 +135,44 @@ export function SettingsPage({ client, lite }: { client: CloudClient; lite: bool
         </div>
       </Card>
 
+      <Card title="Downloads and encoding">
+        <div className="flex flex-col gap-4 p-[var(--card-pad)]">
+          <div className="flex flex-wrap gap-2">
+            <Badge tone={caps?.ytdlp.available ? "ok" : "muted"}>
+              yt-dlp {caps?.ytdlp.available ? `v${caps.ytdlp.version}` : "not installed"}
+            </Badge>
+            <Badge tone={caps?.ffmpeg ? "ok" : "muted"}>
+              ffmpeg {caps?.ffmpeg ? "ready" : "not installed"}
+            </Badge>
+          </div>
+          <Select
+            label="Default encoder"
+            value={form.default_encoder ?? "copy"}
+            onChange={(e) => set("default_encoder", e.target.value)}
+            hint="Used when a download does not pick its own. Original keeps the file as it is. Hardware encoders need the matching graphics card and drivers on the server."
+          >
+            {(
+              caps?.encoders ?? [
+                { id: "copy", label: "Original (no re-encode)", kind: "copy", available: true },
+              ]
+            ).map((enc) => (
+              <option key={enc.id} value={enc.id} disabled={!enc.available}>
+                {enc.label}
+                {enc.available ? "" : " (not available)"}
+              </option>
+            ))}
+          </Select>
+          {!caps?.ytdlp.available && (
+            <p className="text-sm text-muted">
+              Install yt-dlp on the server (and keep it on the PATH) to save YouTube videos, live
+              streams and pages from many other sites.
+            </p>
+          )}
+        </div>
+      </Card>
+
       <Card title="Storage">
-        <div className="p-5">
+        <div className="p-[var(--card-pad)]">
           <Field
             label="Delete watched items after (days)"
             type="number"
@@ -145,48 +185,30 @@ export function SettingsPage({ client, lite }: { client: CloudClient; lite: bool
       </Card>
 
       <Card title="Updates">
-        <label className="flex items-start gap-3 p-5 text-sm">
-          <input
-            type="checkbox"
+        <div className="p-[var(--card-pad)]">
+          <Toggle
             checked={form.update_check !== "false"}
-            onChange={(e) => set("update_check", String(e.target.checked))}
-            className="mt-1 size-4 accent-[var(--accent)]"
+            onChange={(on) => set("update_check", String(on))}
+            label="Check for new versions"
+            hint="Once a week the server asks GitHub for the latest release and tells the app if there is one. Nothing else is sent."
           />
-          <span>
-            <b className="block">Check for new versions</b>
-            <span className="text-muted">
-              Once a week the server asks GitHub for the latest release and tells the app if there
-              is one. Nothing else is sent.
-            </span>
-          </span>
-        </label>
+        </div>
       </Card>
 
       {!lite && (
         <Card title="Network">
-          <label className="flex items-start gap-3 p-5 text-sm">
-            <input
-              type="checkbox"
+          <div className="p-[var(--card-pad)]">
+            <Toggle
               checked={form.allow_private === "true"}
-              onChange={(e) => set("allow_private", String(e.target.checked))}
-              className="mt-1 size-4 accent-[var(--accent)]"
+              onChange={(on) => set("allow_private", String(on))}
+              label="Allow private network addresses"
+              hint="Lets the proxy and recorder reach hosts on your own network. Leave this off on a public server: it stops people using the server to probe the network it runs in."
             />
-            <span>
-              <b className="block">Allow private network addresses</b>
-              <span className="text-muted">
-                Lets the proxy and recorder reach hosts on your own network. Leave this off on a
-                public server: it stops people using the server to probe the network it runs in.
-              </span>
-            </span>
-          </label>
+          </div>
         </Card>
       )}
 
-      {failure && (
-        <p role="alert" className="mb-4 text-sm text-accent">
-          {failure}
-        </p>
-      )}
+      <Notice>{failure}</Notice>
       <div className="flex items-center gap-3">
         <Button type="submit" variant="primary">
           Save settings

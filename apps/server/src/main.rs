@@ -4,6 +4,7 @@ mod config;
 mod db;
 mod discovery;
 mod download;
+mod encode;
 mod epg;
 mod error;
 mod ffmpeg;
@@ -14,6 +15,7 @@ mod schedule;
 mod state;
 mod tasks;
 mod web;
+mod ytdlp;
 
 use std::{
     collections::HashMap,

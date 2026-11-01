@@ -173,8 +173,18 @@ class Vesper:
 
     # -- reading ----------------------------------------------------------------------------
 
-    def recordings(self, tag="", q=""):
-        return self._call("GET", "/recordings", query={"tag": tag, "q": q})
+    def recordings(self, tag="", q="", kind=""):
+        return self._call("GET", "/recordings", query={"tag": tag, "q": q, "kind": kind})
+
+    def capabilities(self):
+        """What the server can do: ffmpeg, yt-dlp and which encoders it can run."""
+        return self._call("GET", "/capabilities")
+
+    def sync_pull(self, since=0):
+        return self._call("GET", "/sync", query={"since": int(since)})
+
+    def sync_push(self, items):
+        return self._call("PUT", "/sync", {"items": items})
 
     def sources(self):
         return self._call("GET", "/sources").get("sources", [])
@@ -219,8 +229,19 @@ class Vesper:
             body["backup_url"] = backup_url
         return self._call("POST", "/recordings", body)
 
-    def download(self, title, url):
-        return self._call("POST", "/downloads", {"title": title, "url": url})
+    def download(self, title, url, encoder="", quality="", live=False, engine="auto", tag=""):
+        """Saves a movie, an episode, a web video or a live stream to the server. The server uses
+        yt-dlp for web pages and a plain fetch for files; `encoder` is an id from `capabilities()`."""
+        body = {"title": title, "url": url, "engine": engine or "auto"}
+        if encoder:
+            body["encoder"] = encoder
+        if quality:
+            body["quality"] = quality
+        if live:
+            body["live"] = True
+        if tag:
+            body["tag"] = tag
+        return self._call("POST", "/downloads", body)
 
     def stop(self, recording_id):
         return self._call("POST", "/recordings/%s/stop" % recording_id, {})

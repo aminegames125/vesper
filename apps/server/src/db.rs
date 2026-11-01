@@ -229,6 +229,26 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     add_column(conn, "recordings", "series_rule_id", "TEXT")?;
     add_column(conn, "recordings", "total_bytes", "INTEGER")?;
     add_column(conn, "recordings", "retries", "INTEGER NOT NULL DEFAULT 0")?;
+    // How a download is fetched (`direct` file or `ytdlp` page), converted, and at what quality.
+    add_column(
+        conn,
+        "recordings",
+        "engine",
+        "TEXT NOT NULL DEFAULT 'direct'",
+    )?;
+    add_column(
+        conn,
+        "recordings",
+        "encoder",
+        "TEXT NOT NULL DEFAULT 'copy'",
+    )?;
+    add_column(
+        conn,
+        "recordings",
+        "dl_quality",
+        "TEXT NOT NULL DEFAULT 'best'",
+    )?;
+    add_column(conn, "recordings", "live", "INTEGER NOT NULL DEFAULT 0")?;
     // Schedules made before the default timer existed keep their recordings, as they always did.
     let first_run_of_timer = !conn
         .prepare("PRAGMA table_info(schedules)")?

@@ -83,6 +83,87 @@
         </setting>
       </group>
     </category>
+    <category id="downloads" label="30021" help="">
+      <group id="1" label="30021">
+        <setting id="encoder" type="string" label="30022" help="">
+          <level>0</level>
+          <default>copy</default>
+          <constraints>
+            <options>
+              <option label="30040">copy</option>
+              <option label="30041">h264</option>
+              <option label="30042">h265</option>
+              <option label="30043">av1</option>
+              <option label="30044">vp9</option>
+              <option label="30045">h264_nvenc</option>
+              <option label="30046">h265_nvenc</option>
+              <option label="30047">h264_qsv</option>
+              <option label="30048">h265_qsv</option>
+              <option label="30049">h264_amf</option>
+              <option label="30050">h265_amf</option>
+              <option label="30051">h264_vt</option>
+              <option label="30052">h265_vt</option>
+            </options>
+          </constraints>
+          <control type="list" format="string">
+            <heading>30022</heading>
+          </control>
+        </setting>
+        <setting id="quality" type="string" label="30023" help="">
+          <level>0</level>
+          <default>best</default>
+          <constraints>
+            <options>
+              <option label="30060">best</option>
+              <option label="30061">2160</option>
+              <option label="30062">1080</option>
+              <option label="30063">720</option>
+              <option label="30064">480</option>
+              <option label="30065">audio</option>
+            </options>
+          </constraints>
+          <control type="list" format="string">
+            <heading>30023</heading>
+          </control>
+        </setting>
+        <setting id="ask_encoder" type="boolean" label="30024" help="">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle"/>
+        </setting>
+      </group>
+    </category>
+    <category id="sync" label="30025" help="">
+      <group id="1" label="30025">
+        <setting id="sync_enabled" type="boolean" label="30026" help="">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle"/>
+        </setting>
+        <setting id="export_library" type="boolean" label="30027" help="">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle"/>
+        </setting>
+        <setting id="library_path" type="path" label="30028" help="">
+          <level>1</level>
+          <default></default>
+          <constraints>
+            <writable>true</writable>
+          </constraints>
+          <control type="button" format="path">
+            <heading>30028</heading>
+          </control>
+        </setting>
+        <setting id="sync_now" type="action" label="30029" help="">
+          <level>0</level>
+          <data>RunPlugin(plugin://plugin.video.vesper/?action=sync_now)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
+      </group>
+    </category>
     <category id="playback" label="30006" help="">
       <group id="1" label="30006">
         <setting id="ask_resume" type="boolean" label="30007" help="">

@@ -66,6 +66,12 @@ export interface CloudRecording {
   seriesRuleId: string | null;
   /** Size a download is going to reach, when the provider said. */
   totalBytes: number | null;
+  /** How a download was fetched: a plain `direct` file or a page read by `ytdlp`. */
+  engine: "direct" | "ytdlp";
+  /** The encoder id the download was converted with; `copy` keeps the original. */
+  encoder: string;
+  /** A live stream that was captured until stopped. */
+  live: boolean;
 }
 
 export interface NewRecording {
@@ -83,11 +89,47 @@ export interface NewRecording {
   tag?: string;
 }
 
+export type DownloadQuality = "best" | "2160" | "1080" | "720" | "480" | "audio";
+
 export interface NewDownload {
   title: string;
   url: string;
   keep_hours?: number;
   tag?: string;
+  /** `auto` uses yt-dlp for web pages and a plain fetch for files. */
+  engine?: "auto" | "direct" | "ytdlp";
+  /** An id from `capabilities().encoders`; leave out for the admin's default. */
+  encoder?: string;
+  quality?: DownloadQuality;
+  /** Keep a live stream until it is stopped. Needs yt-dlp. */
+  live?: boolean;
+}
+
+export interface EncoderInfo {
+  id: string;
+  label: string;
+  kind: "copy" | "software" | "hardware";
+  available: boolean;
+}
+
+export interface Capabilities {
+  ffmpeg: boolean;
+  ytdlp: { available: boolean; version: string | null };
+  encoders: EncoderInfo[];
+  defaultEncoder: string;
+  qualities: DownloadQuality[];
+  sync: boolean;
+}
+
+export interface SyncItem {
+  key: string;
+  /** `null` means the key was removed. */
+  value: unknown;
+  updatedAt: number;
+}
+
+export interface SyncOverview {
+  users: { user: string; keys: number; bytes: number; lastSync: number | null }[];
 }
 
 /** Bit 0 is Monday and bit 6 is Sunday; 0 records once, on the start date. */
@@ -355,6 +397,7 @@ export type ServerSettings = Record<
   | "quiet_start"
   | "quiet_end"
   | "update_check"
+  | "default_encoder"
   | "session_days",
   string
 >;
@@ -526,6 +569,13 @@ export class CloudClient {
     this.request<{ ok: boolean }>("PATCH", `/recordings/${id}`, { title });
   clearFailedRecordings = () => this.post<{ removed: number }>("/recordings/clear-failed");
   status = () => this.get<ServerStatus>("/status");
+  capabilities = () => this.get<Capabilities>("/capabilities");
+  /** Everything that changed after `since` (epoch seconds). */
+  syncPull = (since = 0) => this.get<{ items: SyncItem[]; now: number }>(`/sync?since=${since}`);
+  syncPush = (items: { key: string; value: unknown; updatedAt?: number }[]) =>
+    this.request<{ applied: number; skipped: number; now: number }>("PUT", "/sync", { items });
+  syncForget = (key: string) =>
+    this.request<{ ok: boolean }>("DELETE", `/sync/${encodeURIComponent(key)}`);
   storage = () => this.get<StorageUse>("/status/storage");
   /** Opens the stream; with `seconds` (3 to 30) it records a throwaway sample instead. */
   testChannel = (url: string, seconds?: number) =>
@@ -587,6 +637,16 @@ export class CloudClient {
     return this.get<{ channels: Channel[]; total: number; groups: string[] }>(`/channels?${query}`);
   };
 
+  /** A key that only opens media, so a player or an image never carries the sign-in token. */
+  mediaToken = () => this.post<{ token: string }>("/auth/media-token");
+  /** Where a player opens a recording: its HLS playlist, or the file of a download. */
+  streamUrl = (rec: { id: string; kind: "recording" | "download" }, mediaToken = "") => {
+    const leaf = rec.kind === "download" ? "download" : "index.m3u8";
+    const query = mediaToken ? `?token=${encodeURIComponent(mediaToken)}` : "";
+    return `${this.baseUrl}/api/v1/recordings/${rec.id}/${leaf}${query}`;
+  };
+  thumbFor = (id: string, mediaToken = "") =>
+    `${this.baseUrl}/api/v1/recordings/${id}/thumb.jpg${mediaToken ? `?token=${encodeURIComponent(mediaToken)}` : ""}`;
   /** Address of the HLS playlist; any HLS player can open it, even while recording. */
   playlistUrl = (id: string) =>
     `${this.baseUrl}/api/v1/recordings/${id}/index.m3u8${this.token ? `?token=${this.token}` : ""}`;
@@ -644,6 +704,7 @@ export class CloudClient {
     recordings: () => this.get<AdminRecording[]>("/admin/recordings"),
     deleteRecording: (id: string) =>
       this.request<{ ok: boolean }>("DELETE", `/admin/recordings/${id}`),
+    sync: () => this.get<SyncOverview>("/admin/sync"),
     schedules: () => this.get<AdminSchedule[]>("/admin/schedules"),
     deleteSchedule: (id: string) =>
       this.request<{ ok: boolean }>("DELETE", `/admin/schedules/${id}`),

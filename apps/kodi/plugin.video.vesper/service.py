@@ -6,25 +6,35 @@ import time
 
 import xbmc
 
-from resources.lib import api, bridge, common, discovery, notify
+from resources.lib import api, bridge, common, discovery, library, notify, syncstate
 
 
 class Watcher(xbmc.Player):
     def __init__(self):
         super().__init__()
         self.rid = None
+        self.path = None
+        self.title = ""
         self.at = 0.0
         self.total = 0.0
 
     def onAVStarted(self):
+        self.rid = self.path = None
         try:
-            self.rid = api.recording_id_of(self.getPlayingFile())
+            playing = self.getPlayingFile()
+            self.rid = api.recording_id_of(playing)
+            # Anything else that plays from the web has its resume point synced too, so a movie
+            # started on one device can be continued on another.
+            # (A live stream has no length, so it never passes the length check in `save`.)
+            if not self.rid and playing.lower().startswith(("http://", "https://")):
+                self.path = playing
+                self.title = self.getVideoInfoTag().getTitle() if self.isPlayingVideo() else ""
         except RuntimeError:
-            self.rid = None
+            self.rid = self.path = None
         self.at = self.total = 0.0
 
     def tick(self):
-        if self.rid and self.isPlayingVideo():
+        if (self.rid or self.path) and self.isPlayingVideo():
             try:
                 self.at, self.total = self.getTime(), self.getTotalTime()
             except RuntimeError:
@@ -37,8 +47,10 @@ class Watcher(xbmc.Player):
         self.save(ended=True)
 
     def save(self, ended):
-        rid, at, total = self.rid, self.at, self.total
-        self.rid = None
+        rid, at, total, path = self.rid, self.at, self.total, self.path
+        self.rid = self.path = None
+        if path and total > 60:
+            self.remember(path, at, total, ended)
         if not rid:
             return
         # Within the last half minute counts as watched; so does reaching the end.
@@ -56,6 +68,23 @@ class Watcher(xbmc.Player):
         threading.Thread(target=send, daemon=True).start()
 
 
+    def remember(self, path, at, total, ended):
+        done = ended or at >= total - 30
+        if not done and at < 20:
+            return
+
+        def keep():
+            try:
+                store = library.store()
+                store.set(syncstate.resume_key(path), {"at": 0 if done else int(at), "total": int(total), "done": done, "title": self.title})
+                store.save()
+                library.run_sync()
+            except (api.VesperError, OSError):
+                pass
+
+        threading.Thread(target=keep, daemon=True).start()
+
+
 def find_server():
     """First start: use the one Vesper server on the network, so there is nothing to set up."""
     if api.normalise(common.setting("server")):
@@ -70,6 +99,7 @@ def find_server():
 
 
 SYNC_EVERY = 6 * 3600
+LIBRARY_EVERY = 1800  # favourites, resume points and the library files
 POLL_EVERY = 30  # seconds between looks at the recordings, for notifications
 DISK_EVERY = 3600
 
@@ -116,11 +146,16 @@ def run():
     if not monitor.waitForAbort(20):  # let Kodi finish starting and loading Live TV
         find_server()
         bridge.sync()
-    waited = polled = 0
+        library.run_sync()
+    waited = polled = shared = 0
     while not monitor.waitForAbort(5):
         player.tick()
         waited += 5
         polled += 5
+        shared += 5
+        if shared >= LIBRARY_EVERY:
+            shared = 0
+            library.run_sync()
         if polled >= POLL_EVERY:
             polled = 0
             notifier.poll(time.time())

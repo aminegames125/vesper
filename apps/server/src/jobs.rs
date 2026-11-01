@@ -181,7 +181,8 @@ pub fn start(state: &AppState, id: &str) {
             )
             .unwrap_or(0);
         if downloading >= MAX_DOWNLOADS {
-            return fail("Too many downloads at once. Try again when one has finished.");
+            // Stays queued; the background tick starts it when a slot frees up.
+            return;
         }
     } else if max_concurrent > 0 && running >= max_concurrent {
         // A scheduled one waits for the other to end (back-to-back programmes overlap by their padding).

@@ -1,7 +1,19 @@
 import { type CloudClient, formatBytes, type Role } from "@vesper/cloud-client";
 import { type FormEvent, useState } from "react";
 import { useAction, useLoad } from "../hooks";
-import { Badge, Button, Card, Empty, Field, Modal, Select, when } from "../ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Empty,
+  Field,
+  Modal,
+  Notice,
+  PageHeader,
+  ROW,
+  Select,
+  when,
+} from "../ui";
 
 export function InvitesPage({ client }: { client: CloudClient }) {
   const { data: invites, error, reload } = useLoad(() => client.admin.invites(), 15_000);
@@ -11,16 +23,11 @@ export function InvitesPage({ client }: { client: CloudClient }) {
 
   return (
     <div>
-      <h1 className="mb-2 text-3xl font-bold">Invites</h1>
-      <p className="mb-6 max-w-2xl text-sm text-muted">
-        An invite code lets someone create their own account with the role and limits you choose.
-        Turn on invite registration under Settings so the app shows the code field.
-      </p>
-      {(error || message) && (
-        <p role="alert" className="mb-4 text-sm text-accent">
-          {error ?? message}
-        </p>
-      )}
+      <PageHeader
+        title="Invites"
+        lead="An invite code lets someone create their own account with the role and limits you choose. Turn on invite registration under Settings so the app shows the code field."
+      />
+      <Notice>{error ?? message}</Notice>
       <Card
         title={`${invites?.length ?? 0} codes`}
         actions={
@@ -32,7 +39,7 @@ export function InvitesPage({ client }: { client: CloudClient }) {
         {invites && invites.length === 0 && <Empty>No invite codes yet.</Empty>}
         <ul className="divide-y divide-line">
           {invites?.map((i) => (
-            <li key={i.code} className="flex flex-wrap items-center gap-4 px-5 py-4">
+            <li key={i.code} className={ROW}>
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2">
                   <code className="select-text rounded-lg bg-raised px-2.5 py-1 font-mono text-sm text-accent">

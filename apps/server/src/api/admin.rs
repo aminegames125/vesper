@@ -476,6 +476,7 @@ pub async fn update_settings(
                 !(text.is_empty() || text.starts_with("http://") || text.starts_with("https://"))
             }
             "quiet_start" | "quiet_end" => !(text.is_empty() || valid_clock(&text)),
+            "default_encoder" => crate::encode::validate(&text).is_err(),
             "delete_watched_days" | "default_keep_hours" => {
                 !(text.is_empty() || text.parse::<u32>().is_ok())
             }

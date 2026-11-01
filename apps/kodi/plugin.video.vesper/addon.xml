@@ -13,11 +13,15 @@
         <label>30010</label>
         <visible>Window.IsActive(tvchannels) | Window.IsActive(tvguide) | Window.IsActive(tvsearch)</visible>
       </item>
+      <item library="download_context.py">
+        <label>30020</label>
+        <visible>[Window.IsActive(videos) | Window.IsActive(home) | Window.IsActive(video)] + !String.IsEmpty(ListItem.FileNameAndPath) + !ListItem.IsFolder</visible>
+      </item>
     </menu>
   </extension>
   <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Record and schedule from Kodi's own Live TV, on your own Vesper server</summary>
-    <description lang="en_GB">Adds recording to the Live TV you already have. It finds your Vesper server and your IPTV providers on its own; press the menu button on a channel or a programme and choose Record with Vesper. Record now, schedule a programme, repeat it every week or record every episode; manage schedules, watch your recordings and resume where you stopped. Works with a Vesper server in lite mode (home network) or full mode (accounts, HTTPS, remote access). Recordings are made and kept by your Vesper server.</description>
+    <summary lang="en_GB">Record Live TV, save movies and series, and download from YouTube and 20+ add-ons, on your own Vesper server</summary>
+    <description lang="en_GB">Adds recording to the Live TV you already have. It finds your Vesper server and your IPTV providers on its own; press the menu button on a channel or a programme and choose Record with Vesper. Record now, schedule a programme, repeat it every week or record every episode; manage schedules, watch your recordings and resume where you stopped. Works with a Vesper server in lite mode (home network) or full mode (accounts, HTTPS, remote access). Movies and series from your providers are saved straight to the server instead of recorded, and videos from YouTube, Twitch, Vimeo and more than twenty other add-ons can be downloaded with yt-dlp, live streams included, in the encoder you choose. Favourites and resume points follow you between devices, and finished downloads can appear in Kodi's own library. Everything is made and kept by your Vesper server.</description>
     <disclaimer lang="en_GB">Vesper records only the sources you add yourself. Use it for content you have the right to record.</disclaimer>
     <platform>all</platform>
     <license>MIT</license>

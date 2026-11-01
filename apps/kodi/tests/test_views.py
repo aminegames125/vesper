@@ -226,10 +226,23 @@ class OnTopOfKodi(unittest.TestCase):
         self.addCleanup(setattr, views.common, "client", real)
         views.common.client = lambda: self.stub
 
-    def test_the_home_screen_is_only_recordings_and_schedules(self):
+    def test_the_home_screen_lists_the_main_places(self):
         self.stub.saved = [{"id": "s0", "name": "x", "kind": "m3u", "url": "u"}]
         views.route("")
-        self.assertEqual(labels(), ["Continue watching", "Recording now and coming up", "Recordings", "Schedules", "Server"])
+        self.assertEqual(labels(), [
+                "Continue watching",
+                "Recording now and coming up",
+                "Recordings",
+                "Movies",
+                "Series",
+                "Downloads",
+                "Favourites",
+                "Schedules",
+                "Add-ons Vesper can save from",
+                "Download from a web address",
+                "Sync now",
+                "Server",
+            ])
 
     def test_with_no_provider_it_offers_to_read_them_from_kodi(self):
         views.route("")
@@ -435,7 +448,19 @@ class Screens(unittest.TestCase):
         views.route("")
         self.assertEqual(
             [x for x in labels() if not x.startswith(("Continue", "Connect"))],
-            ["Recording now and coming up", "Recordings", "Schedules", "Server"],
+            [
+                "Recording now and coming up",
+                "Recordings",
+                "Movies",
+                "Series",
+                "Downloads",
+                "Favourites",
+                "Schedules",
+                "Add-ons Vesper can save from",
+                "Download from a web address",
+                "Sync now",
+                "Server",
+            ],
         )
 
     def test_a_recording_in_progress_is_listed_playable_and_stoppable(self):

@@ -14,13 +14,15 @@ use super::files;
 use crate::{
     auth::{bearer, AuthUser, User},
     db::now,
+    encode,
     error::{ApiError, ApiResult},
     jobs::{self, check_quota, recording_dir, remove_files},
     net::check_target,
     state::AppState,
+    ytdlp,
 };
 
-const COLUMNS: &str = "id, user_id, title, channel_name, status, start_at, max_seconds, seconds, bytes, keep_hours, keep_until, error, created_at, finished_at, schedule_id, kind, tag, watched, position_s, backup_url, thumb, file_name, series_rule_id, total_bytes";
+const COLUMNS: &str = "id, user_id, title, channel_name, status, start_at, max_seconds, seconds, bytes, keep_hours, keep_until, error, created_at, finished_at, schedule_id, kind, tag, watched, position_s, backup_url, thumb, file_name, series_rule_id, total_bytes, engine, encoder, live";
 
 /// The longest a recording can be kept: ten years.
 const MAX_KEEP_HOURS: i64 = 24 * 365 * 10;
@@ -53,6 +55,9 @@ fn row_json(r: &rusqlite::Row) -> rusqlite::Result<Value> {
         "fileName": r.get::<_, Option<String>>(21)?,
         "seriesRuleId": r.get::<_, Option<String>>(22)?,
         "totalBytes": r.get::<_, Option<i64>>(23)?,
+        "engine": r.get::<_, String>(24)?,
+        "encoder": r.get::<_, String>(25)?,
+        "live": r.get::<_, i64>(26)? != 0,
     }))
 }
 
@@ -202,6 +207,18 @@ pub struct NewDownload {
     keep_hours: Option<i64>,
     #[serde(default)]
     tag: String,
+    /// `auto` picks yt-dlp for web pages and a plain fetch for files; or `direct` / `ytdlp`.
+    #[serde(default)]
+    engine: String,
+    /// An id from `/capabilities`. Leave out for the admin's default.
+    #[serde(default)]
+    encoder: Option<String>,
+    /// `best`, `2160`, `1080`, `720`, `480` or `audio` (yt-dlp only).
+    #[serde(default)]
+    quality: String,
+    /// A live stream: keep what was captured until it is stopped (yt-dlp only).
+    #[serde(default)]
+    live: bool,
 }
 
 /// Saves a movie or episode file from a source address to the server, so it can be watched later.
@@ -224,16 +241,50 @@ pub async fn create_download(
         return Err(ApiError::bad("Give the download a title."));
     }
     let keep_hours = keep_for(&state, &user, body.keep_hours);
+    let engine = match body.engine.as_str() {
+        "" | "auto" => {
+            if ytdlp::available() && ytdlp::looks_like_a_page(&body.url) {
+                "ytdlp"
+            } else {
+                "direct"
+            }
+        }
+        "direct" => "direct",
+        "ytdlp" => "ytdlp",
+        _ => return Err(ApiError::bad("The engine must be auto, direct or ytdlp.")),
+    };
+    if engine == "ytdlp" && !ytdlp::available() {
+        return Err(ApiError::bad(
+            "yt-dlp is not installed on this server, so it cannot save web pages.",
+        ));
+    }
+    let quality = if body.quality.is_empty() {
+        "best"
+    } else {
+        body.quality.as_str()
+    };
+    if ytdlp::format_for(quality).is_none() {
+        return Err(ApiError::bad("Unknown quality."));
+    }
+    let encoder_id = body
+        .encoder
+        .filter(|e| !e.is_empty())
+        .unwrap_or_else(|| state.db.setting("default_encoder", encode::DEFAULT));
+    let encoder = encode::validate(&encoder_id).map_err(ApiError::bad)?;
+    let live = body.live && engine == "ytdlp";
     let id = uuid::Uuid::new_v4().to_string();
     state.db.conn().execute(
-        "INSERT INTO recordings (id, user_id, title, channel_name, source_url, status, start_at, max_seconds, keep_hours, created_at, kind, tag)
-         VALUES (?1, ?2, ?3, '', ?4, 'queued', ?5, 0, ?6, ?5, 'download', ?7)",
+        "INSERT INTO recordings (id, user_id, title, channel_name, source_url, status, start_at, max_seconds, keep_hours, created_at, kind, tag, engine, encoder, dl_quality, live)
+         VALUES (?1, ?2, ?3, '', ?4, 'queued', ?5, 0, ?6, ?5, 'download', ?7, ?8, ?9, ?10, ?11)",
         params![id, user.id, title, body.url, now(), keep_hours,
-                body.tag.trim().chars().take(40).collect::<String>()],
+                body.tag.trim().chars().take(40).collect::<String>(),
+                engine, encoder.id, quality, live as i64],
     )?;
     jobs::start(&state, &id);
     state.db.audit(&user.username, "download.create", &title);
-    Ok(Json(json!({ "id": id })))
+    Ok(Json(
+        json!({ "id": id, "engine": engine, "encoder": encoder.id }),
+    ))
 }
 
 pub async fn show(
