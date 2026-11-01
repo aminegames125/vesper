@@ -52,11 +52,17 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import androidx.media3.ui.PlayerView
 import dev.aminegames125.vesper.cast.CastButton
 import dev.aminegames125.vesper.cast.CastSupport
 import dev.aminegames125.vesper.cast.Variant
+import dev.aminegames125.vesper.cast.castUrlFor
 import dev.aminegames125.vesper.cast.fetchVariants
 import dev.aminegames125.vesper.cast.heightsOf
 import dev.aminegames125.vesper.cast.isLocalOnly
@@ -111,8 +117,13 @@ private fun hasKnownExtension(url: String): Boolean {
  */
 fun playbackCandidates(url: String, fallbacks: List<String>): List<Pair<String, String?>> =
     (listOf(url) + fallbacks).distinct().flatMap { address ->
-        if (hasKnownExtension(address)) listOf(address to null) else listOf(address to null, address to MimeTypes.APPLICATION_M3U8)
-    }
+        when {
+            // A raw Xtream .ts link: many providers only let a player in through the .m3u8 twin.
+            castUrlFor(address) != address -> listOf(address to null, castUrlFor(address) to null)
+            hasKnownExtension(address) -> listOf(address to null)
+            else -> listOf(address to null, address to MimeTypes.APPLICATION_M3U8)
+        }
+    }.distinct()
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
@@ -143,12 +154,26 @@ fun PlayerScreen(
     val candidates = remember(source) { playbackCandidates(source.url, source.fallbacks) }
     var attempt by remember(source) { mutableIntStateOf(0) }
     var failed by remember(source) { mutableStateOf(false) }
+    var failure by remember(source) { mutableStateOf("") }
     var overlay by remember { mutableStateOf(true) }
     var inPip by remember { mutableStateOf(false) }
     var showBookmarks by remember { mutableStateOf(false) }
 
     val exo = remember {
-        ExoPlayer.Builder(context)
+        // IPTV providers often turn away "ExoPlayerLib", redirect from http to https, or send
+        // transport streams with odd key frames; the player is set up to cope with all three.
+        val http = DefaultHttpDataSource.Factory()
+            .setUserAgent("VLC/3.0.20 LibVLC/3.0.20")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(20_000)
+        val extractors = DefaultExtractorsFactory()
+            .setTsExtractorFlags(
+                DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS,
+            )
+            .setConstantBitrateSeekingEnabled(true)
+        ExoPlayer.Builder(context, DefaultRenderersFactory(context).setEnableDecoderFallback(true))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(context, extractors).setDataSourceFactory(http))
             .setSeekBackIncrementMs(10_000)
             .setSeekForwardIncrementMs(10_000)
             .setAudioAttributes(AudioAttributes.DEFAULT, true)
@@ -217,9 +242,17 @@ fun PlayerScreen(
         }
     }
 
-    DisposableEffect(exo) {
+    // Keyed on the source too: after changing channel the listener must use the new channel's tries.
+    DisposableEffect(exo, source) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
+                // A live stream that fell behind its window just needs to be joined again.
+                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                    exo.seekToDefaultPosition()
+                    exo.prepare()
+                    return
+                }
+                failure = error.errorCodeName
                 if (attempt < candidates.lastIndex) {
                     attempt += 1
                 } else {
@@ -346,6 +379,7 @@ fun PlayerScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 VText("This stream will not play on this device.", color = Color.White, style = Vesper.type.heading)
+                if (failure.isNotEmpty()) VText(failure, color = Color.White.copy(alpha = 0.6f), style = Vesper.type.small)
                 VText(
                     if (cast?.available == true) {
                         "Cast it to a TV or Chromecast instead, or go back and try another channel."
