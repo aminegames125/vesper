@@ -40,11 +40,7 @@ pub async fn fetch(
 
     // Follow redirects by hand so every hop is checked, not only the first address.
     for _ in 0..5 {
-        // Providers turn away unknown players, so this looks like a common one.
-        let mut request = state
-            .http
-            .get(url.clone())
-            .header(header::USER_AGENT, "VLC/3.0.20 LibVLC/3.0.20");
+        let mut request = state.http.get(url.clone());
         if let Some(range) = headers.get(header::RANGE) {
             request = request.header(header::RANGE, range);
         }
@@ -105,11 +101,6 @@ pub async fn fetch(
     }
     // Whatever the upstream says, it must never run as a page on this server's origin.
     let headers = out.headers_mut();
-    // A live stream never ends, so it must not wait in the compressor for enough data to squeeze.
-    headers.insert(
-        header::CONTENT_ENCODING,
-        HeaderValue::from_static("identity"),
-    );
     headers.insert(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),

@@ -25,7 +25,6 @@ class Settings(private val context: Context) {
     private val announcedKey = stringSetPreferencesKey("announced")
     private val favoritesKey = stringSetPreferencesKey("favorites")
     private val themeKey = stringPreferencesKey("theme")
-    private val relayKey = stringPreferencesKey("relay")
     private val quietStartKey = stringPreferencesKey("quiet_start")
     private val quietEndKey = stringPreferencesKey("quiet_end")
 
@@ -61,15 +60,6 @@ class Settings(private val context: Context) {
             val now = it[favoritesKey].orEmpty()
             it[favoritesKey] = if (url in now) now - url else now + url
         }
-    }
-
-    /** How live TV reaches this device: `auto` (direct, then through the server), `always` or `off`. */
-    val relay: Flow<String> = context.store.data
-        .catch { emit(emptyPreferences()) }
-        .map { it[relayKey] ?: "auto" }
-
-    suspend fun setRelay(value: String) {
-        context.store.edit { it[relayKey] = value }
     }
 
     /** `system`, `light` or `dark`. */

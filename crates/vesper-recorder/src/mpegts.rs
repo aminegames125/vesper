@@ -102,11 +102,7 @@ fn is_ts(data: &[u8]) -> bool {
 }
 
 fn packets_of(data: &[u8]) -> Vec<Vec<u8>> {
-    data.as_chunks::<PACKET>()
-        .0
-        .iter()
-        .map(|c| c.to_vec())
-        .collect()
+    data.chunks_exact(PACKET).map(|c| c.to_vec()).collect()
 }
 
 fn pid_of(p: &[u8]) -> u16 {

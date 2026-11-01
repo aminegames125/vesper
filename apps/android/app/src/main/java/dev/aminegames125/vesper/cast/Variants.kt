@@ -56,10 +56,7 @@ private val client = OkHttpClient.Builder()
 /** Looks at the stream's playlist and lists its qualities; empty when it offers only one. */
 suspend fun fetchVariants(url: String): List<Variant> = withContext(Dispatchers.IO) {
     val path = url.substringBefore('?').lowercase()
-    // Only an HLS playlist has qualities to list. Anything else (a raw live stream above all) must
-    // not be opened here: IPTV accounts often allow one connection, and this would steal it from
-    // the player.
-    if (!path.endsWith(".m3u8")) return@withContext emptyList()
+    if (path.endsWith(".mp4") || path.endsWith(".mkv") || path.endsWith(".ts")) return@withContext emptyList()
     runCatching {
         val request = Request.Builder().url(url).build()
         client.newCall(request).execute().use { response ->

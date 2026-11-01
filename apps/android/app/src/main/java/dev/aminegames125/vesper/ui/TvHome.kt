@@ -1,8 +1,8 @@
-@file:OptIn(ExperimentalComposeUiApi::class)
+@file:OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
 
 package dev.aminegames125.vesper.ui
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,49 +11,44 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.tv.material3.Border
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.Surface
+import coil.compose.AsyncImage
 import dev.aminegames125.vesper.data.Recording
 import dev.aminegames125.vesper.data.formatBytes
 import dev.aminegames125.vesper.data.formatClock
 import dev.aminegames125.vesper.data.formatDuration
 import dev.aminegames125.vesper.data.formatMoment
 import dev.aminegames125.vesper.data.formatUntil
-import dev.aminegames125.vesper.ui.kit.ButtonKind
-import dev.aminegames125.vesper.ui.kit.Ic
-import dev.aminegames125.vesper.ui.kit.Poster
-import dev.aminegames125.vesper.ui.kit.Shapes
-import dev.aminegames125.vesper.ui.kit.Tone
-import dev.aminegames125.vesper.ui.kit.VButton
-import dev.aminegames125.vesper.ui.kit.VPill
-import dev.aminegames125.vesper.ui.kit.VText
-import dev.aminegames125.vesper.ui.kit.Vesper
-import dev.aminegames125.vesper.ui.kit.pressable
 
 /**
  * The first screen on a TV: what is recording, what is next, what to carry on watching, and what
- * was recorded lately. A large hero at the top says what matters most right now; under it, rows of
- * cards that the remote's arrows move through.
+ * was recorded lately, as rows of cards that the remote's arrows move through.
  */
 @Composable
 fun TvHome(
@@ -66,7 +61,6 @@ fun TvHome(
     val recordings by vm.recordings.collectAsState()
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
-    val c = Vesper.colors
 
     val running = remember(recordings) { recordings.filter { it.isRunning && !it.isDownload } }
     val next = remember(recordings) { recordings.filter { it.isScheduled }.sortedBy { it.startAt }.take(12) }
@@ -76,187 +70,108 @@ fun TvHome(
     }
     val downloads = remember(recordings) { recordings.filter { it.isDownload && it.status != "failed" }.take(16) }
 
-    // The one thing the hero talks about: what is recording, else what starts next, else a welcome.
-    val headline = running.firstOrNull() ?: next.firstOrNull()
-
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 12.dp, end = 48.dp, top = 28.dp, bottom = 48.dp),
-        verticalArrangement = Arrangement.spacedBy(22.dp),
+        contentPadding = PaddingValues(start = 24.dp, end = 48.dp, top = 24.dp, bottom = 48.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         item {
-            Hero(
-                recording = headline,
-                thumb = headline?.let { vm.thumbUrl(it.id).takeIf { _ -> it.thumb } },
-                live = headline?.isRunning == true,
-                first = first,
-                onRecordNow = onRecordNow,
-                onGuide = onGuide,
-                onCalendar = onCalendar,
-                onWatch = { headline?.let(onPlay) },
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Vesper", style = MaterialTheme.typography.displaySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = onRecordNow, modifier = Modifier.focusRequester(first)) { Text("Record now") }
+                    OutlinedButton(onClick = onGuide) { Text("TV guide") }
+                    OutlinedButton(onClick = onCalendar) { Text("This week") }
+                }
+            }
         }
         if (recordings.isEmpty()) {
             item {
-                VText(
+                Text(
                     "Nothing recorded yet. Choose Record now, or plan something from the TV guide.",
-                    Modifier.padding(start = 12.dp),
-                    style = Vesper.type.heading,
-                    color = c.textDim,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        if (running.isNotEmpty()) item {
-            CardRow("Recording now") {
-                items(running, key = { it.id }) { r ->
-                    TvCard(r.title, "${formatDuration(r.seconds)} · ${formatBytes(r.bytes)}", vm.thumbUrl(r.id).takeIf { r.thumb }, null, badge = "REC") { onPlay(r) }
-                }
-            }
-        }
-        if (resume.isNotEmpty()) item {
-            CardRow("Continue watching") {
-                items(resume, key = { "resume${it.id}" }) { r ->
-                    TvCard(
-                        r.title,
-                        "Resume at ${formatClock(r.positionS)}",
-                        vm.thumbUrl(r.id).takeIf { r.thumb },
-                        if (r.isDownload || r.seconds <= 0) null else (r.positionS.toFloat() / r.seconds).coerceIn(0f, 1f),
-                    ) { onPlay(r) }
-                }
-            }
-        }
-        if (next.isNotEmpty()) item {
-            CardRow("Up next") {
-                items(next, key = { "next${it.id}" }) { r ->
-                    TvCard(r.title, "${formatMoment(r.startAt)} · ${formatUntil(r.startAt)}", null, null) {}
-                }
-            }
-        }
-        if (recent.isNotEmpty()) item {
-            CardRow("Recorded lately") {
-                items(recent, key = { "recent${it.id}" }) { r ->
-                    TvCard(r.title, "${formatDuration(r.seconds)} · ${formatBytes(r.bytes)}", vm.thumbUrl(r.id).takeIf { r.thumb }, null) { onPlay(r) }
-                }
-            }
-        }
-        if (downloads.isNotEmpty()) item {
-            CardRow("Downloads") {
-                items(downloads, key = { "dl${it.id}" }) { r ->
-                    TvCard(
-                        r.title,
-                        if (r.isRunning) "Downloading · ${formatBytes(r.bytes)}" else formatBytes(r.bytes),
-                        vm.thumbUrl(r.id).takeIf { r.thumb },
-                        r.progress,
-                    ) { if (r.status == "done") onPlay(r) }
-                }
-            }
-        }
-    }
-}
-
-/** The big banner: a soft picture, the headline, and the three things most worth doing. */
-@Composable
-private fun Hero(
-    recording: Recording?,
-    thumb: String?,
-    live: Boolean,
-    first: FocusRequester,
-    onRecordNow: () -> Unit,
-    onGuide: () -> Unit,
-    onCalendar: () -> Unit,
-    onWatch: () -> Unit,
-) {
-    val c = Vesper.colors
-    Box(
-        Modifier
-            .padding(start = 12.dp)
-            .fillMaxWidth()
-            .height(280.dp),
-    ) {
-        Poster(
-            url = thumb,
-            title = recording?.title ?: "Vesper",
-            modifier = Modifier.fillMaxSize(),
-            shape = Shapes.sheet,
-        )
-        // Fade the picture into ink on the left so the words can sit on it.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Brush.horizontalGradient(listOf(c.bg.copy(alpha = 0.96f), c.bg.copy(alpha = 0.55f), Color.Transparent)), Shapes.sheet),
-        )
-        Column(
-            Modifier.align(Alignment.CenterStart).padding(start = 40.dp).fillMaxWidth(0.62f),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            if (recording != null) {
-                VText(recording.title, style = Vesper.type.display.copy(fontSize = 40.sp, lineHeight = 44.sp), maxLines = 2)
-                VText(
-                    if (live) {
-                        "Recording now · ${formatDuration(recording.seconds)} · ${formatBytes(recording.bytes)}"
-                    } else {
-                        "${formatMoment(recording.startAt)} · ${formatUntil(recording.startAt)}"
-                    },
-                    style = Vesper.type.heading,
-                    color = c.textDim,
-                    maxLines = 1,
-                )
-            } else {
-                VText("Vesper", style = Vesper.type.display.copy(fontSize = 52.sp, lineHeight = 56.sp))
-                VText("Your recordings, planned and ready.", style = Vesper.type.heading, color = c.textDim)
-            }
-            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (live) {
-                    VButton("Watch live", onWatch, Modifier.focusRequester(first), icon = Ic.Play)
-                    VButton("Record now", onRecordNow, kind = ButtonKind.Soft, icon = Ic.Record)
-                } else {
-                    VButton("Record now", onRecordNow, Modifier.focusRequester(first), icon = Ic.Record)
-                }
-                VButton("TV guide", onGuide, kind = ButtonKind.Soft, icon = Ic.Guide)
-                VButton("This week", onCalendar, kind = ButtonKind.Soft, icon = Ic.Calendar)
-            }
-        }
+        if (running.isNotEmpty()) item { CardRow("Recording now") { items(running, key = { it.id }) { r ->
+            TvCard(r.title, "${formatDuration(r.seconds)} · ${formatBytes(r.bytes)}", vm.thumbUrl(r.id).takeIf { r.thumb }, null) { onPlay(r) }
+        } } }
+        if (resume.isNotEmpty()) item { CardRow("Continue watching") { items(resume, key = { "resume${it.id}" }) { r ->
+            TvCard(
+                r.title,
+                "Resume at ${formatClock(r.positionS)}",
+                vm.thumbUrl(r.id).takeIf { r.thumb },
+                if (r.isDownload || r.seconds <= 0) null else (r.positionS.toFloat() / r.seconds).coerceIn(0f, 1f),
+            ) { onPlay(r) }
+        } } }
+        if (next.isNotEmpty()) item { CardRow("Up next") { items(next, key = { "next${it.id}" }) { r ->
+            TvCard(r.title, "${formatMoment(r.startAt)} · ${formatUntil(r.startAt)}", null, null) {}
+        } } }
+        if (recent.isNotEmpty()) item { CardRow("Recorded lately") { items(recent, key = { "recent${it.id}" }) { r ->
+            TvCard(r.title, "${formatDuration(r.seconds)} · ${formatBytes(r.bytes)}", vm.thumbUrl(r.id).takeIf { r.thumb }, null) { onPlay(r) }
+        } } }
+        if (downloads.isNotEmpty()) item { CardRow("Downloads") { items(downloads, key = { "dl${it.id}" }) { r ->
+            TvCard(
+                r.title,
+                if (r.isRunning) "Downloading · ${formatBytes(r.bytes)}" else formatBytes(r.bytes),
+                vm.thumbUrl(r.id).takeIf { r.thumb },
+                r.progress,
+            ) { if (r.status == "done") onPlay(r) }
+        } } }
     }
 }
 
 @Composable
-private fun CardRow(title: String, content: LazyListScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        VText(title, Modifier.padding(start = 12.dp), style = Vesper.type.title)
+private fun CardRow(title: String, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge)
         LazyRow(
             Modifier.fillMaxWidth().focusRestorer(),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            contentPadding = PaddingValues(vertical = 14.dp, horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
             content = content,
         )
     }
 }
 
-/** A card the remote can focus: it grows, gets an accent ring and a glow. Wide picture, two lines of text. */
+/** A card the remote can focus: it grows a little and gets a border when it has the focus. */
 @Composable
-private fun TvCard(title: String, subtitle: String, thumb: String?, progress: Float?, badge: String? = null, onClick: () -> Unit) {
-    val c = Vesper.colors
-    Column(
-        Modifier
-            .width(268.dp)
-            .pressable(onClick, Shapes.tile, focusScale = 1.06f),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
+private fun TvCard(title: String, subtitle: String, thumb: String?, progress: Float?, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.width(260.dp),
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(12.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.08f),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(BorderStroke(3.dp, colors.primary), shape = RoundedCornerShape(12.dp)),
+        ),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = colors.surfaceVariant,
+            contentColor = colors.onSurfaceVariant,
+            focusedContainerColor = colors.surfaceVariant,
+            focusedContentColor = colors.onSurface,
+        ),
     ) {
-        Poster(
-            url = thumb,
-            title = title,
-            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-            shape = Shapes.tile,
-            progress = progress,
-            overlay = if (badge != null) {
-                { Box(Modifier.align(Alignment.TopStart).padding(10.dp)) { VPill(badge, Tone.Live, pulse = true) } }
-            } else {
-                null
-            },
-        )
-        Column(Modifier.padding(horizontal = 4.dp, vertical = 10.dp)) {
-            VText(title, style = Vesper.type.heading, maxLines = 1)
-            VText(subtitle, style = Vesper.type.small, color = c.textDim, maxLines = 2)
+        Column {
+            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+                if (thumb != null) {
+                    AsyncImage(
+                        model = thumb,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+            if (progress != null) {
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            }
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+            }
         }
     }
 }

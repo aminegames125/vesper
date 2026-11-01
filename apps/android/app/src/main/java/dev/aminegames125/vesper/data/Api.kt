@@ -304,17 +304,6 @@ class Api(
     private fun media(path: String): String =
         "$base/api/v1/recordings/$path" + ((mediaToken ?: token)?.let { "?token=$it" } ?: "")
 
-    /**
-     * The start of an address that makes this server fetch something and pass it on. Live TV played
-     * through it comes from the server's own internet connection, which is the way round a provider
-     * that only allows the server's country.
-     */
-    fun relayPrefix(): String? {
-        val key = mediaToken ?: token ?: return null
-        if (base.isBlank()) return null
-        return "$base/api/v1/proxy?token=$key&url="
-    }
-
     suspend fun refreshMediaToken() {
         val reply: MediaToken = decode(send("POST", "/auth/media-token"))
         mediaToken = reply.token
