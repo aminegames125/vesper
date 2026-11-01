@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.25.0] - 2026-11-01 <!-- release: minor; push: 34; changes: 2 -->
+
+### Added
+- Redesign the landing page around the Vesper mark
+
+### Changed
+- Fix formatting that failed CI
+
 ## [0.24.0] - 2026-11-01 <!-- release: minor; push: 33; changes: 2 -->
 
 ### Changed
