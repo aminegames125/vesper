@@ -22,14 +22,17 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Only what changed since the previous release is built (scripts/changes.mjs). A release that did
-  # not touch the server has no server files, and says so in its notes; the same for the add-on.
+  # Only what changed since the previous release is built (scripts/release-plan.mjs). Parts that did
+  # not change are copied from the release that last built them, so every release page still has the
+  # server downloads and the Kodi add-on, and the image gets this release's tag without a rebuild.
   plan:
-    name: What changed since the last release
+    name: What to build and what to carry forward
     runs-on: ubuntu-latest
     outputs:
-      server: ${{ steps.parts.outputs.server }}
-      kodi: ${{ steps.parts.outputs.kodi }}
+      build_server: ${{ steps.plan.outputs.build_server }}
+      build_kodi: ${{ steps.plan.outputs.build_kodi }}
+      server_source: ${{ steps.plan.outputs.server_source }}
+      kodi_source: ${{ steps.plan.outputs.kodi_source }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,15 +41,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - id: parts
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Scripts come from the tag being released, which may predate this one; fall back to everything.
-          PREVIOUS=$(git tag --list 'v[0-9]*' --sort=-v:refname | grep -x -A1 -- "$TAG" | tail -n +2 | head -n 1 || true)
-          if [ -n "$PREVIOUS" ] && [ -f scripts/changes.mjs ]; then
-            node scripts/changes.mjs --base "$PREVIOUS" --head "$TAG"
+          # The scripts come from the tag being released; a tag from before they existed builds everything.
+          if [ -f scripts/release-plan.mjs ]; then
+            node scripts/release-plan.mjs "$TAG"
           else
-            echo "server=true" >> "$GITHUB_OUTPUT"
-            echo "kodi=true" >> "$GITHUB_OUTPUT"
+            { echo "build_server=true"; echo "build_kodi=true"; echo "server_source=$TAG"; echo "kodi_source=$TAG"; } | tee -a "$GITHUB_OUTPUT"
           fi
 
   draft:
@@ -60,22 +63,64 @@ jobs:
       - name: Create the draft if it does not exist yet
         env:
           GH_TOKEN: ${{ github.token }}
-          SERVER: ${{ needs.plan.outputs.server }}
-          KODI: ${{ needs.plan.outputs.kodi }}
+          SERVER: ${{ needs.plan.outputs.build_server }}
+          KODI: ${{ needs.plan.outputs.build_kodi }}
+          SERVER_SOURCE: ${{ needs.plan.outputs.server_source }}
+          KODI_SOURCE: ${{ needs.plan.outputs.kodi_source }}
         run: |
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             node scripts/release-notes.mjs "$TAG" > "$RUNNER_TEMP/notes.md"
             {
               echo
-              echo "**In this release:** server $([ "$SERVER" = true ] && echo "rebuilt" || echo "unchanged, use the previous release's files and image"), Kodi add-on $([ "$KODI" = true ] && echo "rebuilt" || echo "unchanged")."
+              if [ "$SERVER" = true ]; then S="rebuilt"; else S="unchanged, the files and image are the ones from $SERVER_SOURCE"; fi
+              if [ "$KODI" = true ]; then K="rebuilt"; else K="unchanged, the files are the ones from $KODI_SOURCE"; fi
+              echo "**In this release:** server $S. Kodi add-on $K."
             } >> "$RUNNER_TEMP/notes.md"
             gh release create "$TAG" --draft --title "Vesper $TAG" --notes-file "$RUNNER_TEMP/notes.md"
           fi
 
+  # Copies what was not rebuilt from the release that built it, so nothing is missing from this one.
+  carry:
+    name: Carry forward what did not change
+    needs: [plan, draft]
+    if: ${{ needs.plan.outputs.build_server != 'true' || needs.plan.outputs.build_kodi != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        if: ${{ needs.plan.outputs.build_server != 'true' }}
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Copy the files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUILD_SERVER: ${{ needs.plan.outputs.build_server }}
+          BUILD_KODI: ${{ needs.plan.outputs.build_kodi }}
+          SERVER_SOURCE: ${{ needs.plan.outputs.server_source }}
+          KODI_SOURCE: ${{ needs.plan.outputs.kodi_source }}
+        run: |
+          mkdir carried
+          if [ "$BUILD_SERVER" != true ]; then
+            gh release download "$SERVER_SOURCE" --dir carried --pattern 'vesper-server-*'
+          fi
+          if [ "$BUILD_KODI" != true ]; then
+            gh release download "$KODI_SOURCE" --dir carried --pattern 'plugin.video.vesper-*' --pattern 'repository.vesper-*'
+          fi
+          gh release upload "$TAG" carried/* --clobber
+      - name: Give the unchanged server image this release's tag
+        if: ${{ needs.plan.outputs.build_server != 'true' }}
+        env:
+          SERVER_SOURCE: ${{ needs.plan.outputs.server_source }}
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/vesper-server"
+          docker buildx imagetools create -t "$IMAGE:$TAG" "$IMAGE:$SERVER_SOURCE"
+
   server:
     name: Server (${{ matrix.name }})
     needs: [plan, draft]
-    if: ${{ needs.plan.outputs.server == 'true' }}
+    if: ${{ needs.plan.outputs.build_server == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -128,7 +173,7 @@ jobs:
   kodi:
     name: Kodi add-on
     needs: [plan, draft]
-    if: ${{ needs.plan.outputs.kodi == 'true' }}
+    if: ${{ needs.plan.outputs.build_kodi == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -156,7 +201,7 @@ jobs:
   docker:
     name: Server image
     needs: [plan, draft]
-    if: ${{ needs.plan.outputs.server == 'true' }}
+    if: ${{ needs.plan.outputs.build_server == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -186,7 +231,7 @@ jobs:
 
   publish:
     name: Publish release
-    needs: [plan, server, kodi, docker]
+    needs: [plan, carry, server, kodi, docker]
     # A part that was skipped on purpose is fine; one that failed is not.
     if: ${{ !failure() && !cancelled() }}
     runs-on: ubuntu-latest

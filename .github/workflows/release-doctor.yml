@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: 22
       - name: Test the rules
-        run: node --test scripts/release-doctor.test.mjs scripts/changes.test.mjs
+        run: node --test scripts/*.test.mjs
       - name: Check and fix
         env:
           GH_TOKEN: ${{ github.token }}

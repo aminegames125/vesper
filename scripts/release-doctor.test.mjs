@@ -83,24 +83,25 @@ test("a broken draft older than a published release is deleted, not retried", ()
   assert.match(out[0].why, /superseded by v0\.27\.2/);
 });
 
-test("a release that only changed Kodi expects only the Kodi files and needs no image", () => {
-  const kodiOnly = { server: false, kodi: true };
-  const names = full("v1.0.0").filter((n) => !n.startsWith("vesper-server-"));
-  assert.deepEqual(missingAssets("v1.0.0", names, kodiOnly), []);
-  const out = plan({
-    ...base,
-    drafts: [{ tag: "v1.0.0", assets: names }],
-    runs: [done],
-    imageExists: () => false,
-    partsOf: () => kodiOnly,
-  });
-  assert.equal(out[0].action, "publish");
+test("a release that carried its server files expects them under the original release's name", () => {
+  const sources = { server: "v0.9.0", kodi: "v1.0.0" };
+  const names = [...full("v0.9.0").filter((n) => n.startsWith("vesper-server-")), ...full("v1.0.0").filter((n) => !n.startsWith("vesper-server-"))];
+  assert.deepEqual(missingAssets("v1.0.0", names, sources), []);
+  // The release's own name would not do for the server files.
+  assert.ok(missingAssets("v1.0.0", full("v1.0.0").filter((n) => !n.startsWith("vesper-server-")), sources).length > 0);
 });
 
-test("a release that only changed the server does not wait for the Kodi files", () => {
-  const serverOnly = { server: true, kodi: false };
-  const names = full("v1.0.0").filter((n) => !n.startsWith("plugin.") && !n.startsWith("repository."));
-  assert.deepEqual(missingAssets("v1.0.0", names, serverOnly), []);
+test("a release that carried its Kodi files expects the add-on at the older version", () => {
+  const sources = { server: "v1.0.0", kodi: "v0.8.0" };
+  const names = [...full("v1.0.0").filter((n) => n.startsWith("vesper-server-")), "plugin.video.vesper-0.8.0.zip", "plugin.video.vesper-0.8.0.zip.sha256", "repository.vesper-1.0.0.zip", "repository.vesper-1.0.0.zip.sha256"];
+  assert.deepEqual(missingAssets("v1.0.0", names, sources), []);
+});
+
+test("a complete carried release is published once its image exists", () => {
+  const sources = { server: "v0.9.0", kodi: "v1.0.0" };
+  const names = [...full("v0.9.0").filter((n) => n.startsWith("vesper-server-")), ...full("v1.0.0").filter((n) => !n.startsWith("vesper-server-"))];
+  const out = plan({ ...base, drafts: [{ tag: "v1.0.0", assets: names }], runs: [done], sourcesOf: () => sources });
+  assert.equal(out[0].action, "publish");
 });
 
 test("files without a Docker image are not published", () => {

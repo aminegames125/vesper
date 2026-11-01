@@ -1,19 +1,25 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { kodiVersion, parts, previousTag, shipped } from "./changes.mjs";
+import { kodiVersion, PARTS, parts, previousTag, shipped } from "./changes.mjs";
 
-const only = (hit) => Object.entries(hit).filter(([, v]) => v).map(([k]) => k).sort();
+const only = (hit) => PARTS.filter((p) => hit[p]).sort();
 
-test("a Kodi-only change touches only Kodi", () => {
-  assert.deepEqual(only(parts(["apps/kodi/plugin.video.vesper/service.py"])), ["kodi"]);
+test("a Kodi-only change touches only Kodi, and ships it", () => {
+  const hit = parts(["apps/kodi/plugin.video.vesper/service.py"]);
+  assert.deepEqual(only(hit), ["kodi"]);
+  assert.deepEqual(hit.ships, { server: false, kodi: true });
 });
 
 test("a server change touches the server but not Kodi or the site", () => {
-  assert.deepEqual(only(parts(["apps/server/src/jobs.rs", "crates/vesper-recorder/src/hls.rs"])), ["server"]);
+  const hit = parts(["apps/server/src/jobs.rs", "crates/vesper-recorder/src/hls.rs"]);
+  assert.deepEqual(only(hit), ["server"]);
+  assert.deepEqual(hit.ships, { server: true, kodi: false });
 });
 
 test("the admin panel is built into the server, so it counts for both", () => {
-  assert.deepEqual(only(parts(["apps/admin/src/app.tsx"])), ["server", "web"]);
+  const hit = parts(["apps/admin/src/app.tsx"]);
+  assert.deepEqual(only(hit), ["server", "web"]);
+  assert.equal(hit.ships.server, true);
 });
 
 test("the landing page and docs ship nothing", () => {
@@ -25,9 +31,23 @@ test("the landing page and docs ship nothing", () => {
   assert.equal(shipped(docs), false);
 });
 
-test("the CI workflow, lockfiles and root config can affect everything", () => {
-  for (const file of [".github/workflows/ci.yml", "pnpm-lock.yaml", "package.json"]) {
-    assert.deepEqual(only(parts([file])).filter((p) => p !== "tooling"), ["all", "kodi", "server", "site", "web"], file);
+test("changing the CI workflow makes CI check everything but ships nothing", () => {
+  const hit = parts([".github/workflows/ci.yml"]);
+  assert.deepEqual(only(hit), ["all", "kodi", "server", "site", "tooling", "web"]);
+  assert.equal(shipped(hit), false);
+});
+
+test("a lockfile change rebuilds the server (the admin panel is inside it) but not the add-on", () => {
+  const hit = parts(["pnpm-lock.yaml"]);
+  assert.deepEqual(only(hit), ["server", "site", "web"]);
+  assert.deepEqual(hit.ships, { server: true, kodi: false });
+});
+
+test("root JavaScript config is checked for the web parts and ships nothing", () => {
+  for (const file of ["package.json", "biome.json", "turbo.json"]) {
+    const hit = parts([file]);
+    assert.deepEqual(only(hit), ["site", "web"], file);
+    assert.equal(shipped(hit), false, file);
   }
 });
 
@@ -39,8 +59,10 @@ test("release tooling ships nothing and builds nothing", () => {
   }
 });
 
-test("the end-to-end scripts count for the server and the add-on", () => {
-  assert.deepEqual(only(parts(["scripts/e2e-kodi.mjs"])), ["kodi", "server", "tooling"]);
+test("the end-to-end scripts are checked against the server and the add-on, not shipped", () => {
+  const hit = parts(["scripts/e2e-kodi.mjs"]);
+  assert.deepEqual(only(hit), ["kodi", "server", "tooling"]);
+  assert.equal(shipped(hit), false);
 });
 
 test("a file nobody planned for is treated carefully, but known inert files are not", () => {
@@ -50,6 +72,7 @@ test("a file nobody planned for is treated carefully, but known inert files are 
 
 test("an empty change touches nothing", () => {
   assert.deepEqual(only(parts([])), []);
+  assert.equal(shipped(parts([])), false);
 });
 
 test("the previous tag is the next one down the list", () => {
@@ -62,5 +85,8 @@ test("Kodi stays at the last release that changed it", () => {
   const all = ["v0.30.0", "v0.29.0", "v0.28.0", "v0.27.0"];
   const touched = (tag) => tag === "v0.28.0" || tag === "v0.27.0";
   assert.equal(kodiVersion(all, touched), "0.28.0");
-  assert.equal(kodiVersion(all, () => false), "0.27.0");
+  assert.equal(
+    kodiVersion(all, () => false),
+    "0.27.0",
+  );
 });
