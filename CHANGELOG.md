@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.27.0] - 2026-11-01 <!-- release: minor; push: 36; changes: 2 -->
+
+### Added
+- Viewer dashboard, downloads with yt-dlp and encoders, sync, Kodi VOD
+
+### Changed
+- Ignore generated Gradle and Kotlin build output
+
 ## [0.26.0] - 2026-11-01 <!-- release: minor; push: 35; changes: 1 -->
 
 ### Added

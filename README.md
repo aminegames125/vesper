@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/aminegames125/vesper/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/aminegames125/vesper/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white&style=for-the-badge&color=FF5C7A&labelColor=151518" /></a>
-  <!-- version:start --><img alt="Version" src="https://img.shields.io/badge/version-0.26.0-FF5C7A?style=for-the-badge&labelColor=151518" /> <img alt="minor update" src="https://img.shields.io/badge/release-minor-FF5C7A?style=for-the-badge&labelColor=151518" /><!-- version:end -->
+  <!-- version:start --><img alt="Version" src="https://img.shields.io/badge/version-0.27.0-FF5C7A?style=for-the-badge&labelColor=151518" /> <img alt="minor update" src="https://img.shields.io/badge/release-minor-FF5C7A?style=for-the-badge&labelColor=151518" /><!-- version:end -->
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-FF5C7A?style=for-the-badge&labelColor=151518" /></a>
 </p>
 
