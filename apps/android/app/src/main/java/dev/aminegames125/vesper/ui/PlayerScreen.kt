@@ -9,7 +9,6 @@ import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,21 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.BookmarkAdd
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.HighQuality
-import androidx.compose.material.icons.filled.Bookmarks
-import androidx.compose.material.icons.filled.PictureInPictureAlt
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +28,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -80,6 +65,19 @@ import dev.aminegames125.vesper.cast.qualityLabel
 import dev.aminegames125.vesper.cast.mimeFor
 import dev.aminegames125.vesper.data.Bookmark
 import dev.aminegames125.vesper.data.formatClock
+import dev.aminegames125.vesper.ui.kit.ButtonKind
+import dev.aminegames125.vesper.ui.kit.ChoiceRow
+import dev.aminegames125.vesper.ui.kit.Ic
+import dev.aminegames125.vesper.ui.kit.IconStyle
+import dev.aminegames125.vesper.ui.kit.Shapes
+import dev.aminegames125.vesper.ui.kit.VButton
+import dev.aminegames125.vesper.ui.kit.VDialog
+import dev.aminegames125.vesper.ui.kit.VIcon
+import dev.aminegames125.vesper.ui.kit.VIconButton
+import dev.aminegames125.vesper.ui.kit.VRow
+import dev.aminegames125.vesper.ui.kit.VText
+import dev.aminegames125.vesper.ui.kit.Vesper
+import dev.aminegames125.vesper.ui.kit.glass
 import dev.aminegames125.vesper.ui.theme.LocalIsTv
 import kotlinx.coroutines.delay
 
@@ -347,15 +345,16 @@ fun PlayerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("This stream will not play on this device.", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                Text(
+                VText("This stream will not play on this device.", color = Color.White, style = Vesper.type.heading)
+                VText(
                     if (cast?.available == true) {
                         "Cast it to a TV or Chromecast instead, or go back and try another channel."
                     } else {
                         "Go back and try another channel."
                     },
                     color = Color.White.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = Vesper.type.body,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 if (cast != null && !isTv) CastButton(cast)
             }
@@ -364,15 +363,15 @@ fun PlayerScreen(
         if (isTv && (banner || overlay) && !inPip) {
             Column(
                 Modifier.align(Alignment.BottomStart).padding(start = 48.dp, bottom = 56.dp, end = 48.dp)
-                    .background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 20.dp, vertical = 12.dp),
+                    .glass(Shapes.tile, strong = true).padding(horizontal = 22.dp, vertical = 14.dp),
             ) {
-                Text(source.title, color = Color.White, style = MaterialTheme.typography.headlineSmall, maxLines = 1)
+                VText(source.title, color = Color.White, style = Vesper.type.title, maxLines = 1)
                 val hints = buildList {
                     if (source.live && onZap != null) add("Up / Down: change channel")
                     if (heightsOf(variants).size > 1) add("Menu: picture quality")
                     add("Back: leave")
                 }
-                Text(hints.joinToString("   ·   "), color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.bodyMedium)
+                VText(hints.joinToString("   ·   "), color = Color.White.copy(alpha = 0.75f), style = Vesper.type.body)
             }
         }
 
@@ -382,11 +381,12 @@ fun PlayerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(source.title, color = Color.White, style = MaterialTheme.typography.titleLarge)
-                Text(
+                VText(source.title, color = Color.White, style = Vesper.type.title, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                VText(
                     if (cast?.available == true) "Pick a TV or Chromecast to start it there." else "Casting needs Google Play services, which this phone does not have.",
                     color = Color.White.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = Vesper.type.body,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 if (cast != null) CastButton(cast)
             }
@@ -394,102 +394,96 @@ fun PlayerScreen(
 
         if (overlay && !inPip) {
             Row(
-                Modifier.fillMaxWidth().statusBarsPadding().background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 4.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent)))
+                    .statusBarsPadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                }
+                VIconButton(Ic.Back, "Back", onBack, style = IconStyle.Scrim)
                 Column(Modifier.weight(1f)) {
-                    Text(source.title, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                    VText(source.title, color = Color.White, style = Vesper.type.heading, maxLines = 1)
                     // A Chromecast cannot reach an address that only means "this phone".
                     if (cast?.available == true && !isTv && isLocalOnly(source.castUrl) && !source.live) {
-                        Text(
+                        VText(
                             "To cast, connect the app to the server's network address, not localhost.",
                             color = Color.White.copy(alpha = 0.8f),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = Vesper.type.small,
                         )
                     }
                 }
                 if (heightsOf(variants).size > 1 && !isTv) {
-                    IconButton(onClick = { showQuality = true }) {
-                        Icon(Icons.Filled.HighQuality, contentDescription = "Picture quality", tint = Color.White)
-                    }
+                    VIconButton(Ic.Quality, "Picture quality", { showQuality = true }, style = IconStyle.Scrim)
                 }
                 if (!source.live && !isTv) {
-                    IconButton(onClick = { onBookmark(current.currentPosition / 1000) }) {
-                        Icon(Icons.Filled.BookmarkAdd, contentDescription = "Add a bookmark here", tint = Color.White)
-                    }
+                    VIconButton(Ic.BookmarkAdd, "Add a bookmark here", { onBookmark(current.currentPosition / 1000) }, style = IconStyle.Scrim)
                     if (bookmarks.isNotEmpty()) {
-                        IconButton(onClick = { showBookmarks = true }) {
-                            Icon(Icons.Filled.Bookmarks, contentDescription = "Bookmarks", tint = Color.White)
-                        }
+                        VIconButton(Ic.Bookmarks, "Bookmarks", { showBookmarks = true }, style = IconStyle.Scrim)
                     }
                 }
                 if (!isTv && cast != null) CastButton(cast)
                 if (canPip) {
-                    IconButton(onClick = {
-                        activity?.enterPictureInPictureMode(PictureInPictureParams.Builder().build())
-                    }) {
-                        Icon(Icons.Filled.PictureInPictureAlt, contentDescription = "Picture in picture", tint = Color.White)
-                    }
+                    VIconButton(
+                        Ic.Pip,
+                        "Picture in picture",
+                        { activity?.enterPictureInPictureMode(PictureInPictureParams.Builder().build()) },
+                        style = IconStyle.Scrim,
+                    )
                 }
             }
         }
     }
 
     if (showQuality) {
-        AlertDialog(
-            onDismissRequest = { showQuality = false },
-            title = { Text("Picture quality") },
-            text = {
-                Column {
-                    (listOf(0) + heightsOf(variants)).forEach { height ->
-                        ListItem(
-                            headlineContent = { Text(qualityLabel(height)) },
-                            trailingContent = if (maxHeight == height) ({ Icon(Icons.Filled.Check, contentDescription = "Selected") }) else null,
-                            modifier = Modifier.clickable {
-                                chooseQuality(height)
-                                showQuality = false
-                            },
-                        )
-                    }
-                    Text(
-                        "A lower quality uses less data and buffers less on a slow connection.",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = { showQuality = false }) { Text("Close") } },
-        )
+        VDialog(
+            onDismiss = { showQuality = false },
+            title = "Picture quality",
+            actions = { VButton("Close", { showQuality = false }, kind = ButtonKind.Soft) },
+        ) {
+            (listOf(0) + heightsOf(variants)).forEach { height ->
+                ChoiceRow(
+                    qualityLabel(height),
+                    selected = maxHeight == height,
+                    onClick = {
+                        chooseQuality(height)
+                        showQuality = false
+                    },
+                )
+            }
+            VText(
+                "A lower quality uses less data and buffers less on a slow connection.",
+                style = Vesper.type.small,
+                color = Vesper.colors.textFaint,
+            )
+        }
     }
 
     if (showBookmarks) {
-        AlertDialog(
-            onDismissRequest = { showBookmarks = false },
-            title = { Text("Bookmarks") },
-            text = {
-                Column {
-                    bookmarks.forEach { bookmark ->
-                        ListItem(
-                            headlineContent = { Text(bookmark.label.ifBlank { formatClock(bookmark.atS) }) },
-                            supportingContent = if (bookmark.label.isNotBlank()) ({ Text(formatClock(bookmark.atS)) }) else null,
-                            trailingContent = {
-                                IconButton(onClick = {
-                                    onDeleteBookmark(bookmark.id)
-                                    if (bookmarks.size <= 1) showBookmarks = false
-                                }) { Icon(Icons.Filled.Delete, contentDescription = "Delete this bookmark") }
-                            },
-                            modifier = Modifier.clickable {
-                                current.seekTo(bookmark.atS * 1000)
-                                showBookmarks = false
-                            },
-                        )
-                    }
+        VDialog(
+            onDismiss = { showBookmarks = false },
+            title = "Bookmarks",
+            actions = { VButton("Close", { showBookmarks = false }, kind = ButtonKind.Soft) },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                bookmarks.forEach { bookmark ->
+                    VRow(
+                        title = bookmark.label.ifBlank { formatClock(bookmark.atS) },
+                        subtitle = if (bookmark.label.isNotBlank()) formatClock(bookmark.atS) else null,
+                        onClick = {
+                            current.seekTo(bookmark.atS * 1000)
+                            showBookmarks = false
+                        },
+                        trailing = {
+                            VIconButton(Ic.Delete, "Delete this bookmark", {
+                                onDeleteBookmark(bookmark.id)
+                                if (bookmarks.size <= 1) showBookmarks = false
+                            }, tint = Vesper.colors.danger)
+                        },
+                    )
                 }
-            },
-            confirmButton = { TextButton(onClick = { showBookmarks = false }) { Text("Close") } },
-        )
+            }
+        }
     }
 }

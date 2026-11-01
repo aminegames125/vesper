@@ -1,32 +1,12 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package dev.aminegames125.vesper.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,6 +19,16 @@ import androidx.compose.ui.unit.dp
 import dev.aminegames125.vesper.data.GuideHit
 import dev.aminegames125.vesper.data.formatDuration
 import dev.aminegames125.vesper.data.formatMoment
+import dev.aminegames125.vesper.ui.kit.ButtonKind
+import dev.aminegames125.vesper.ui.kit.Ic
+import dev.aminegames125.vesper.ui.kit.VButton
+import dev.aminegames125.vesper.ui.kit.VDialog
+import dev.aminegames125.vesper.ui.kit.VField
+import dev.aminegames125.vesper.ui.kit.VIconButton
+import dev.aminegames125.vesper.ui.kit.VRow
+import dev.aminegames125.vesper.ui.kit.VText
+import dev.aminegames125.vesper.ui.kit.VTopBar
+import dev.aminegames125.vesper.ui.kit.Vesper
 import kotlinx.coroutines.delay
 
 /** Find a programme by title and record it once or every time it is on. */
@@ -56,64 +46,42 @@ fun GuideScreen(vm: VesperViewModel, onBack: () -> Unit) {
         vm.searchGuide(query)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("TV guide") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                },
-                actions = {
-                    IconButton(onClick = vm::refreshGuide, enabled = !busy) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Update the guide now")
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    Column(Modifier.fillMaxSize()) {
+        VTopBar("TV guide", onBack) {
+            VIconButton(Ic.Refresh, "Update the guide now", vm::refreshGuide, enabled = !busy)
+        }
         LazyColumn(
-            Modifier.padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = pageHorizontal(), end = pageHorizontal(), top = 8.dp, bottom = 24.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = pageHorizontal(), end = pageHorizontal(), top = 4.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text("Search programmes") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                VField(query, { query = it }, "Search programmes", Modifier.fillMaxWidth(), leading = Ic.Search)
             }
             if (query.trim().length >= 2 && hits.isEmpty()) {
                 item {
                     EmptyState(
                         "Nothing found",
                         "Set the guide address in the admin panel (Settings), then update the guide here.",
+                        icon = Ic.Search,
                     )
                 }
             }
             items(hits) { hit ->
-                ListItem(
-                    modifier = Modifier.clickable { chosen = hit },
-                    headlineContent = { Text(hit.title, maxLines = 1) },
-                    supportingContent = {
-                        Text("${hit.channelName} · ${formatMoment(hit.startAt)} · ${formatDuration(hit.stopAt - hit.startAt)}", maxLines = 2)
-                    },
+                VRow(
+                    title = hit.title,
+                    subtitle = "${hit.channelName} · ${formatMoment(hit.startAt)} · ${formatDuration(hit.stopAt - hit.startAt)}",
+                    onClick = { chosen = hit },
                 )
             }
             if (rules.isNotEmpty()) {
                 item { SectionTitle("Recorded every time") }
                 items(rules, key = { it.id }) { rule ->
-                    ListItem(
-                        headlineContent = { Text(rule.title) },
-                        supportingContent = { Text(rule.channelName) },
-                        trailingContent = {
-                            IconButton(onClick = { vm.deleteRule(rule.id) }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Stop recording ${rule.title}")
-                            }
+                    VRow(
+                        title = rule.title,
+                        subtitle = rule.channelName,
+                        trailing = {
+                            VIconButton(Ic.Delete, "Stop recording ${rule.title}", { vm.deleteRule(rule.id) }, tint = Vesper.colors.danger)
                         },
                     )
                 }
@@ -127,40 +95,41 @@ fun GuideScreen(vm: VesperViewModel, onBack: () -> Unit) {
 /** What to do with a programme from the guide. */
 @Composable
 fun ProgrammeDialog(hit: GuideHit, vm: VesperViewModel, busy: Boolean, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(hit.title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("${hit.channelName} · ${formatMoment(hit.startAt)}", style = MaterialTheme.typography.bodyMedium)
-                if (hit.description.isNotBlank()) {
-                    Text(hit.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Text(
-                    "Recording starts a minute early and runs until the guide says it has ended.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+    val c = Vesper.colors
+    VDialog(
+        onDismiss = onDismiss,
+        title = hit.title,
+        actions = {
+            VButton("Close", onDismiss, kind = ButtonKind.Ghost)
+            VButton(
+                "Every time",
+                {
+                    vm.recordSeries(hit)
+                    onDismiss()
+                },
+                kind = ButtonKind.Soft,
+                enabled = !busy,
+                icon = Ic.Refresh,
+            )
+            VButton(
+                "Record",
+                {
+                    vm.recordProgramme(hit)
+                    onDismiss()
+                },
+                enabled = !busy,
+                icon = Ic.Record,
+            )
         },
-        confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    enabled = !busy,
-                    onClick = {
-                        vm.recordSeries(hit)
-                        onDismiss()
-                    },
-                ) { Text("Every time") }
-                Button(
-                    enabled = !busy,
-                    onClick = {
-                        vm.recordProgramme(hit)
-                        onDismiss()
-                    },
-                ) { Text("Record") }
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-    )
+    ) {
+        VText("${hit.channelName} · ${formatMoment(hit.startAt)}", style = Vesper.type.bodyStrong)
+        if (hit.description.isNotBlank()) {
+            VText(hit.description, style = Vesper.type.small, color = c.textDim)
+        }
+        VText(
+            "Recording starts a minute early and runs until the guide says it has ended.",
+            style = Vesper.type.small,
+            color = c.textFaint,
+        )
+    }
 }

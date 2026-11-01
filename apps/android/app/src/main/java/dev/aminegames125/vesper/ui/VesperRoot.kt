@@ -1,29 +1,26 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalTvMaterial3Api::class)
-
 package dev.aminegames125.vesper.ui
 
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -34,8 +31,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -47,34 +48,36 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.tv.material3.DrawerValue
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.ModalNavigationDrawer
-import androidx.tv.material3.NavigationDrawerItem
-import androidx.tv.material3.rememberDrawerState
 import dev.aminegames125.vesper.cast.CastSupport
+import dev.aminegames125.vesper.ui.kit.Ic
+import dev.aminegames125.vesper.ui.kit.LoadingBox
+import dev.aminegames125.vesper.ui.kit.Shapes
+import dev.aminegames125.vesper.ui.kit.ToastHost
+import dev.aminegames125.vesper.ui.kit.VIcon
+import dev.aminegames125.vesper.ui.kit.VText
+import dev.aminegames125.vesper.ui.kit.Vesper
+import dev.aminegames125.vesper.ui.kit.backdrop
+import dev.aminegames125.vesper.ui.kit.glass
+import dev.aminegames125.vesper.ui.kit.pressable
+import dev.aminegames125.vesper.ui.kit.rememberToastState
 import dev.aminegames125.vesper.work.Notifications
 import kotlinx.coroutines.delay
-import androidx.tv.material3.Icon as TvIcon
-import androidx.tv.material3.MaterialTheme as TvTheme
-import androidx.tv.material3.Text as TvText
-import androidx.tv.material3.darkColorScheme as tvDarkColorScheme
 
 /** The three places a phone has in its bottom bar; a TV has these plus Home and Channels. */
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
 private val PhoneTabs = listOf(
-    Tab("schedule", "Schedule", Icons.Filled.Event),
-    Tab("recordings", "Recordings", Icons.Filled.PlayCircle),
-    Tab("settings", "Settings", Icons.Filled.Settings),
+    Tab("schedule", "Schedule", Ic.Calendar),
+    Tab("recordings", "Recordings", Ic.Library),
+    Tab("settings", "Settings", Ic.Sliders),
 )
 
 private val TvTabs = listOf(
-    Tab("home", "Home", Icons.Filled.Home),
-    Tab("schedule", "Schedule", Icons.Filled.Event),
-    Tab("recordings", "Recordings", Icons.Filled.PlayCircle),
-    Tab("channels", "Channels", Icons.Filled.LiveTv),
-    Tab("settings", "Settings", Icons.Filled.Settings),
+    Tab("home", "Home", Ic.Home),
+    Tab("schedule", "Schedule", Ic.Calendar),
+    Tab("recordings", "Recordings", Ic.Library),
+    Tab("channels", "Channels", Ic.Tv),
+    Tab("settings", "Settings", Ic.Sliders),
 )
 
 @Composable
@@ -83,14 +86,13 @@ fun VesperRoot(isTv: Boolean) {
     val gate by vm.gate.collectAsState()
     val busy by vm.busy.collectAsState()
     when (val state = gate) {
-        Gate.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        Gate.Loading -> LoadingBox()
         is Gate.NeedServer, is Gate.NeedLogin -> {
-            val snackbar = remember { SnackbarHostState() }
-            LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
-            Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
-                Box(Modifier.padding(padding)) {
-                    ConnectScreen(state, busy, vm::connect, vm::signIn, vm::changeServer)
-                }
+            val toast = rememberToastState()
+            LaunchedEffect(Unit) { vm.messages.collect { toast.show(it) } }
+            Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+                ConnectScreen(state, busy, vm::connect, vm::signIn, vm::changeServer)
+                ToastHost(toast, Modifier.align(Alignment.BottomCenter))
             }
         }
         is Gate.Ready -> MainScaffold(vm, state, isTv)
@@ -104,13 +106,13 @@ private fun MainScaffold(vm: VesperViewModel, gate: Gate.Ready, isTv: Boolean) {
     val route = entry?.destination?.route
     val tabs = if (isTv) TvTabs else PhoneTabs
     val onTop = tabs.any { it.route == route }
-    val snackbar = remember { SnackbarHostState() }
+    val toast = rememberToastState()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val context = LocalContext.current
     // Casting is for phones; a TV box is the thing being cast to.
     val cast = remember(isTv) { if (isTv) null else CastSupport(context) }
 
-    LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
+    LaunchedEffect(Unit) { vm.messages.collect { toast.show(it) } }
     // Keep the lists fresh while the app is on screen, so a recording's progress moves.
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -146,23 +148,8 @@ private fun MainScaffold(vm: VesperViewModel, gate: Gate.Ready, isTv: Boolean) {
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
-        bottomBar = {
-            if (onTop && !isTv) {
-                NavigationBar {
-                    PhoneTabs.forEach { tab ->
-                        NavigationBarItem(
-                            selected = route == tab.route,
-                            onClick = { nav.goTo(tab.route, PhoneTabs.first().route) },
-                            icon = { Icon(tab.icon, contentDescription = null) },
-                            label = { Text(tab.label) },
-                        )
-                    }
-                }
-            }
-        },
-    ) { padding ->
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
         val host: @Composable (Modifier) -> Unit = { modifier ->
             NavHost(nav, startDestination = if (isTv) "home" else "schedule", modifier = modifier) {
                 composable("home") {
@@ -285,68 +272,109 @@ private fun MainScaffold(vm: VesperViewModel, gate: Gate.Ready, isTv: Boolean) {
             TvShell(
                 tabs = tabs,
                 route = route,
-                showDrawer = onTop,
+                showRail = onTop,
                 onSelect = { nav.goTo(it, "home") },
-                modifier = Modifier.padding(padding).fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
             ) { host(Modifier.fillMaxSize()) }
         } else {
-            host(Modifier.padding(padding).fillMaxSize())
+            host(Modifier.fillMaxSize())
+        }
+        ToastHost(toast, Modifier.align(Alignment.BottomCenter))
+        }
+        if (onTop && !isTv) {
+            PhoneNav(PhoneTabs, route) { nav.goTo(it, PhoneTabs.first().route) }
         }
     }
 }
 
 /**
- * The TV's menu: a strip of icons at the left edge that opens into labels when the remote moves
- * onto it, over the screen instead of pushing it aside. It is absent on full-screen pages.
+ * The phone's navigation: a floating glass pill. The page you are on is a lit capsule with its
+ * name; the others are just their icons, so the bar stays small and calm.
+ */
+@Composable
+private fun PhoneNav(tabs: List<Tab>, route: String?, onSelect: (String) -> Unit) {
+    val c = Vesper.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 10.dp)
+            .glass(Shapes.pill, strong = true)
+            .padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        tabs.forEach { tab ->
+            val selected = route == tab.route
+            val weight by animateFloatAsState(if (selected) 1.9f else 1f, spring(dampingRatio = 0.8f, stiffness = 380f), label = "navWeight")
+            Row(
+                Modifier
+                    .weight(weight)
+                    .height(48.dp)
+                    .pressable({ onSelect(tab.route) }, Shapes.pill, role = Role.Tab, focusScale = 1.03f)
+                    .background(if (selected) c.accentSoft else Color.Transparent, Shapes.pill),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                VIcon(tab.icon, if (selected) null else tab.label, tint = if (selected) c.accent else c.textDim, size = 22.dp)
+                if (selected) VText(tab.label, style = Vesper.type.button, color = c.accent, maxLines = 1)
+            }
+        }
+    }
+}
+
+/**
+ * The TV's menu: a floating glass rail of icons at the left edge that opens into labels when the
+ * remote moves onto it, over the screen instead of pushing it aside. It is absent on full-screen pages.
  */
 @Composable
 private fun TvShell(
     tabs: List<Tab>,
     route: String?,
-    showDrawer: Boolean,
+    showRail: Boolean,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val m3 = androidx.compose.material3.MaterialTheme.colorScheme
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
-    TvTheme(
-        colorScheme = tvDarkColorScheme(
-            primary = m3.primary,
-            onPrimary = m3.onPrimary,
-            surface = m3.surface,
-            onSurface = m3.onSurface,
-            background = m3.background,
-            onBackground = m3.onBackground,
-            surfaceVariant = m3.surfaceVariant,
-            onSurfaceVariant = m3.onSurfaceVariant,
-            secondaryContainer = m3.secondaryContainer,
-            onSecondaryContainer = m3.onSecondaryContainer,
-        ),
-    ) {
-        ModalNavigationDrawer(
-            drawerContent = {
-                if (showDrawer) {
-                    androidx.compose.foundation.layout.Column(
-                        Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+    val c = Vesper.colors
+    var open by remember { mutableStateOf(false) }
+    val railWidth by animateDpAsState(if (open) 232.dp else 64.dp, spring(dampingRatio = 0.85f, stiffness = 360f), label = "railWidth")
+    Box(modifier) {
+        Box(Modifier.fillMaxSize().padding(start = if (showRail) 112.dp else 0.dp)) { content() }
+        if (showRail) {
+            if (open) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Brush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.72f), Color.Transparent))),
+                )
+            }
+            Column(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 20.dp)
+                    .onFocusChanged { open = it.hasFocus }
+                    .width(railWidth + 24.dp)
+                    .glass(RoundedCornerShape(36.dp), strong = true)
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                tabs.forEach { tab ->
+                    val selected = route == tab.route
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(54.dp)
+                            .pressable({ onSelect(tab.route) }, Shapes.pill, role = Role.Tab, focusScale = 1.03f)
+                            .background(if (selected) c.accentSoft else Color.Transparent, Shapes.pill)
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        tabs.forEach { tab ->
-                            NavigationDrawerItem(
-                                selected = route == tab.route,
-                                onClick = {
-                                    onSelect(tab.route)
-                                },
-                                leadingContent = { TvIcon(tab.icon, contentDescription = tab.label) },
-                            ) { TvText(tab.label) }
-                        }
+                        VIcon(tab.icon, tab.label, tint = if (selected) c.accent else c.textDim, size = 24.dp)
+                        if (open) VText(tab.label, style = Vesper.type.heading, color = if (selected) c.accent else c.text, maxLines = 1)
                     }
                 }
-            },
-            drawerState = drawerState,
-            modifier = modifier,
-        ) {
-            Box(Modifier.fillMaxSize().padding(start = if (showDrawer) 72.dp else 0.dp)) { content() }
+            }
         }
     }
 }

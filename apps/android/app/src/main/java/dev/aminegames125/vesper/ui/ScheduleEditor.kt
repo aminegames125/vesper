@@ -1,36 +1,13 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-
 package dev.aminegames125.vesper.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,20 +21,39 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import dev.aminegames125.vesper.ui.kit.ButtonKind
+import dev.aminegames125.vesper.ui.kit.DatePickerDialog
+import dev.aminegames125.vesper.ui.kit.Ic
+import dev.aminegames125.vesper.ui.kit.Shapes
+import dev.aminegames125.vesper.ui.kit.TimePickerDialog
+import dev.aminegames125.vesper.ui.kit.VButton
+import dev.aminegames125.vesper.ui.kit.VCard
+import dev.aminegames125.vesper.ui.kit.VChip
+import dev.aminegames125.vesper.ui.kit.VDialog
+import dev.aminegames125.vesper.ui.kit.VField
+import dev.aminegames125.vesper.ui.kit.VFlow
+import dev.aminegames125.vesper.ui.kit.VIcon
+import dev.aminegames125.vesper.ui.kit.VIconButton
+import dev.aminegames125.vesper.ui.kit.VSwitch
+import dev.aminegames125.vesper.ui.kit.VText
+import dev.aminegames125.vesper.ui.kit.VTopBar
+import dev.aminegames125.vesper.ui.kit.Vesper
+import dev.aminegames125.vesper.ui.kit.IconStyle
+import dev.aminegames125.vesper.ui.kit.glass
+import dev.aminegames125.vesper.ui.kit.pressable
 import dev.aminegames125.vesper.data.EVERY_DAY
 import dev.aminegames125.vesper.data.NewSchedule
 import dev.aminegames125.vesper.data.WEEKDAYS
 import dev.aminegames125.vesper.data.WEEKEND
 import dev.aminegames125.vesper.data.bit
-import dev.aminegames125.vesper.ui.theme.LocalIsTv
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.TextStyle
@@ -178,207 +174,224 @@ fun ScheduleEditorScreen(vm: VesperViewModel, onBack: () -> Unit, onPickChannel:
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(if (editing == null) "New schedule" else "Edit schedule") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                },
-            )
-        },
-    ) { padding ->
+    Column(Modifier.fillMaxSize()) {
+        VTopBar(if (editing == null) "New schedule" else "Edit schedule", onBack)
         Column(
-            Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = pageHorizontal(), vertical = 8.dp),
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = pageHorizontal(), vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedTextField(title, { title = it }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text("Channel", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(channelName.ifBlank { "None picked" }, style = MaterialTheme.typography.bodyLarge)
-                }
-                OutlinedButton(
-                    onClick = {
-                        vm.returningToEditor = true
-                        onPickChannel()
-                    },
-                ) { Text("Change") }
-            }
-
-            Label(if (days == 0) "Date" else "Starting")
-            DateField(date) { date = it }
-            Label("Start time (${zone.getDisplayName(TextStyle.SHORT, Locale.getDefault())})")
-            TimeField(time) { time = it }
-
-            Label("Length")
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { minutes = (minutes - 5).coerceAtLeast(1) }) { Text("−5") }
-                Text(dev.aminegames125.vesper.data.formatDuration(minutes * 60L), style = MaterialTheme.typography.titleMedium)
-                OutlinedButton(onClick = { minutes = (minutes + 5).coerceAtMost(24 * 60) }) { Text("+5") }
-            }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DURATIONS.forEach { m ->
-                    FilterChip(selected = minutes == m, onClick = { minutes = m }, label = { Text(dev.aminegames125.vesper.data.formatDuration(m * 60L)) })
-                }
-            }
-
-            Label("Repeat")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                REPEATS.forEach { (mask, label) ->
-                    FilterChip(selected = !custom && days == mask, onClick = { custom = false; days = mask }, label = { Text(label) })
-                }
-                FilterChip(selected = custom, onClick = { custom = true; if (days == 0) days = bit(DayOfWeek.MONDAY) }, label = { Text("Custom") })
-            }
-            if (custom) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DayOfWeek.entries.forEach { day ->
-                        FilterChip(
-                            selected = days and bit(day) != 0,
-                            onClick = { days = days xor bit(day) },
-                            label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) },
-                        )
-                    }
-                }
-            }
-
-            Label("Start early")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PADS.forEach { m -> FilterChip(selected = padBefore == m, onClick = { padBefore = m }, label = { Text(if (m == 0) "Exactly" else "$m min") }) }
-            }
-            Label("Stop late")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PADS.forEach { m -> FilterChip(selected = padAfter == m, onClick = { padAfter = m }, label = { Text(if (m == 0) "Exactly" else "$m min") }) }
-            }
-
-            Label("Delete recordings after")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                KEEPS.forEach { h ->
-                    FilterChip(selected = keep == h, onClick = { keep = h }, label = { Text(keepLabel(h, status?.defaultKeepHours)) })
-                }
-            }
-            Text(
-                "You can change this later for each recording.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            if (epgId.isNotBlank()) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            VCard(Modifier.fillMaxWidth()) {
+                Label("What", first = true)
+                VField(title, { title = it }, "Title", Modifier.fillMaxWidth())
+                Row(
+                    Modifier.padding(top = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Follow the guide", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            "If the programme runs over, keep recording until the guide says it ended.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        VText("Channel", style = Vesper.type.small, color = Vesper.colors.textDim)
+                        VText(channelName.ifBlank { "None picked" }, style = Vesper.type.heading, maxLines = 1)
                     }
-                    androidx.compose.material3.Switch(checked = followGuide, onCheckedChange = { followGuide = it })
+                    VButton(
+                        "Change",
+                        {
+                            vm.returningToEditor = true
+                            onPickChannel()
+                        },
+                        kind = ButtonKind.Soft,
+                        compact = true,
+                        icon = Ic.Tv,
+                    )
                 }
             }
 
-            Label("Picture quality")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !lowest, onClick = { lowest = false }, label = { Text("Best") })
-                FilterChip(selected = lowest, onClick = { lowest = true }, label = { Text("Smaller files") })
+            VCard(Modifier.fillMaxWidth()) {
+                Label(if (days == 0) "Date" else "Starting", first = true)
+                DateField(date) { date = it }
+                Label("Start time (${zone.getDisplayName(TextStyle.SHORT, Locale.getDefault())})")
+                TimeField(time) { time = it }
+
+                Label("Length")
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    VIconButton(Ic.Down, "5 minutes shorter", { minutes = (minutes - 5).coerceAtLeast(1) }, style = IconStyle.Glass)
+                    VText(
+                        dev.aminegames125.vesper.data.formatDuration(minutes * 60L),
+                        Modifier.weight(1f),
+                        style = Vesper.type.numeral,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 1,
+                    )
+                    VIconButton(Ic.Up, "5 minutes longer", { minutes = (minutes + 5).coerceAtMost(24 * 60) }, style = IconStyle.Glass)
+                }
+                VFlow(Modifier.padding(top = 10.dp)) {
+                    DURATIONS.forEach { m ->
+                        VChip(dev.aminegames125.vesper.data.formatDuration(m * 60L), selected = minutes == m, onClick = { minutes = m })
+                    }
+                }
+
+                Label("Repeat")
+                VFlow {
+                    REPEATS.forEach { (mask, label) ->
+                        VChip(label, selected = !custom && days == mask, onClick = { custom = false; days = mask })
+                    }
+                    VChip("Custom", selected = custom, onClick = { custom = true; if (days == 0) days = bit(DayOfWeek.MONDAY) })
+                }
+                if (custom) {
+                    VFlow(Modifier.padding(top = 8.dp)) {
+                        DayOfWeek.entries.forEach { day ->
+                            VChip(
+                                day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                                selected = days and bit(day) != 0,
+                                onClick = { days = days xor bit(day) },
+                            )
+                        }
+                    }
+                }
             }
 
-            OutlinedTextField(tag, { tag = it }, label = { Text("Folder (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(
-                backup,
-                { backup = it },
-                label = { Text("Backup address (optional)") },
-                supportingText = { Text("Used if the channel keeps failing.") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+            VCard(Modifier.fillMaxWidth()) {
+                Label("Start early", first = true)
+                VFlow {
+                    PADS.forEach { m -> VChip(if (m == 0) "Exactly" else "$m min", selected = padBefore == m, onClick = { padBefore = m }) }
+                }
+                Label("Stop late")
+                VFlow {
+                    PADS.forEach { m -> VChip(if (m == 0) "Exactly" else "$m min", selected = padAfter == m, onClick = { padAfter = m }) }
+                }
+                if (epgId.isNotBlank()) {
+                    Row(
+                        Modifier.padding(top = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            VText("Follow the guide", style = Vesper.type.bodyStrong)
+                            VText(
+                                "If the programme runs over, keep recording until the guide says it ended.",
+                                style = Vesper.type.small,
+                                color = Vesper.colors.textDim,
+                            )
+                        }
+                        VSwitch(followGuide, { followGuide = it })
+                    }
+                }
+            }
+
+            VCard(Modifier.fillMaxWidth()) {
+                Label("Delete recordings after", first = true)
+                VFlow {
+                    KEEPS.forEach { h ->
+                        VChip(keepLabel(h, status?.defaultKeepHours), selected = keep == h, onClick = { keep = h })
+                    }
+                }
+                VText(
+                    "You can change this later for each recording.",
+                    style = Vesper.type.small,
+                    color = Vesper.colors.textFaint,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Label("Keep only the newest")
+                VFlow {
+                    KEEP_LAST.forEach { n ->
+                        VChip(if (n == null) "All of them" else "$n", selected = keepLast == n, onClick = { keepLast = n })
+                    }
+                }
+            }
+
+            VCard(Modifier.fillMaxWidth()) {
+                Label("Picture quality", first = true)
+                VFlow {
+                    VChip("Best", selected = !lowest, onClick = { lowest = false })
+                    VChip("Smaller files", selected = lowest, onClick = { lowest = true })
+                }
+                Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    VField(tag, { tag = it }, "Folder (optional)", Modifier.fillMaxWidth())
+                    VField(backup, { backup = it }, "Backup address (optional)", Modifier.fillMaxWidth(), hint = "Used if the channel keeps failing.")
+                }
+            }
+
+            error?.let { VText(it, color = Vesper.colors.danger, style = Vesper.type.bodyStrong) }
+            VButton(
+                if (busy) "Saving…" else "Save schedule",
+                ::save,
+                Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 24.dp),
+                enabled = !busy,
+                icon = Ic.Check,
             )
-
-            Label("Keep only the newest")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                KEEP_LAST.forEach { n ->
-                    FilterChip(selected = keepLast == n, onClick = { keepLast = n }, label = { Text(if (n == null) "All of them" else "$n") })
-                }
-            }
-
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Button(onClick = ::save, enabled = !busy, modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp)) {
-                Text(if (busy) "Saving…" else "Save schedule")
-            }
         }
     }
 
     warnings?.let { notes ->
-        AlertDialog(
-            onDismissRequest = onBack,
-            title = { Text("Saved, but check this") },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { notes.forEach { Text(it) } } },
-            confirmButton = { Button(onClick = onBack) { Text("OK") } },
-        )
+        VDialog(
+            onDismiss = onBack,
+            title = "Saved, but check this",
+            actions = { VButton("OK", onBack) },
+        ) {
+            notes.forEach { VText(it, style = Vesper.type.body, color = Vesper.colors.textDim) }
+        }
     }
 }
 
 @Composable
-private fun Label(text: String) {
-    Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun Label(text: String, first: Boolean = false) {
+    VText(
+        text.uppercase(),
+        Modifier.padding(top = if (first) 0.dp else 18.dp, bottom = 8.dp),
+        style = Vesper.type.label,
+        color = Vesper.colors.textFaint,
+    )
 }
 
-/** The system date picker on a phone; steppers on a TV, where a remote cannot drive a calendar well. */
+/** A big tappable field that shows the chosen value and opens the picker. */
+@Composable
+private fun PickerField(value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    val c = Vesper.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .pressable(onClick, Shapes.field, focusScale = 1.02f)
+            .glass(Shapes.field, strong = true)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        VIcon(icon, null, tint = c.accent, size = 22.dp)
+        VText(value, Modifier.weight(1f), style = Vesper.type.heading, maxLines = 1)
+        VIcon(Ic.Right, null, tint = c.textFaint, size = 18.dp)
+    }
+}
+
 @Composable
 private fun DateField(date: LocalDate, onChange: (LocalDate) -> Unit) {
     val formatted = DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).format(date)
-    if (LocalIsTv.current) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { onChange(date.minusDays(1)) }) { Text("−1 day") }
-            Text(formatted, style = MaterialTheme.typography.titleMedium)
-            OutlinedButton(onClick = { onChange(date.plusDays(1)) }) { Text("+1 day") }
-        }
-        return
-    }
     var open by remember { mutableStateOf(false) }
-    OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) { Text(formatted) }
+    PickerField(formatted, Ic.Calendar) { open = true }
     if (open) {
-        val state = rememberDatePickerState(initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
         DatePickerDialog(
-            onDismissRequest = { open = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    state.selectedDateMillis?.let { onChange(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()) }
-                    open = false
-                }) { Text("OK") }
+            initial = date,
+            onPick = {
+                onChange(it)
+                open = false
             },
-            dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
-        ) { DatePicker(state) }
+            onDismiss = { open = false },
+        )
     }
 }
 
 @Composable
 private fun TimeField(time: LocalTime, onChange: (LocalTime) -> Unit) {
     val formatted = time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
-    if (LocalIsTv.current) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { onChange(time.minusHours(1)) }) { Text("−1 h") }
-            OutlinedButton(onClick = { onChange(time.minusMinutes(5)) }) { Text("−5 min") }
-            Text(formatted, style = MaterialTheme.typography.titleMedium)
-            OutlinedButton(onClick = { onChange(time.plusMinutes(5)) }) { Text("+5 min") }
-            OutlinedButton(onClick = { onChange(time.plusHours(1)) }) { Text("+1 h") }
-        }
-        return
-    }
     var open by remember { mutableStateOf(false) }
-    OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) { Text(formatted) }
+    PickerField(formatted, Ic.Clock) { open = true }
     if (open) {
-        val state = rememberTimePickerState(initialHour = time.hour, initialMinute = time.minute, is24Hour = android.text.format.DateFormat.is24HourFormat(androidx.compose.ui.platform.LocalContext.current))
-        AlertDialog(
-            onDismissRequest = { open = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    onChange(LocalTime.of(state.hour, state.minute))
-                    open = false
-                }) { Text("OK") }
+        TimePickerDialog(
+            initial = time,
+            is24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current),
+            onPick = {
+                onChange(it)
+                open = false
             },
-            dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
-            text = { TimePicker(state) },
+            onDismiss = { open = false },
         )
     }
 }
