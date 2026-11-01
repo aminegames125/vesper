@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.28.1] - 2026-11-01 <!-- release: patch; push: 41; changes: 1 -->
+
+### Fixed
+- Release doctor counts failures per draft and deletes drafts a newer release has overtaken
+
 ## [0.28.0] - 2026-11-01 <!-- release: minor; push: 40; changes: 1 -->
 
 ### Added
