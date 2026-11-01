@@ -7,15 +7,15 @@
 // The rules, in order, for each draft release:
 //   - A Release workflow is still running: leave everything alone.
 //   - All the expected files are there: publish it.
-//   - Files are missing and it is the newest draft: start the Release workflow for it again,
-//     unless that has already failed MAX_TRIES times today (then say so and stop).
-//   - Files are missing and a newer draft exists: delete the draft. The tag stays.
+//   - Files are missing and a newer release (draft or published) exists: delete the draft. The tag
+//     stays.
+//   - Files are missing and it is the newest: start the Release workflow for it again, unless runs
+//     since the draft was created have already failed MAX_TRIES times (then say so and stop).
 
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 export const MAX_TRIES = 3;
-export const DAY = 24 * 3600;
 
 /** The files a finished release carries, from its tag (`v1.2.3`). */
 export function expectedAssets(tag) {
@@ -54,31 +54,40 @@ export function newer(a, b) {
 }
 
 /**
- * Decides what to do. `drafts` are `{ tag, assets: [names] }`, `runs` are the Release workflow's
+ * Decides what to do. `drafts` are `{ tag, assets: [names], createdAt }`, `published` is the list
+ * of tags already published, `runs` are the Release workflow's
  * recent runs `{ status, conclusion, createdAt (epoch seconds) }`, `imageExists(tag)` says whether
  * the Docker image for the tag was pushed.
  * Returns a list of `{ action: "publish" | "retry" | "delete" | "give-up" | "wait", tag, why }`.
  */
-export function plan({ drafts, runs, now, imageExists }) {
+export function plan({ drafts, published = [], runs, imageExists }) {
   if (runs.some((r) => r.status !== "completed")) {
     return [{ action: "wait", tag: "", why: "a Release run is still going" }];
   }
   const sorted = [...drafts].sort((a, b) => (newer(a.tag, b.tag) ? -1 : 1));
-  const failuresToday = runs.filter((r) => r.conclusion === "failure" && now - r.createdAt < DAY).length;
+  // Only runs after a draft was made can be about it; older failures are someone else's history.
+  const failuresFor = (draft) =>
+    runs.filter((r) => r.conclusion === "failure" && r.createdAt >= (draft.createdAt ?? 0)).length;
   return sorted.map((draft, index) => {
+    const failures = failuresFor(draft);
+    const overtaken = published.find((tag) => newer(tag, draft.tag));
     const missing = missingAssets(draft.tag, draft.assets);
     if (missing.length === 0) {
       return imageExists(draft.tag)
         ? { action: "publish", tag: draft.tag, why: "every file is attached" }
-        : index === 0 && failuresToday < MAX_TRIES
+        : index === 0 && !overtaken && failures < MAX_TRIES
           ? { action: "retry", tag: draft.tag, why: "files are there but the Docker image is not" }
           : { action: "delete", tag: draft.tag, why: "no Docker image and not the newest" };
     }
-    if (index > 0) {
-      return { action: "delete", tag: draft.tag, why: `superseded by ${sorted[0].tag}; missing ${missing.length} files` };
+    if (index > 0 || overtaken) {
+      return {
+        action: "delete",
+        tag: draft.tag,
+        why: `superseded by ${overtaken ?? sorted[0].tag}; missing ${missing.length} files`,
+      };
     }
-    return failuresToday >= MAX_TRIES
-      ? { action: "give-up", tag: draft.tag, why: `${failuresToday} failed runs today; missing ${missing.join(", ")}` }
+    return failures >= MAX_TRIES
+      ? { action: "give-up", tag: draft.tag, why: `${failures} failed runs since it was created; missing ${missing.join(", ")}` }
       : { action: "retry", tag: draft.tag, why: `missing ${missing.length} files` };
   });
 }
@@ -106,14 +115,20 @@ function main() {
   const releases = json("api", `repos/${repo}/releases?per_page=50`);
   const drafts = releases
     .filter((r) => r.draft)
-    .map((r) => ({ tag: r.tag_name, id: r.id, assets: r.assets.map((a) => a.name) }));
+    .map((r) => ({
+      tag: r.tag_name,
+      id: r.id,
+      assets: r.assets.map((a) => a.name),
+      createdAt: Date.parse(r.created_at) / 1000,
+    }));
+  const published = releases.filter((r) => !r.draft).map((r) => r.tag_name);
   const runs = json("run", "list", "--workflow", "release.yml", "--limit", "20", "--json", "status,conclusion,createdAt").map(
     (r) => ({ ...r, createdAt: Date.parse(r.createdAt) / 1000 }),
   );
   const steps = plan({
     drafts,
+    published,
     runs,
-    now: Date.now() / 1000,
     imageExists: (tag) => imageExists(owner, tag),
   });
   if (steps.length === 0) console.log("No draft releases. Nothing to do.");

@@ -15,7 +15,7 @@ const full = (tag, version = tag.slice(1)) => [
 
 const done = { status: "completed", conclusion: "success", createdAt: 0 };
 const failed = (createdAt) => ({ status: "completed", conclusion: "failure", createdAt });
-const base = { now: 1000, imageExists: () => true, runs: [] };
+const base = { imageExists: () => true, runs: [] };
 
 test("versions compare as numbers", () => {
   assert.ok(newer("v0.27.10", "v0.27.9"));
@@ -54,9 +54,33 @@ test("the newest incomplete draft is retried, older incomplete drafts are delete
   ]);
 });
 
-test("it stops retrying after three failures in a day", () => {
-  const out = plan({ ...base, drafts: [{ tag: "v1.0.0", assets: [] }], runs: [failed(900), failed(800), failed(700)] });
+test("it stops retrying after three failures since the draft was made", () => {
+  const out = plan({
+    ...base,
+    drafts: [{ tag: "v1.0.0", assets: [], createdAt: 600 }],
+    runs: [failed(900), failed(800), failed(700)],
+  });
   assert.equal(out[0].action, "give-up");
+});
+
+test("failures from before the draft existed do not count against it", () => {
+  const out = plan({
+    ...base,
+    drafts: [{ tag: "v1.0.0", assets: [], createdAt: 1000 }],
+    runs: [failed(900), failed(800), failed(700), failed(600)],
+  });
+  assert.equal(out[0].action, "retry");
+});
+
+test("a broken draft older than a published release is deleted, not retried", () => {
+  const out = plan({
+    ...base,
+    drafts: [{ tag: "v0.27.1", assets: [], createdAt: 1 }],
+    published: ["v0.27.2", "v0.28.0"],
+    runs: [done],
+  });
+  assert.equal(out[0].action, "delete");
+  assert.match(out[0].why, /superseded by v0\.27\.2/);
 });
 
 test("files without a Docker image are not published", () => {
