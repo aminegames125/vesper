@@ -2,7 +2,7 @@
   "name": "vesper",
   "private": true,
   "version": "0.23.1",
-  "description": "Vesper: schedule IPTV recordings on a server, from native Android and Android TV apps.",
+  "description": "Vesper: record and schedule IPTV from Kodi's own Live TV, on a recording server you host.",
   "license": "MIT",
   "packageManager": "pnpm@11.7.0",
   "scripts": {

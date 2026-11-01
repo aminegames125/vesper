@@ -36,8 +36,8 @@ use tracing::info;
 use crate::{config::Config, db::Db, state::AppState};
 
 /// Full mode signs requests with bearer tokens, so any origin may call it. Lite mode has no
-/// logins, so a web page the user happens to visit must not be able to; only the desktop app's
-/// own origins and localhost are allowed (native clients send no Origin and are unaffected).
+/// logins, so a web page the user happens to visit must not be able to; only localhost origins
+/// are allowed (Kodi and other native clients send no Origin and are unaffected).
 fn cors(lite: bool) -> CorsLayer {
     let origin = if lite {
         AllowOrigin::predicate(|origin, _| {
@@ -46,8 +46,7 @@ fn cors(lite: bool) -> CorsLayer {
             };
             let host = origin.split("://").nth(1).unwrap_or("");
             let host = host.split(':').next().unwrap_or("");
-            matches!(host, "localhost" | "127.0.0.1" | "tauri.localhost")
-                || origin.starts_with("tauri://")
+            matches!(host, "localhost" | "127.0.0.1")
         })
     } else {
         AllowOrigin::any()

@@ -1,19 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-label="Vesper">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-label="Vesper: record IPTV from Kodi">
   <defs>
-    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.7">
-      <stop offset="0" stop-color="#ff5c7a" stop-opacity="0.25"/>
-      <stop offset="1" stop-color="#ff5c7a" stop-opacity="0"/>
+    <style>@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Geist:wght@400;600&amp;display=swap");</style>
+    <radialGradient id="g" cx="0.72" cy="0.2" r="0.75">
+      <stop offset="0" stop-color="#ff4d6d" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#ff4d6d" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="1280" height="640" fill="#0d0d0f"/>
-  <rect width="1280" height="640" fill="url(#glow)"/>
-  <g transform="translate(496 96) scale(4.5)">
-    <rect x="8" y="10" width="48" height="7" rx="3.5" fill="#FF5C7A"/>
-    <rect x="14" y="21" width="36" height="7" rx="3.5" fill="#F4F1EA"/>
-    <rect x="20" y="32" width="24" height="7" rx="3.5" fill="#F4F1EA"/>
-    <rect x="26" y="43" width="12" height="7" rx="3.5" fill="#F4F1EA"/>
+  <rect width="1280" height="640" fill="#0a0a0c"/>
+  <rect width="1280" height="640" fill="url(#g)"/>
+  <g transform="translate(72 64) scale(0.9)">
+    <rect x="8" y="10" width="48" height="7" rx="3.5" fill="#FF4D6D"/>
+    <rect x="14" y="21" width="36" height="7" rx="3.5" fill="#F3EEE6"/>
+    <rect x="20" y="32" width="24" height="7" rx="3.5" fill="#F3EEE6"/>
+    <rect x="26" y="43" width="12" height="7" rx="3.5" fill="#F3EEE6"/>
   </g>
-  <text x="640" y="454" text-anchor="middle" font-family="'Bricolage Grotesque','Segoe UI',system-ui,sans-serif" font-size="112" font-weight="800" fill="#F4F1EA" letter-spacing="-3">Vesper</text>
-  <text x="640" y="512" text-anchor="middle" font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="32" fill="#9a9aa3">A fast, light IPTV player with a cloud of its own</text>
-  <text x="640" y="574" text-anchor="middle" font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="22" fill="#ff5c7a">Windows · Linux · Android · Android TV · Rust server</text>
+  <text x="136" y="104" font-family="'Bricolage Grotesque','Segoe UI',Arial,sans-serif" font-size="34" font-weight="700" fill="#F3EEE6">Vesper</text>
+  <text x="72" y="300" font-family="'Bricolage Grotesque','Arial Narrow',Arial,sans-serif" font-size="150" font-weight="800" letter-spacing="-8" fill="#F3EEE6">Record IPTV</text>
+  <text x="72" y="436" font-family="'Bricolage Grotesque','Arial Narrow',Arial,sans-serif" font-size="150" font-weight="800" letter-spacing="-8" fill="#FF4D6D">from Kodi.</text>
+  <text x="76" y="500" font-family="'Geist','Segoe UI',Arial,sans-serif" font-size="30" fill="#c9c4bb">A Kodi add-on and a small self-hosted recording server.</text>
+  <g transform="translate(72 540)" font-family="'Geist','Segoe UI',Arial,sans-serif" font-size="20" fill="#F3EEE6">
+    <rect x="0" y="0" width="300" height="44" rx="10" fill="#1d1d22"/>
+    <rect x="300" y="0" width="212" height="44" rx="10" fill="#c8294a"/>
+    <rect x="518" y="0" width="338" height="44" rx="10" fill="#1d1d22"/>
+    <rect x="862" y="0" width="190" height="44" rx="10" fill="#c8294a"/>
+    <rect x="1058" y="0" width="100" height="44" rx="10" fill="#1d1d22"/>
+    <text x="16" y="29" fill="#a8a49d">Evening Bulletin</text>
+    <text x="316" y="29">Record with Vesper</text>
+    <text x="534" y="29" fill="#a8a49d">Late Edition</text>
+    <text x="878" y="29">Recorded</text>
+    <rect x="300" y="-8" width="3" height="60" fill="#ffb454"/>
+  </g>
 </svg>

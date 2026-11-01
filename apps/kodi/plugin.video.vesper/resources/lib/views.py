@@ -1,5 +1,6 @@
 """The screens. Every function draws one directory or does one action; `route` picks by `action`."""
 
+import re
 import sys
 import time
 import urllib.parse
@@ -118,7 +119,8 @@ def root():
     add(url(action="recordings", view="continue"), item("Continue watching" + (" (%d)" % resumable if resumable else "")), True)
     add(url(action="recordings", view="active"), item("Recording now and coming up", plot=", ".join(parts)), True)
     add(url(action="recordings", view="done"), item("Recordings"), True)
-    add(url(action="schedules"), item("Schedules", plot="What records on its own."), True)
+    add(url(action="schedules"), item("Schedules", plot="What records on its own: repeating schedules and series."), True)
+    add(url(action="status"), item("Server", plot="Disk space, what is next, and your account."), False)
     if not providers:
         add(
             url(action="sync"),
@@ -130,9 +132,21 @@ def root():
 
 def type_address():
     text = xbmcgui.Dialog().input("Server address", defaultt=common.setting("server"))
-    if text:
-        common.set_setting("server", api.normalise(text))
-        refresh()
+    if not text:
+        return
+    address = api.normalise(text)
+    if address.startswith("http://") and not api.is_private_host(address):
+        # A server out on the internet: the password would travel unprotected.
+        if not xbmcgui.Dialog().yesno(
+            "Vesper",
+            "This address is not on your home network and does not use HTTPS, so your password would be sent in the clear. "
+            "Put the server behind HTTPS (a reverse proxy) and type an https:// address. Use it anyway?",
+            nolabel="No",
+            yeslabel="Use it anyway",
+        ):
+            return
+    common.set_setting("server", address)
+    refresh()
 
 
 def discover():
@@ -151,7 +165,11 @@ def discover():
             return
         chosen = found[pick]
     common.set_setting("server", chosen["address"])
-    say("Connected to " + chosen["name"])
+    if chosen.get("mode") == "full" and not common.setting("username"):
+        say("Found %s. It has accounts: enter your username and password in the settings." % chosen["name"])
+        xbmc.executebuiltin("Addon.OpenSettings(plugin.video.vesper)")
+    else:
+        say("Connected to " + chosen["name"])
     refresh()
 
 
@@ -185,8 +203,7 @@ def recording_item(c, r):
     plot = "\n".join(x for x in (r.get("channelName"), status_line(r)) if x)
     art = {}
     if r.get("thumb"):
-        token = c.media_token()
-        art = {"thumb": "%s/api/v1/recordings/%s/thumb.jpg%s" % (c.base, r["id"], "?token=" + token if token else "")}
+        art = {"thumb": c.thumb_url(r["id"])}
     playable = r["status"] in ("done", "recording")
     menu = []
     if r["status"] == "recording":
@@ -196,6 +213,9 @@ def recording_item(c, r):
         menu.append(
             ("Mark as unwatched" if r["watched"] else "Mark as watched", "RunPlugin(%s)" % url(action="watched", id=r["id"], value="0" if r["watched"] else "1"))
         )
+    menu.append(("Rename", "RunPlugin(%s)" % url(action="rename", id=r["id"], title=r["title"])))
+    if r["status"] == "done":
+        menu.append(("Move to folder", "RunPlugin(%s)" % url(action="folder", id=r["id"], tag=r.get("tag", ""))))
     menu.append(("Delete", "RunPlugin(%s)" % url(action="delete", id=r["id"], title=r["title"])))
     total = r["seconds"] if r["status"] == "done" else 0
     li = item(label, art, plot, playable, resume=0 if r["watched"] else r["positionS"], total=total, menu=menu)
@@ -264,6 +284,18 @@ def confirm_delete(rid, title):
     act(lambda c: c.delete(rid), "Deleted")
 
 
+def rename(rid, title):
+    text = xbmcgui.Dialog().input("New title", defaultt=title).strip()
+    if text and text != title:
+        act(lambda c: c.rename(rid, text), "Renamed")
+
+
+def folder(rid, tag):
+    text = xbmcgui.Dialog().input("Folder name", defaultt=tag).strip()
+    if text and text != tag:
+        act(lambda c: c.set_folder(rid, text), "Moved")
+
+
 def act(call, done):
     try:
         call(get_client())
@@ -290,7 +322,9 @@ def repeats(days, start_date):
 
 def schedules():
     try:
-        rows = get_client().schedules()
+        c = get_client()
+        rows = c.schedules()
+        rules = c.rules()
     except api.VesperError as e:
         return failed(e)
     for s in rows:
@@ -302,20 +336,159 @@ def schedules():
         if paused:
             label = "[COLOR FF9A9AA3]%s (paused)[/COLOR]" % label
         add(url(action="schedule_menu", id=s["id"], paused="1" if paused else "0", title=s["title"]), item(label, plot=plot), False)
-    if not rows:
-        add(url(action="noop"), item("No repeating schedules. Make them in the Vesper app; one-off ones come from Kodi's TV guide."), False)
+    for r in rules:
+        paused = not r.get("enabled", True)
+        label = "Every episode: %s" % r["title"]
+        if paused:
+            label = "[COLOR FF9A9AA3]%s (paused)[/COLOR]" % label
+        add(url(action="rule_menu", id=r["id"], paused="1" if paused else "0", title=r["title"]), item(label, plot=r.get("channelName", "")), False)
+    if not rows and not rules:
+        add(url(action="noop"), item("Nothing scheduled. Press the menu button on a programme in Kodi's TV guide and choose Record with Vesper."), False)
     finish("videos")
 
 
 def schedule_menu(sid, paused, title):
-    options = ["Resume" if paused == "1" else "Pause", "Record now", "Delete"]
+    options = ["Resume" if paused == "1" else "Pause", "Record now", "Edit", "Delete"]
     pick = xbmcgui.Dialog().select(title, options)
     if pick == 0:
         act(lambda c: c.set_schedule_enabled(sid, paused == "1"), "Done")
     elif pick == 1:
         act(lambda c: c.run_schedule(sid), "Recording started")
-    elif pick == 2 and xbmcgui.Dialog().yesno("Delete", "Delete the schedule \"%s\"?" % title):
+    elif pick == 2:
+        edit_schedule(sid)
+    elif pick == 3 and xbmcgui.Dialog().yesno("Delete", "Delete the schedule \"%s\"?" % title):
         act(lambda c: c.delete_schedule(sid), "Deleted")
+
+
+REPEAT_CHOICES = [("Once", 0), ("Every day", 127), ("Weekdays", 31), ("Weekends", 96)]
+
+
+def edit_schedule(sid):
+    try:
+        row = next((s for s in get_client().schedules() if s["id"] == sid), None)
+    except api.VesperError as e:
+        return say(str(e), error=True)
+    if not row:
+        return say("That schedule is gone.", error=True)
+    dialog = xbmcgui.Dialog()
+    pick = dialog.select(
+        row["title"],
+        ["Title: " + row["title"], "Start time: " + row["startTime"], "Length: %d minutes" % (row["seconds"] // 60), "Repeats: " + repeats(row["days"], row["startDate"])],
+    )
+    changes = {}
+    if pick == 0:
+        text = dialog.input("Title", defaultt=row["title"]).strip()
+        if text:
+            changes["title"] = text
+    elif pick == 1:
+        text = dialog.input("Start time (HH:MM)", defaultt=row["startTime"]).strip()
+        if re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", text):
+            changes["start_time"] = text
+        elif text:
+            return say("Use the form 21:30.", error=True)
+    elif pick == 2:
+        text = dialog.input("Length in minutes", defaultt=str(row["seconds"] // 60)).strip()
+        if text.isdigit() and int(text) > 0:
+            changes["seconds"] = int(text) * 60
+        elif text:
+            return say("Type a number of minutes.", error=True)
+    elif pick == 3:
+        chosen = dialog.select("Repeats", [label for label, _ in REPEAT_CHOICES])
+        if chosen >= 0:
+            changes["days"] = REPEAT_CHOICES[chosen][1]
+    if changes:
+        act(lambda c: c.update_schedule(row, **changes), "Saved")
+
+
+def rule_menu(rid, paused, title):
+    pick = xbmcgui.Dialog().select(title, ["Resume" if paused == "1" else "Pause", "Delete"])
+    if pick == 0:
+        act(lambda c: c.set_rule_enabled(rid, paused == "1"), "Done")
+    elif pick == 1 and xbmcgui.Dialog().yesno("Delete", "Stop recording every episode of \"%s\"?" % title):
+        act(lambda c: c.delete_rule(rid), "Deleted")
+
+
+# -- server and account ---------------------------------------------------------------------
+
+
+def status():
+    try:
+        c = get_client()
+        st = c.status()
+        me = c.me() if c.mode == "full" else None
+    except api.VesperError as e:
+        return say(str(e), error=True)
+    lines = ["Vesper %s, %s mode" % (st.get("version", "?"), st.get("mode", "?"))]
+    if st.get("diskFree") is not None:
+        disk = "Disk: %s free" % size(st["diskFree"])
+        if st.get("diskTotal"):
+            disk += " of " + size(st["diskTotal"])
+        lines.append(disk)
+    if st.get("daysLeft") is not None:
+        lines.append("At the recent pace the disk lasts about %d days." % st["daysLeft"])
+    lines.append("Recording now: %d, coming up: %d, failed: %d" % (st.get("recording", 0), st.get("scheduled", 0), st.get("failed", 0)))
+    nxt = st.get("next")
+    lines.append("Next: %s, %s" % (nxt["title"], when(nxt["startAt"])) if nxt else "Next: nothing scheduled")
+    if st.get("ffmpeg") is False:
+        lines.append("ffmpeg was not found on the server; recording needs it.")
+    if st.get("brokenChannels"):
+        lines.append("Channels that stopped working: " + ", ".join(b["name"] for b in st["brokenChannels"][:5]))
+    if st.get("updateAvailable"):
+        lines.append("A newer server is available: " + str(st["updateAvailable"]))
+    if me:
+        limit = me.get("storage_bytes") or 0
+        lines.append("Account: %s (%s). Storage used: %s%s" % (me.get("username"), me.get("role"), size(me.get("storageUsed", 0)), " of " + size(limit) if limit else ""))
+        if me.get("max_concurrent"):
+            lines.append("You can record %d at a time." % me["max_concurrent"])
+    xbmcgui.Dialog().textviewer("Vesper server", "\n".join(lines))
+
+
+def test_connection():
+    try:
+        c = common.client()
+    except api.VesperError as e:
+        return say(str(e), error=True)
+    if c.mode == "full":
+        say("Connected, signed in as %s." % c.username)
+    else:
+        say("Connected. This server has no accounts (lite mode).")
+
+
+def sign_out():
+    try:
+        common.client(ready=False).sign_out()
+    except api.VesperError:
+        pass
+    say("Signed out.")
+
+
+def register():
+    """Makes an account on a full-mode server that is open to sign-ups or gives out invites."""
+    dialog = xbmcgui.Dialog()
+    try:
+        c = common.client(ready=False)
+        info = c.info()
+    except api.VesperError as e:
+        return say(str(e), error=True)
+    if info.get("mode") != "full":
+        return say("This server has no accounts to create.")
+    invite = ""
+    if info.get("registration") != "open":
+        invite = dialog.input("Invite code").strip()
+        if not invite:
+            return
+    name = dialog.input("Choose a username").strip()
+    password = dialog.input("Choose a password (8 letters or more)", option=xbmcgui.ALPHANUM_HIDE_INPUT)
+    if not name or not password:
+        return
+    try:
+        c.register(name, password, invite)
+    except api.VesperError as e:
+        return say(str(e), error=True)
+    common.set_setting("username", name)
+    common.set_setting("password", password)
+    say("Account created. You are signed in.")
+    refresh()
 
 
 # -- router ---------------------------------------------------------------------------------
@@ -334,6 +507,20 @@ def route(query):
         schedules()
     elif action == "schedule_menu":
         schedule_menu(q["id"], q.get("paused", "0"), q.get("title", ""))
+    elif action == "rule_menu":
+        rule_menu(q["id"], q.get("paused", "0"), q.get("title", ""))
+    elif action == "rename":
+        rename(q["id"], q.get("title", ""))
+    elif action == "folder":
+        folder(q["id"], q.get("tag", ""))
+    elif action == "status":
+        status()
+    elif action == "test":
+        test_connection()
+    elif action == "signout":
+        sign_out()
+    elif action == "register":
+        register()
     elif action == "stop":
         act(lambda c: c.stop(q["id"]), "Stopped")
     elif action == "keep":

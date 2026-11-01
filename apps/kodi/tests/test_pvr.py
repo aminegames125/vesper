@@ -69,5 +69,28 @@ class Matching(unittest.TestCase):
         self.assertIsNone(pvr.programme({"starttime": "", "endtime": ""}, now))
 
 
+class RepeatingRecordings(unittest.TestCase):
+    def test_a_typed_time_zone_wins_then_the_environment(self):
+        self.assertEqual(pvr.timezone_name("Europe/Paris", {"TZ": "Asia/Tokyo"}, root="/nonexistent"), "Europe/Paris")
+        self.assertEqual(pvr.timezone_name("", {"TZ": ":Asia/Tokyo"}, root="/nonexistent"), "Asia/Tokyo")
+        self.assertEqual(pvr.timezone_name("", {"TZ": "UTC"}, root="/nonexistent"), "UTC")
+        self.assertEqual(pvr.timezone_name("not a zone", {}, root="/nonexistent"), "")
+
+    def test_the_zone_is_read_from_etc_timezone(self):
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "etc"))
+            with open(os.path.join(root, "etc", "timezone"), "w") as f:
+                f.write("America/New_York" + chr(10))
+            self.assertEqual(pvr.timezone_name("", {}, root=root), "America/New_York")
+
+    def test_a_programme_becomes_wall_clock_fields_in_local_time(self):
+        import time as t
+
+        start = int(t.mktime((2030, 3, 6, 21, 30, 0, 0, 0, -1)))  # a Wednesday
+        self.assertEqual(pvr.repeat_fields(start, "weekly"), ("21:30", "2030-03-06", 1 << 2))
+        self.assertEqual(pvr.repeat_fields(start, "daily"), ("21:30", "2030-03-06", 127))
+        self.assertEqual(pvr.repeat_fields(start, "once"), ("21:30", "2030-03-06", 0))
+
+
 if __name__ == "__main__":
     unittest.main()

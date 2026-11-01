@@ -147,8 +147,7 @@ pub fn bearer(parts: &Parts) -> Option<String> {
         || path.contains("/seg/")
         || path.ends_with("/download")
         || path.ends_with("/thumb.jpg")
-        || path.ends_with("/export.mp4")
-        || path.ends_with("/proxy");
+        || path.ends_with("/export.mp4");
     if !media {
         return None;
     }

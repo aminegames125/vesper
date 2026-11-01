@@ -6,6 +6,7 @@ body:
     id: problem
     attributes:
       label: What problem would this solve?
+      description: Describe what you are trying to do in Kodi or on the server.
     validations:
       required: true
   - type: textarea
@@ -18,3 +19,13 @@ body:
     id: alternatives
     attributes:
       label: Alternatives you considered
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part would it touch?
+      options:
+        - Kodi add-on
+        - Server
+        - Admin panel
+        - Docs
+        - Not sure
