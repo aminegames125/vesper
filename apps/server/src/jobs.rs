@@ -274,6 +274,10 @@ pub fn start(state: &AppState, id: &str) {
             options.append = reconnects > 0;
             // The playlist stays open between attempts and is closed once the recording is over.
             options.more_to_come = true;
+            // Never keep a silent recording: when the sound lives in a separate rendition it is
+            // joined in, and when even that is missing the recorder reports `NoAudio` so the
+            // address switch below can try the channel's other (usually muxed) form.
+            options.require_audio = true;
             let attempt_started = Instant::now();
 
             let progress_state = state.clone();

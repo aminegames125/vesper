@@ -6,6 +6,7 @@
 
 mod dns;
 mod hls;
+mod mpegts;
 mod sink;
 
 use std::{
@@ -76,6 +77,11 @@ pub struct Options {
     pub public_only: bool,
     /// Pick the smallest variant of a master playlist instead of the best one, to save disk space.
     pub lowest_quality: bool,
+    /// Refuse a stream whose sound cannot be captured. Some providers serve one variant with the
+    /// picture and sound together and another with the sound in its own rendition; when even the
+    /// separate rendition is missing, the caller is told with [`Error::NoAudio`] so it can try the
+    /// channel's other address instead of writing a silent recording.
+    pub require_audio: bool,
 }
 
 impl Options {
@@ -90,6 +96,7 @@ impl Options {
             more_to_come: false,
             public_only: false,
             lowest_quality: false,
+            require_audio: false,
         }
     }
 }
@@ -119,6 +126,8 @@ pub enum Error {
     Encrypted,
     #[error("The playlist has no streams.")]
     NoStreams,
+    #[error("This stream only offers its sound separately and none could be found.")]
+    NoAudio,
     #[error("Could not write the recording: {0}")]
     Io(#[from] std::io::Error),
     #[error("Nothing was captured: {0}")]
@@ -227,6 +236,7 @@ pub fn record(
             sink.as_mut(),
             &mut run,
             options.lowest_quality,
+            options.require_audio,
         )
     } else {
         record_raw(&client, url, sink.as_mut(), &mut run)

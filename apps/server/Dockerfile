@@ -1,6 +1,6 @@
 # Vesper Cloud server. Build from the repository root:
 #   docker build -f apps/server/Dockerfile -t vesper-server .
-#   docker run -p 8484:8484 -v vesper-data:/data vesper-server --mode lite
+#   docker run -p 8484:8484 -v vesper-data:/data vesper-server
 
 # 1. The admin panel, embedded into the binary later.
 FROM node:22-slim AS admin
@@ -31,4 +31,3 @@ VOLUME /data
 EXPOSE 8484
 ENV VESPER_DATA_DIR=/data VESPER_BIND=0.0.0.0:8484
 ENTRYPOINT ["vesper-server"]
-CMD ["--mode", "lite"]
