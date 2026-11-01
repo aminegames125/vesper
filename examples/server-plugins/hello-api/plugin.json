@@ -1,0 +1,9 @@
+{
+  "id": "hello-api",
+  "name": "Hello API",
+  "version": "1.0.0",
+  "description": "Adds GET /api/v1/x/hello-api/ping. The smallest possible plugin that serves its own endpoint.",
+  "author": "Vesper",
+  "hooks": ["http"],
+  "command": ["python3", "./run.py"]
+}

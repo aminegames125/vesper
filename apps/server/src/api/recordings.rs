@@ -236,14 +236,34 @@ pub async fn create_download(
         ));
     }
     check_target(&state, &body.url).await?;
-    let title: String = body.title.trim().chars().take(120).collect();
+    // A plugin may know how to download an address the server does not (a new site).
+    let mut address = body.url.clone();
+    let mut requested_engine = body.engine.clone();
+    let mut fallback_title = None;
+    if let Some((_, found)) = crate::plugins::resolve(&state, &body.url).await {
+        check_target(&state, &found.url).await?;
+        address = found.url;
+        fallback_title = found.title;
+        if let Some(engine) = found.engine {
+            requested_engine = engine;
+        }
+    }
+    let mut title: String = body.title.trim().chars().take(120).collect();
+    if title.is_empty() {
+        title = fallback_title
+            .unwrap_or_default()
+            .trim()
+            .chars()
+            .take(120)
+            .collect();
+    }
     if title.is_empty() {
         return Err(ApiError::bad("Give the download a title."));
     }
     let keep_hours = keep_for(&state, &user, body.keep_hours);
-    let engine = match body.engine.as_str() {
+    let engine = match requested_engine.as_str() {
         "" | "auto" => {
-            if ytdlp::available() && ytdlp::looks_like_a_page(&body.url) {
+            if ytdlp::available() && ytdlp::looks_like_a_page(&address) {
                 "ytdlp"
             } else {
                 "direct"
@@ -276,12 +296,18 @@ pub async fn create_download(
     state.db.conn().execute(
         "INSERT INTO recordings (id, user_id, title, channel_name, source_url, status, start_at, max_seconds, keep_hours, created_at, kind, tag, engine, encoder, dl_quality, live)
          VALUES (?1, ?2, ?3, '', ?4, 'queued', ?5, 0, ?6, ?5, 'download', ?7, ?8, ?9, ?10, ?11)",
-        params![id, user.id, title, body.url, now(), keep_hours,
+        params![id, user.id, title, address, now(), keep_hours,
                 body.tag.trim().chars().take(40).collect::<String>(),
                 engine, encoder.id, quality, live as i64],
     )?;
     jobs::start(&state, &id);
     state.db.audit(&user.username, "download.create", &title);
+    crate::plugins::emit(
+        &state,
+        None,
+        "download.created",
+        json!({ "id": id, "title": title, "url": address, "engine": engine, "encoder": encoder.id, "user": user.username }),
+    );
     Ok(Json(
         json!({ "id": id, "engine": engine, "encoder": encoder.id }),
     ))

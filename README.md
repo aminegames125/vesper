@@ -17,7 +17,8 @@
   <a href="#configuration">Configuration</a> ·
   <a href="#faq-and-troubleshooting">FAQ</a> ·
   <a href="docs/KODI.md">Kodi guide</a> ·
-  <a href="docs/SERVER.md">Server guide</a>
+  <a href="docs/SERVER.md">Server guide</a> ·
+  <a href="docs/EXTENDING.md">Extending Vesper</a>
 </p>
 
 # Vesper
@@ -66,6 +67,7 @@ flowchart LR
 | **Keeps the disk tidy** | Recordings delete themselves after a week by default; change it per recording or keep one forever. Recording is refused when less than 512 MB of disk is free. |
 | **Self-hosted** | One binary or one Docker image. No database server. ffmpeg is optional and only adds thumbnails, MP4 export and cutting. |
 | **Lite or full** | Lite is for one home network with no login. Full adds users, bearer tokens, quotas, invites and an admin panel for shared or internet-facing servers. |
+| **Plugins and extensions** | The server takes plugins in any language (events, new download sources, your own API endpoints) and the Kodi add-on takes extensions from other add-ons, with a Python module and Kodi events. See [Extending Vesper](docs/EXTENDING.md). |
 | **HTTP API** | Everything is a plain HTTP call, so you can script it, for example to make a schedule with a custom set of days (see the [server guide](docs/SERVER.md#http-api)). |
 
 ## Quick start

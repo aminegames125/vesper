@@ -443,6 +443,12 @@ fn after_finish(
         return;
     };
 
+    crate::plugins::emit(
+        state,
+        runtime.clone(),
+        "item.finished",
+        serde_json::json!({ "id": id, "title": title, "status": status, "seconds": seconds, "bytes": bytes, "error": error }),
+    );
     if let Some(schedule) = schedule_id {
         prune_schedule(state, &schedule);
     }

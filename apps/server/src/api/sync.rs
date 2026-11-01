@@ -32,6 +32,10 @@ pub async fn capabilities(State(state): State<AppState>, AuthUser(_): AuthUser) 
         "defaultEncoder": state.db.setting("default_encoder", encode::DEFAULT),
         "qualities": ["best", "2160", "1080", "720", "480", "audio"],
         "sync": true,
+        "plugins": crate::plugins::discover(&state).0.iter()
+            .filter(|p| crate::plugins::enabled(&state, &p.manifest.id))
+            .map(|p| json!({ "id": p.manifest.id, "name": p.manifest.name, "hooks": p.manifest.hooks }))
+            .collect::<Vec<_>>(),
     }))
 }
 

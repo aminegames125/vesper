@@ -8,15 +8,17 @@ import xbmcvfs
 
 from . import api
 
-ADDON = xbmcaddon.Addon()
+# Named explicitly: other add-ons import this code through the public `vesper` module, and a bare
+# `Addon()` would then mean *their* settings and folders.
+ADDON = xbmcaddon.Addon("plugin.video.vesper")
 
 
 def setting(key):
-    return xbmcaddon.Addon().getSetting(key)
+    return xbmcaddon.Addon("plugin.video.vesper").getSetting(key)
 
 
 def set_setting(key, value):
-    xbmcaddon.Addon().setSetting(key, value)
+    xbmcaddon.Addon("plugin.video.vesper").setSetting(key, value)
 
 
 def flag(key, default=True):

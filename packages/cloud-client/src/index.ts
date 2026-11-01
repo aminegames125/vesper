@@ -119,6 +119,8 @@ export interface Capabilities {
   defaultEncoder: string;
   qualities: DownloadQuality[];
   sync: boolean;
+  /** Plugins that are switched on. */
+  plugins: { id: string; name: string; hooks: PluginHook[] }[];
 }
 
 export interface SyncItem {
@@ -126,6 +128,29 @@ export interface SyncItem {
   /** `null` means the key was removed. */
   value: unknown;
   updatedAt: number;
+}
+
+export type PluginHook = "download.created" | "item.finished" | "resolve" | "http";
+
+export interface ServerPlugin {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  hooks: PluginHook[];
+  command: string[];
+  enabled: boolean;
+  config: Record<string, unknown>;
+}
+
+export interface PluginList {
+  /** The folder plugins are installed in, on the server. */
+  dir: string;
+  hooks: PluginHook[];
+  plugins: ServerPlugin[];
+  /** Folders that look like plugins but cannot be used, with the reason. */
+  skipped: { folder: string; error: string }[];
 }
 
 export interface SyncOverview {
@@ -705,6 +730,12 @@ export class CloudClient {
     deleteRecording: (id: string) =>
       this.request<{ ok: boolean }>("DELETE", `/admin/recordings/${id}`),
     sync: () => this.get<SyncOverview>("/admin/sync"),
+    plugins: () => this.get<PluginList>("/admin/plugins"),
+    updatePlugin: (id: string, patch: { enabled?: boolean; config?: Record<string, unknown> }) =>
+      this.request<{ ok: boolean }>("PUT", `/admin/plugins/${id}`, patch),
+    /** Starts the plugin once with the `test` hook and returns what it printed. */
+    testPlugin: (id: string) =>
+      this.post<{ ok: boolean; output?: string; error?: string }>(`/admin/plugins/${id}/test`),
     schedules: () => this.get<AdminSchedule[]>("/admin/schedules"),
     deleteSchedule: (id: string) =>
       this.request<{ ok: boolean }>("DELETE", `/admin/schedules/${id}`),

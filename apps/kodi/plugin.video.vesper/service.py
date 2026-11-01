@@ -6,7 +6,7 @@ import time
 
 import xbmc
 
-from resources.lib import api, bridge, common, discovery, library, notify, syncstate
+from resources.lib import api, bridge, common, discovery, integrate, library, notify, syncstate
 
 
 class Watcher(xbmc.Player):
@@ -126,6 +126,8 @@ class Notifier:
         try:
             c = self._client()
             rows = c.recordings().get("recordings", [])
+            for event, data in notify.events(self.seen, rows):
+                integrate.announce(event, data)
             messages, self.seen = notify.changes(self.seen, rows)
             for text, bad in messages:
                 bridge.say(text, error=bad)

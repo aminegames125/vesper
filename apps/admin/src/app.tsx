@@ -7,6 +7,7 @@ import { Dashboard } from "./pages/dashboard";
 import { DownloadsPage } from "./pages/downloads";
 import { InvitesPage } from "./pages/invites";
 import { LibraryPage } from "./pages/library";
+import { PluginsPage } from "./pages/plugins";
 import { SettingsPage } from "./pages/settings";
 import { SyncPage } from "./pages/sync";
 import { UsersPage } from "./pages/users";
@@ -130,6 +131,7 @@ function Workspace({
       library: <LibraryPage client={client} />,
       downloads: <DownloadsPage client={client} />,
       sync: <SyncPage client={client} />,
+      plugins: <PluginsPage client={client} />,
       activity: <AuditPage client={client} />,
       settings: <SettingsPage client={client} lite={lite} />,
     }[route.page] ?? <Dashboard client={client} go={go} />;

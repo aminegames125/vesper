@@ -1,0 +1,9 @@
+{
+  "id": "url-rewrite",
+  "name": "Address rewriter",
+  "version": "1.0.0",
+  "description": "A resolver: rewrites addresses before they are downloaded, for example to send a provider's old host to its new one. Configure {\"rules\": [{\"from\": \"http://old.example\", \"to\": \"http://new.example\"}]}.",
+  "author": "Vesper",
+  "hooks": ["resolve"],
+  "command": ["python3", "./run.py"]
+}

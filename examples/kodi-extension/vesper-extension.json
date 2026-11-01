@@ -1,0 +1,12 @@
+{
+  "vesper": 1,
+  "name": "Example Site",
+  "resolvers": [
+    {
+      "addon": "plugin.video.examplesite",
+      "name": "Example Site",
+      "rules": [{ "param": "video_id", "template": "https://example.org/watch/{}" }]
+    }
+  ],
+  "menu": [{ "label": "Example Site picks", "path": "plugin://plugin.video.examplesite/?action=picks" }]
+}

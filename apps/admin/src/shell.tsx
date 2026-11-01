@@ -21,6 +21,7 @@ export const MANAGE: NavItem[] = [
   { id: "library", label: "Library", icon: "film" },
   { id: "downloads", label: "Downloads", icon: "download" },
   { id: "sync", label: "Sync", icon: "sync" },
+  { id: "plugins", label: "Plugins", icon: "chip" },
   { id: "activity", label: "Activity", icon: "pulse" },
   { id: "settings", label: "Settings", icon: "settings" },
 ];

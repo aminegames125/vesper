@@ -41,9 +41,33 @@ PLUGINS = [
     ("plugin.video.facebook", "Facebook", []),
     ("plugin.video.internet.archive", "Internet Archive", []),
     ("plugin.video.tubitv", "Tubi", []),
+    ("plugin.video.sendtokodi", "SendToKodi", []),
+    ("plugin.video.invidious", "Invidious", [("video_id", "https://www.youtube.com/watch?v={}")]),
+    ("plugin.video.tubed", "Tubed", [("video_id", "https://www.youtube.com/watch?v={}")]),
+    ("plugin.video.vrt.nu", "VRT MAX", []),
+    ("plugin.video.rtbf", "RTBF Auvio", []),
+    ("plugin.video.abc_iview", "ABC iview", []),
+    ("plugin.video.nasa", "NASA", []),
+    ("plugin.video.vkvideo", "VK Video", []),
 ]
 
+# Rules added at run time by other add-ons (see extensions.py and `register`).
+EXTRA = {}
+
 BY_ID = {addon_id: (name, rules) for addon_id, name, rules in PLUGINS}
+
+
+def register(addon_id, name, rules):
+    """Teaches `resolve` about another add-on. `rules` is `[(parameter, address template)]`.
+    Built-in rules win over a registration for the same add-on, so one add-on cannot change how
+    another is read."""
+    if addon_id not in BY_ID:
+        EXTRA[addon_id] = (name, [tuple(r) for r in rules])
+
+
+def all_plugins():
+    """`[(id, name)]` for the built-in list followed by what other add-ons registered."""
+    return [(i, n) for i, n, _ in PLUGINS] + [(i, v[0]) for i, v in sorted(EXTRA.items())]
 
 
 class Unsupported(Exception):
@@ -78,7 +102,10 @@ def resolve(path):
         raise Unsupported("Vesper cannot save %s:// items." % parsed.scheme)
 
     addon_id = parsed.netloc
-    name, rules = BY_ID.get(addon_id, (addon_id.split(".", 2)[-1].replace("_", " ").title() or "Add-on", []))
+    name, rules = BY_ID.get(addon_id) or EXTRA.get(addon_id) or (addon_id.split(".", 2)[-1].replace("_", " ").title() or "Add-on", [])
+    # Some add-ons (SendToKodi) put the address itself where the parameters go.
+    if is_web(urllib.parse.unquote(parsed.query)):
+        return urllib.parse.unquote(parsed.query).split("|", 1)[0], name
     query = dict(urllib.parse.parse_qsl(parsed.query))
     for param, template in rules:
         if query.get(param):
@@ -95,9 +122,9 @@ def resolve(path):
 
 
 def supported_ids():
-    return [addon_id for addon_id, _, _ in PLUGINS]
+    return [addon_id for addon_id, _ in all_plugins()]
 
 
 def installed(has_addon):
     """The plugins above that this Kodi has, as `[(id, name)]`. `has_addon(id)` asks Kodi."""
-    return [(addon_id, name) for addon_id, name, _ in PLUGINS if has_addon(addon_id)]
+    return [(addon_id, name) for addon_id, name in all_plugins() if has_addon(addon_id)]

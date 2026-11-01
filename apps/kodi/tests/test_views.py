@@ -78,6 +78,9 @@ class Fake:
                 return fake.answers.get("input", "")
 
         class Addon:
+            def __init__(self, addon_id=None):
+                pass
+
             def getSetting(self, key):
                 return settings.get(key, "")
 
@@ -89,6 +92,8 @@ class Fake:
 
         xbmc = types.ModuleType("xbmc")
         xbmc.executebuiltin = lambda cmd: fake.builtins.append(cmd)
+        xbmc.log = lambda *a: None
+        xbmc.LOGWARNING = 2
         xbmc.getInfoLabel = lambda key: fake.labels.get(key, '')
         xbmc.getCondVisibility = lambda cond: cond in fake.visible
         xbmc.executeJSONRPC = lambda request: __import__('json').dumps(fake.rpc)
@@ -237,6 +242,7 @@ class OnTopOfKodi(unittest.TestCase):
                 "Series",
                 "Downloads",
                 "Favourites",
+                "Kodi favourites",
                 "Schedules",
                 "Add-ons Vesper can save from",
                 "Download from a web address",
@@ -455,6 +461,7 @@ class Screens(unittest.TestCase):
                 "Series",
                 "Downloads",
                 "Favourites",
+                "Kodi favourites",
                 "Schedules",
                 "Add-ons Vesper can save from",
                 "Download from a web address",

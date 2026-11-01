@@ -1,0 +1,9 @@
+{
+  "id": "ntfy-notify",
+  "name": "ntfy notifications",
+  "version": "1.0.0",
+  "description": "Sends a push notification through ntfy when a download or recording finishes or fails. Set \"topic\" (and optionally \"server\") in the plugin's configuration.",
+  "author": "Vesper",
+  "hooks": ["item.finished"],
+  "command": ["python3", "./run.py"]
+}

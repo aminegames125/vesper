@@ -9,7 +9,7 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 
-from . import api, bridge, common, discovery, downloads, library, plugins, syncstate, vod
+from . import api, bridge, common, discovery, downloads, integrate, library, plugins, syncstate, vod
 
 HANDLE = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else -1
 BASE = "plugin://plugin.video.vesper/"
@@ -123,6 +123,10 @@ def root():
     add(url(action="vod", kind="series"), item("Series", plot="Shows and seasons from your providers."), True)
     add(url(action="downloads"), item("Downloads", plot="Movies, episodes and videos saved on your server."), True)
     add(url(action="favorites"), item("Favourites", plot="Kept in step on all your devices."), True)
+    add(url(action="kodi_favourites"), item("Kodi favourites", plot="Your Kodi favourites: play them here or save them to the server."), True)
+    menu, _problems = integrate.load()
+    for entry in menu:
+        add(entry["path"], item(entry["label"], plot="From " + entry["owner"]), True)
     add(url(action="schedules"), item("Schedules", plot="What records on its own: repeating schedules and series."), True)
     add(url(action="plugins"), item("Add-ons Vesper can save from", plot="YouTube, Twitch, Vimeo and more."), True)
     add(url(action="download_address"), item("Download from a web address", plot="Paste a link: a video, a YouTube live, a movie file."), False)
@@ -563,10 +567,37 @@ def toggle_favorite(address, title, kind):
 
 def plugin_list():
     have = {addon_id for addon_id, _ in plugins.installed(lambda a: xbmc.getCondVisibility("System.HasAddon(%s)" % a))}
-    for addon_id, name, _ in plugins.PLUGINS:
+    integrate.load()
+    for addon_id, name in plugins.all_plugins():
         label = name if addon_id in have else "[COLOR FF9A9AA3]%s (not installed)[/COLOR]" % name
         add(url(action="plugin_info", id=addon_id, title=name), item(label, plot=addon_id), False)
     finish("videos")
+
+
+def kodi_favourites():
+    """Kodi's own favourites that play one thing, playable here and downloadable."""
+    rows = integrate.kodi_favourites()
+    for r in rows:
+        menu = [
+            ("Download with Vesper", "RunPlugin(%s)" % url(action="dl_path", path=r["path"], title=r["name"])),
+            ("Add to Vesper favourites", "RunPlugin(%s)" % url(action="fav", url=r["path"], title=r["name"], kind="movie")),
+        ]
+        add(r["path"], item(r["name"], {"thumb": r["thumb"], "icon": r["thumb"]}, playable=True, menu=menu), False)
+    if not rows:
+        add(url(action="noop"), item("No Kodi favourites that play a video."), False)
+    finish("videos")
+
+
+def download_path(path, title):
+    """Download from a Kodi path (a plugin:// address, a stream); the shared entry point for the
+    context menu, Kodi favourites and other add-ons calling `RunPlugin`."""
+    integrate.load()
+    try:
+        address, source = plugins.resolve(path)
+        c = get_client()
+    except (plugins.Unsupported, api.VesperError) as e:
+        return say(str(e), error=True)
+    downloads.start(c, title or source, address)
 
 
 def plugin_info(addon_id, name):
@@ -697,6 +728,12 @@ def route(query):
         plugin_list()
     elif action == "plugin_info":
         plugin_info(q["id"], q.get("title", ""))
+    elif action == "kodi_favourites":
+        kodi_favourites()
+    elif action in ("dl_path", "api_download"):
+        # `api_download` is the documented way for skins and add-ons that do not use Python:
+        # RunPlugin(plugin://plugin.video.vesper/?action=api_download&path=<kodi path>&title=<title>)
+        download_path(q.get("path") or q.get("url", ""), q.get("title", ""))
     elif action == "sync_now":
         library.run_sync(loud=True)
     elif action == "play":

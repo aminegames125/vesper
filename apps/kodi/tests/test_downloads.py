@@ -10,6 +10,9 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "plugin.video.vesper", "resources", "lib"))
 
+import extensions  # noqa: E402
+import kodifav  # noqa: E402
+import notify  # noqa: E402
 import plugins  # noqa: E402
 import syncstate  # noqa: E402
 import vod  # noqa: E402
@@ -125,3 +128,71 @@ class Sync(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExtensionFiles(unittest.TestCase):
+    GOOD = (
+        '{"vesper": 1, "name": "My Add-on", "resolvers": [{"addon": "plugin.video.my", "name": "My Site",'
+        ' "rules": [{"param": "video_id", "template": "https://my.site/watch/{}"}]}],'
+        ' "menu": [{"label": "My picks", "path": "plugin://plugin.video.my/?action=picks"}]}'
+    )
+
+    def test_a_good_file_is_read(self):
+        ext = extensions.parse("plugin.video.my", self.GOOD)
+        self.assertEqual(ext["resolvers"], [("plugin.video.my", "My Site", [("video_id", "https://my.site/watch/{}")])])
+        self.assertEqual(ext["menu"][0]["label"], "My picks")
+
+    def test_an_add_on_cannot_describe_another_add_on(self):
+        with self.assertRaises(extensions.Rejected):
+            extensions.parse("plugin.video.evil", self.GOOD)
+
+    def test_bad_files_say_why(self):
+        for text in ("not json", "[]", '{"vesper": 2}', '{"vesper": 1, "menu": [{"label": "x", "path": "http://x"}]}',
+                     '{"vesper": 1, "resolvers": [{"addon": "a", "rules": [{"param": "p", "template": "https://x/{}/{}"}]}]}',
+                     '{"vesper": 1, "resolvers": [{"addon": "a", "rules": [{"param": "p", "template": "file:///etc/{}"}]}]}'):
+            with self.assertRaises(extensions.Rejected, msg=text):
+                extensions.parse("a", text)
+
+    def test_scan_reports_broken_files_without_stopping(self):
+        files = {"plugin.video.my": self.GOOD, "broken": "nope"}
+        found, problems = extensions.scan(["plugin.video.my", "broken", "none"], files.get)
+        self.assertEqual(list(found), ["plugin.video.my"])
+        self.assertEqual([p[0] for p in problems], ["broken"])
+
+    def test_a_registered_add_on_is_resolved_but_cannot_override_a_built_in(self):
+        plugins.register("plugin.video.my", "My Site", [("video_id", "https://my.site/watch/{}")])
+        self.assertEqual(plugins.resolve("plugin://plugin.video.my/?video_id=42"), ("https://my.site/watch/42", "My Site"))
+        plugins.register("plugin.video.youtube", "Fake", [("video_id", "https://evil.example/{}")])
+        self.assertIn("youtube.com", plugins.resolve("plugin://plugin.video.youtube/?video_id=a")[0])
+        self.assertIn("plugin.video.my", plugins.supported_ids())
+
+    def test_an_address_in_place_of_parameters_is_used(self):
+        self.assertEqual(
+            plugins.resolve("plugin://plugin.video.sendtokodi/?https%3A%2F%2Fexample.org%2Fv%2F9")[0],
+            "https://example.org/v/9",
+        )
+
+
+class KodiFavourites(unittest.TestCase):
+    def test_only_favourites_that_play_something_are_kept(self):
+        text = (
+            "<favourites>"
+            '<favourite name="Clip" thumb="a.png">PlayMedia(&quot;plugin://plugin.video.youtube/play/?video_id=1&quot;)</favourite>'
+            '<favourite name="Movies">ActivateWindow(10025,&quot;videodb://movies/&quot;,return)</favourite>'
+            '<favourite name="Stream">PlayMedia(&quot;https://h/a.mkv&quot;)</favourite>'
+            "</favourites>"
+        )
+        rows = kodifav.parse(text)
+        self.assertEqual([r["name"] for r in rows], ["Clip", "Stream"])
+        self.assertEqual(rows[0]["path"], "plugin://plugin.video.youtube/play/?video_id=1")
+        self.assertEqual(kodifav.parse("<broken"), [])
+
+
+class Events(unittest.TestCase):
+    def test_events_follow_status_changes_and_stay_quiet_on_the_first_look(self):
+        rows = [{"id": "a", "title": "A", "status": "done", "kind": "download"}, {"id": "b", "title": "B", "status": "failed", "error": "x"}]
+        self.assertEqual(notify.events(None, rows), [])
+        found = notify.events({"a": "recording", "b": "recording", "c": "done"}, rows)
+        self.assertEqual([e for e, _ in found], ["item_finished", "item_failed"])
+        self.assertEqual(found[0][1]["kind"], "download")
+        self.assertEqual(notify.events({"a": "done", "b": "failed"}, rows), [])

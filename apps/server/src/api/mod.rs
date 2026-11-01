@@ -3,6 +3,7 @@ mod admin;
 mod files;
 mod guide;
 pub mod library;
+mod plugins;
 mod recordings;
 mod schedules;
 pub mod sources;
@@ -87,6 +88,10 @@ pub fn router() -> Router<AppState> {
         .route("/sync", get(sync::pull).put(sync::push))
         .route("/sync/{key}", delete(sync::forget))
         .route("/admin/sync", get(sync::overview))
+        .route("/admin/plugins", get(plugins::list))
+        .route("/admin/plugins/{id}", axum::routing::put(plugins::update))
+        .route("/admin/plugins/{id}/test", post(plugins::test))
+        .route("/x/{id}/{*rest}", axum::routing::any(plugins::serve))
         .route("/channels/test", post(status::test_channel))
         .route("/schedules/pause", post(schedules::pause_all))
         .route("/schedules/export", get(schedules::export))

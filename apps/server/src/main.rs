@@ -11,6 +11,7 @@ mod ffmpeg;
 mod guard;
 mod jobs;
 mod net;
+mod plugins;
 mod schedule;
 mod state;
 mod tasks;

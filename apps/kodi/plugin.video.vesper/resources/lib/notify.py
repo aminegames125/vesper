@@ -25,6 +25,27 @@ def changes(previous, rows):
     return messages, current
 
 
+def events(previous, rows):
+    """The same comparison as `changes`, but as events other add-ons can act on: a list of
+    `(event, {"id", "title", "kind", "status", "error"})` with the event one of `item_started`,
+    `item_finished` and `item_failed`. `previous` is `{id: status}`, or None on the first look."""
+    if previous is None:
+        return []
+    found = []
+    for r in rows:
+        before, now = previous.get(r["id"]), r["status"]
+        if before == now:
+            continue
+        event = {"recording": "item_started", "done": "item_finished", "failed": "item_failed"}.get(now)
+        if event == "item_finished" and before not in ("recording", "queued", "scheduled"):
+            continue
+        if event == "item_failed" and before == "failed":
+            continue
+        if event:
+            found.append((event, {"id": r["id"], "title": r["title"], "kind": r.get("kind", "recording"), "status": now, "error": r.get("error")}))
+    return found
+
+
 def low_disk(status, floor=2 * 1024**3):
     """A warning when the server's disk is nearly full, else None."""
     free = status.get("diskFree")

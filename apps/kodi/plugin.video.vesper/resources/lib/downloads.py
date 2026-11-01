@@ -3,7 +3,7 @@
 import xbmc
 import xbmcgui
 
-from . import api, common, plugins
+from . import api, common, integrate, plugins
 
 QUALITIES = [
     ("best", "Best available"),
@@ -56,6 +56,7 @@ def start(client, title, address, live=False, tag="", ask=False):
         say(str(e), error=True)
         return False
     say(("Capturing live: " if live else "Downloading: ") + title)
+    integrate.announce("download_started", {"title": title, "url": address, "live": bool(live)})
     return True
 
 
@@ -63,6 +64,7 @@ def from_context():
     """The "Download with Vesper" entry in the menu of any video Kodi lists."""
     path = xbmc.getInfoLabel("ListItem.FileNameAndPath") or xbmc.getInfoLabel("ListItem.Path")
     title = xbmc.getInfoLabel("ListItem.Title") or xbmc.getInfoLabel("ListItem.Label") or "Video"
+    integrate.load()  # other add-ons may have taught Vesper about their paths
     try:
         address, source = plugins.resolve(path)
     except plugins.Unsupported as e:
