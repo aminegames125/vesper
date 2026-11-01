@@ -15,5 +15,5 @@
   </g>
   <text x="640" y="454" text-anchor="middle" font-family="'Bricolage Grotesque','Segoe UI',system-ui,sans-serif" font-size="112" font-weight="800" fill="#F4F1EA" letter-spacing="-3">Vesper</text>
   <text x="640" y="512" text-anchor="middle" font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="32" fill="#9a9aa3">A fast, light IPTV player with a cloud of its own</text>
-  <text x="640" y="574" text-anchor="middle" font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="22" fill="#ff5c7a">Windows · Linux · Android · Android TV · Rust server</text>
+  <text x="640" y="574" text-anchor="middle" font-family="'Geist','Segoe UI',system-ui,sans-serif" font-size="22" fill="#ff5c7a">Kodi add-on · Windows · Linux · Docker · Rust server</text>
 </svg>

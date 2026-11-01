@@ -59,7 +59,7 @@
     </g>
     <text x="80" y="262" font-family="'Segoe UI',system-ui,sans-serif" font-size="104" font-weight="800" fill="#F4F1EA" letter-spacing="-4">Vesper</text>
     <text x="84" y="312" font-family="'Segoe UI',system-ui,sans-serif" font-size="28" fill="#9a9aa3">Your IPTV, recorded while you are away.</text>
-    <text x="84" y="372" font-family="'Segoe UI',system-ui,sans-serif" font-size="19" fill="#6e6e78">Schedules · TV guide · Downloads · Chromecast · Android and Android TV</text>
+    <text x="84" y="372" font-family="'Segoe UI',system-ui,sans-serif" font-size="19" fill="#6e6e78">Schedules · TV guide · Downloads · Chromecast · Kodi on Android TV</text>
   </g>
   <rect x="0.5" y="0.5" width="1279" height="439" rx="27.5" fill="none" stroke="#2a2a30"/>
 </svg>
