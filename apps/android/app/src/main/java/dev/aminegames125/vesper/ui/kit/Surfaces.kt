@@ -116,7 +116,7 @@ fun VFab(text: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifie
     val c = Vesper.colors
     Row(
         modifier
-            .shadow(22.dp, Shapes.pill, ambientColor = c.accent, spotColor = c.accent)
+            .shadow(6.dp, Shapes.pill, ambientColor = Color.Black, spotColor = Color.Black)
             .pressable(onClick, Shapes.pill, focusScale = 1.08f)
             .background(Brush.horizontalGradient(listOf(c.accent, c.accent2)), Shapes.pill)
             .heightIn(min = 54.dp)

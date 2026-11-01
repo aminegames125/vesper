@@ -197,7 +197,13 @@ fun PlayerScreen(
     var variants by remember(source) { mutableStateOf(emptyList<Variant>()) }
     var maxHeight by remember(source) { mutableIntStateOf(0) }
     var showQuality by remember { mutableStateOf(false) }
-    LaunchedEffect(source) { variants = fetchVariants(source.castUrl) }
+    LaunchedEffect(source) {
+        // Let the player connect first; a provider that allows one connection must not see two.
+        delay(if (source.live) 6_000 else 0)
+        variants = fetchVariants(source.castUrl)
+    }
+    // Network hiccups (and a provider still closing the previous channel) get one more go.
+    var retry by remember(source) { mutableIntStateOf(0) }
 
     fun castTarget(): String =
         if (maxHeight > 0) pickVariant(variants, maxHeight)?.url ?: source.castUrl else source.castUrl
@@ -253,7 +259,11 @@ fun PlayerScreen(
                     return
                 }
                 failure = error.errorCodeName
-                if (attempt < candidates.lastIndex) {
+                val network = error.errorCode in 2000..2999
+                if (network && retry < 2) {
+                    retry += 1
+                } else if (attempt < candidates.lastIndex) {
+                    retry = 0
                     attempt += 1
                 } else {
                     failed = true
@@ -265,7 +275,8 @@ fun PlayerScreen(
     }
 
     // Start (or move on to the next way of playing it) whenever the attempt changes.
-    LaunchedEffect(attempt, source) {
+    LaunchedEffect(attempt, retry, source) {
+        if (retry > 0) delay(1_500L * retry)
         if (current === exo) loadCandidate(attempt, if (attempt == 0) source.startMs else 0L)
     }
 

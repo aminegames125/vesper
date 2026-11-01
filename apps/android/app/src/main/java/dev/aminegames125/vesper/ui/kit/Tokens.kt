@@ -9,9 +9,6 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
@@ -56,17 +53,17 @@ class VColors(
 
 val NightColors = VColors(
     dark = true,
-    bg = Color(0xFF0B0B0E),
-    surface = Color(0xFF141418),
-    surfaceHi = Color(0xFF1C1C22),
-    surfaceTop = Color(0xFF26262E),
-    line = Color(0x14FFFFFF),
-    lineStrong = Color(0x29FFFFFF),
-    text = Color(0xFFF4F1EA),
-    textDim = Color(0xFFA6A3AB),
-    textFaint = Color(0xFF706E77),
-    accent = Color(0xFFFF5C7A),
-    accent2 = Color(0xFFFF8A5C),
+    bg = Color(0xFF0D0D0F),
+    surface = Color(0xFF161618),
+    surfaceHi = Color(0xFF1F1F22),
+    surfaceTop = Color(0xFF2A2A2E),
+    line = Color(0x1AFFFFFF),
+    lineStrong = Color(0x33FFFFFF),
+    text = Color(0xFFF2F2F0),
+    textDim = Color(0xFFA1A1A6),
+    textFaint = Color(0xFF6E6E73),
+    accent = Color(0xFFFF6B57),
+    accent2 = Color(0xFFFF6B57),
     onAccent = Color(0xFF1C0910),
     accentSoft = Color(0x29FF5C7A),
     danger = Color(0xFFFF6B6B),
@@ -137,11 +134,11 @@ object Vesper {
 
 object Shapes {
     val pill = RoundedCornerShape(percent = 50)
-    val card = RoundedCornerShape(24.dp)
-    val tile = RoundedCornerShape(18.dp)
-    val field = RoundedCornerShape(16.dp)
-    val sheet = RoundedCornerShape(30.dp)
-    val thumb = RoundedCornerShape(14.dp)
+    val card = RoundedCornerShape(14.dp)
+    val tile = RoundedCornerShape(10.dp)
+    val field = RoundedCornerShape(10.dp)
+    val sheet = RoundedCornerShape(18.dp)
+    val thumb = RoundedCornerShape(8.dp)
 }
 
 /** The page's side margin: wider on a TV, where the edges of the screen can be cut off. */
@@ -154,25 +151,13 @@ fun gutterPadding(top: Dp = 8.dp, bottom: Dp = 24.dp): PaddingValues =
 
 /** The app's backdrop: the ink canvas with a warm glow in one corner and a cool one in the other. */
 @Composable
-fun Modifier.backdrop(): Modifier {
-    val c = Vesper.colors
-    val warm = c.accent.copy(alpha = if (c.dark) 0.17f else 0.10f)
-    val cool = Color(0xFF5B6CFF).copy(alpha = if (c.dark) 0.09f else 0.05f)
-    return this
-        .background(c.bg)
-        .drawBehind {
-            val reach = size.maxDimension
-            drawRect(Brush.radialGradient(listOf(warm, Color.Transparent), center = Offset(size.width * 0.05f, 0f), radius = reach * 0.85f))
-            drawRect(Brush.radialGradient(listOf(cool, Color.Transparent), center = Offset(size.width, size.height), radius = reach * 0.8f))
-        }
-}
+fun Modifier.backdrop(): Modifier = this.background(Vesper.colors.bg)
 
-/** A pane of glass: a gentle vertical gradient with a hairline that is brighter along the top edge. */
+/** A flat panel: one solid colour and a hairline. No gradients, no glow. */
 @Composable
 fun Modifier.glass(shape: Shape = Shapes.card, strong: Boolean = false): Modifier {
     val c = Vesper.colors
-    val top = if (strong) c.surfaceTop else c.surfaceHi
     return this
-        .background(Brush.verticalGradient(listOf(top, c.surface)), shape)
-        .border(1.dp, Brush.verticalGradient(listOf(c.lineStrong, c.line)), shape)
+        .background(if (strong) c.surfaceHi else c.surface, shape)
+        .border(1.dp, c.line, shape)
 }

@@ -18,7 +18,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Shape
@@ -97,9 +96,10 @@ fun Modifier.focusFx(
         animationSpec = spring(dampingRatio = 0.72f, stiffness = 420f),
         label = "focusScale",
     )
+    // Focus is a plain, high-contrast outline in the text colour: readable from the sofa, no glow.
     val ringColor by animateColorAsState(
-        targetValue = if (focused && ring) c.accent else Color.Transparent,
-        animationSpec = tween(140),
+        targetValue = if (focused && ring) c.text else Color.Transparent,
+        animationSpec = tween(120),
         label = "focusRing",
     )
     return this
@@ -107,13 +107,6 @@ fun Modifier.focusFx(
             scaleX = scale
             scaleY = scale
         }
-        .then(
-            if (focused && ring) {
-                Modifier.shadow(20.dp, shape, ambientColor = c.accent, spotColor = c.accent)
-            } else {
-                Modifier
-            },
-        )
         .then(if (ringColor.alpha > 0f) Modifier.border(if (tv) 3.dp else 2.dp, ringColor, shape) else Modifier)
         .clip(shape)
 }
