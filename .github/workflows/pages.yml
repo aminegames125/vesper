@@ -35,7 +35,7 @@ jobs:
           # The history and tags, so the add-on's version can stay where it was when it did not change.
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
