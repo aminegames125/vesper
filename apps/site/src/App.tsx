@@ -527,36 +527,35 @@ function Close() {
 }
 
 function Footer() {
+  const link = "foot-a";
   return (
     <footer className="foot">
-      <div className="foot-top">
-        <p>Vesper records only what you add yourself and ships no channels or playlists.</p>
-        <p>
-          <a href="#top">Back to the top</a>
-        </p>
+      <div className="foot-row">
+        <span>Vesper records only what you add yourself and ships no channels or playlists.</span>
+        <a className={link} href={REPO} target="_blank" rel="noopener noreferrer">
+          GitHub
+        </a>
+        <a
+          className={link}
+          href={`${REPO}/tree/main/docs`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Docs
+        </a>
+        <a className={link} href={RELEASES} target="_blank" rel="noopener noreferrer">
+          Releases
+        </a>
+        <a className={link} href="https://amineos.dev" target="_blank" rel="noopener noreferrer">
+          amineos.dev
+        </a>
+        <a className={link} href="#top">
+          Back to the top
+        </a>
       </div>
-      <a className="foot-link" href={REPO} target="_blank" rel="noopener noreferrer">
-        aminegames125
-        <br />
-        /vesper
-      </a>
-      <div className="foot-meta">
-        <span>
-          <a href={`${REPO}/tree/main/docs`} target="_blank" rel="noopener noreferrer">
-            Docs
-          </a>
-          {" · "}
-          <a href={RELEASES} target="_blank" rel="noopener noreferrer">
-            Releases
-          </a>
-          {" · "}
-          <a href="https://amineos.dev" target="_blank" rel="noopener noreferrer">
-            amineos.dev
-          </a>
-        </span>
-        <span>MIT licence</span>
-        <span>Amineos, 2026</span>
-      </div>
+      <p className="foot-word" aria-hidden="true">
+        Vesper
+      </p>
     </footer>
   );
 }
@@ -661,6 +660,22 @@ export function App() {
             { autoAlpha: 0, y: 14, duration: 0.6, ease: "power3.out", stagger: 0.07 },
             0.5,
           );
+
+        // The footer wordmark rises into place as the footer comes into view.
+        gsap.fromTo(
+          ".foot-word",
+          { yPercent: 32 },
+          {
+            yPercent: 0,
+            ease: "none",
+            scrollTrigger: {
+              trigger: ".foot",
+              start: "top bottom",
+              end: "bottom bottom",
+              scrub: 0.4,
+            },
+          },
+        );
 
         // The closing mark is built bar by bar, then the top one blinks like a recording light.
         gsap
