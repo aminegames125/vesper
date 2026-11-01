@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.27.1] - 2026-11-01 <!-- release: patch; push: 37; changes: 1 -->
+
+### Changed
+- Remove the Android app folder and its leftovers
+
 ## [0.27.0] - 2026-11-01 <!-- release: minor; push: 36; changes: 2 -->
 
 ### Added
