@@ -1,20 +1,10 @@
 package dev.aminegames125.vesper.cast
 
 import android.content.Context
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cast
-import androidx.compose.material.icons.filled.CastConnected
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -25,6 +15,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import dev.aminegames125.vesper.ui.kit.ButtonKind
+import dev.aminegames125.vesper.ui.kit.Ic
+import dev.aminegames125.vesper.ui.kit.IconStyle
+import dev.aminegames125.vesper.ui.kit.VButton
+import dev.aminegames125.vesper.ui.kit.VDialog
+import dev.aminegames125.vesper.ui.kit.VIconButton
+import dev.aminegames125.vesper.ui.kit.VPill
+import dev.aminegames125.vesper.ui.kit.VRow
+import dev.aminegames125.vesper.ui.kit.VText
+import dev.aminegames125.vesper.ui.kit.Tone
+import dev.aminegames125.vesper.ui.kit.Vesper
 import androidx.mediarouter.media.MediaRouteSelector
 import androidx.mediarouter.media.MediaRouter
 import androidx.media3.common.MimeTypes
@@ -82,12 +83,14 @@ fun CastButton(support: CastSupport, modifier: Modifier = Modifier) {
     val router = remember { MediaRouter.getInstance(context) }
     var open by remember { mutableStateOf(false) }
     val connected = router.selectedRoute.let { !it.isDefaultOrBluetooth }
-    IconButton(onClick = { open = true }, modifier = modifier) {
-        Icon(
-            if (connected) Icons.Filled.CastConnected else Icons.Filled.Cast,
-            contentDescription = "Cast to a TV",
-        )
-    }
+    VIconButton(
+        if (connected) Ic.CastOn else Ic.Cast,
+        "Cast to a TV",
+        { open = true },
+        modifier,
+        tint = if (connected) Vesper.colors.accent else androidx.compose.ui.graphics.Color.White,
+        style = IconStyle.Scrim,
+    )
     if (open) RoutePicker(router, support.selector) { open = false }
 }
 
@@ -111,39 +114,39 @@ private fun RoutePicker(router: MediaRouter, selector: MediaRouteSelector, onDis
     val connected = !selected.isDefaultOrBluetooth
     // Reading `version` makes the list above re-evaluate when devices appear.
     check(version >= 0)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Cast to") },
-        text = {
-            Column(Modifier.fillMaxWidth()) {
-                if (routes.isEmpty()) {
-                    Text(
-                        "Looking for TVs and Chromecasts on this Wi-Fi…",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(vertical = 8.dp),
-                    )
-                }
-                routes.forEach { route ->
-                    ListItem(
-                        headlineContent = { Text(route.name) },
-                        supportingContent = route.description?.takeIf { it.isNotBlank() }?.let { { Text(it) } },
-                        trailingContent = if (route.id == selected.id) ({ Text("Connected") }) else null,
-                        modifier = Modifier.clickable {
-                            route.select()
-                            onDismiss()
-                        },
-                    )
-                }
-            }
-        },
-        confirmButton = {
+    VDialog(
+        onDismiss = onDismiss,
+        title = "Cast to",
+        actions = {
             if (connected) {
-                TextButton(onClick = {
+                VButton("Stop casting", {
                     router.unselect(MediaRouter.UNSELECT_REASON_STOPPED)
                     onDismiss()
-                }) { Text("Stop casting") }
+                }, kind = ButtonKind.Danger)
             }
+            VButton("Close", onDismiss, kind = ButtonKind.Soft)
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-    )
+    ) {
+        if (routes.isEmpty()) {
+            VText(
+                "Looking for TVs and Chromecasts on this Wi-Fi…",
+                style = Vesper.type.body,
+                color = Vesper.colors.textDim,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+        }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            routes.forEach { route ->
+                VRow(
+                    title = route.name,
+                    subtitle = route.description?.takeIf { it.isNotBlank() },
+                    onClick = {
+                        route.select()
+                        onDismiss()
+                    },
+                    trailing = if (route.id == selected.id) ({ VPill("Connected", Tone.Ok) }) else null,
+                )
+            }
+        }
+    }
 }

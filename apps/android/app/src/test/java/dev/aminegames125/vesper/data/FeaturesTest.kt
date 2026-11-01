@@ -60,6 +60,12 @@ class FeaturesTest {
     }
 
     @Test
+    fun aRawXtreamLiveLinkIsAlsoTriedAsHls() {
+        val tries = playbackCandidates("http://h:80/live/u/p/123.ts", emptyList())
+        assertEquals(listOf("http://h:80/live/u/p/123.ts" to null, "http://h:80/live/u/p/123.m3u8" to null), tries)
+    }
+
+    @Test
     fun theDeletionTimerIsDescribedInPlainWords() {
         assertNull(formatExpiry(null))
         assertEquals("Deleted in 6 d", formatExpiry(1_000_000 + 6 * 86_400 + 100, nowSeconds = 1_000_000))

@@ -1,44 +1,17 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package dev.aminegames125.vesper.ui
 
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Cast
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -48,14 +21,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import dev.aminegames125.vesper.ui.theme.LocalIsTv
-import coil.compose.AsyncImage
 import dev.aminegames125.vesper.data.Channel
 import dev.aminegames125.vesper.data.GuideHit
 import dev.aminegames125.vesper.data.formatMoment
+import dev.aminegames125.vesper.ui.kit.ButtonKind
+import dev.aminegames125.vesper.ui.kit.Ic
+import dev.aminegames125.vesper.ui.kit.LoadingBox
+import dev.aminegames125.vesper.ui.kit.LogoTile
+import dev.aminegames125.vesper.ui.kit.SheetAction
+import dev.aminegames125.vesper.ui.kit.VActionSheet
+import dev.aminegames125.vesper.ui.kit.VButton
+import dev.aminegames125.vesper.ui.kit.VChip
+import dev.aminegames125.vesper.ui.kit.VDialog
+import dev.aminegames125.vesper.ui.kit.VField
+import dev.aminegames125.vesper.ui.kit.VIconButton
+import dev.aminegames125.vesper.ui.kit.VRow
+import dev.aminegames125.vesper.ui.kit.VText
+import dev.aminegames125.vesper.ui.kit.VTopBar
+import dev.aminegames125.vesper.ui.kit.Vesper
+import dev.aminegames125.vesper.ui.theme.LocalIsTv
 
 /**
  * Pick a channel from your playlists. Tapping a row plans a recording; the play button opens it live
@@ -95,52 +80,34 @@ fun ChannelsScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Pick a channel") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                },
-            )
-        },
-    ) { padding ->
+    Column(Modifier.fillMaxSize()) {
+        VTopBar("Pick a channel", onBack)
         if (sources.isEmpty()) {
             EmptyState(
                 title = "Add a playlist first",
                 body = "Vesper needs your IPTV playlist or Xtream login to list channels you can record.",
-                modifier = Modifier.padding(padding),
-                action = { Button(onClick = { addSource = true }) { Text("Add a playlist") } },
+                icon = Ic.Tv,
+                action = { VButton("Add a playlist", { addSource = true }, icon = Ic.Add) },
             )
         } else {
-            Column(Modifier.padding(padding).padding(pagePadding())) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.fillMaxSize().padding(horizontal = pageHorizontal()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
                     items(listOf("live" to "Live", "movie" to "Movies", "series" to "Series"), key = { it.first }) { (kind, label) ->
-                        FilterChip(selected = browser.kind == kind, onClick = { vm.setKind(kind) }, label = { Text(label) })
+                        VChip(label, selected = browser.kind == kind, onClick = { vm.setKind(kind) })
                     }
                     if (sources.size > 1) {
                         items(sources, key = { it.id }) { source ->
-                            FilterChip(
-                                selected = browser.sourceId == source.id,
-                                onClick = { vm.selectSource(source.id) },
-                                label = { Text(source.name) },
-                            )
+                            VChip(source.name, selected = browser.sourceId == source.id, onClick = { vm.selectSource(source.id) })
                         }
                     }
                 }
-                OutlinedTextField(
-                    value = browser.query,
-                    onValueChange = vm::setQuery,
-                    label = { Text("Search channels") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                )
+                VField(browser.query, vm::setQuery, "Search channels", Modifier.fillMaxWidth(), leading = Ic.Search)
                 if (browser.groups.isNotEmpty()) {
-                    LazyRow(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item { FilterChip(selected = onlyFavorites, onClick = { onlyFavorites = !onlyFavorites }, label = { Text("Favorites") }) }
-                        item { FilterChip(selected = browser.group.isEmpty(), onClick = { vm.setGroup("") }, label = { Text("All") }) }
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 2.dp)) {
+                        item { VChip("Favorites", selected = onlyFavorites, onClick = { onlyFavorites = !onlyFavorites }, icon = Ic.Star) }
+                        item { VChip("All", selected = browser.group.isEmpty(), onClick = { vm.setGroup("") }) }
                         items(browser.groups, key = { it }) { group ->
-                            FilterChip(selected = browser.group == group, onClick = { vm.setGroup(group) }, label = { Text(group) })
+                            VChip(group, selected = browser.group == group, onClick = { vm.setGroup(group) })
                         }
                     }
                 }
@@ -148,11 +115,15 @@ fun ChannelsScreen(
                     val base = if (onlyFavorites) browser.channels.filter { it.url in favorites } else browser.channels
                     base.sortedByDescending { it.url in favorites }
                 }
-                Box(browser.loading && browser.channels.isEmpty()) {
+                Spinning(browser.loading && browser.channels.isEmpty()) {
                     if (shown.isEmpty() && !browser.loading) {
-                        EmptyState("No channels found", "Try another search, group or section.")
+                        EmptyState("No channels found", "Try another search, group or section.", icon = Ic.Search)
                     } else {
-                        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+                        LazyColumn(
+                            Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             itemsIndexed(shown, key = { i, c -> "$i${c.url}" }) { index, channel ->
                                 if (!onlyFavorites && index >= shown.size - 5) LaunchedEffect(browser.channels.size) { vm.loadMore() }
                                 ChannelRow(
@@ -219,61 +190,48 @@ private fun ChannelRow(
 ) {
     var menu by remember { mutableStateOf(false) }
     val isTv = LocalIsTv.current
-    ListItem(
-        modifier = Modifier.clickable(onClick = onPick),
-        leadingContent = if (channel.logo.isNotBlank()) {
-            {
-                AsyncImage(
-                    model = channel.logo,
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)),
-                )
-            }
-        } else {
-            null
-        },
-        headlineContent = { Text(channel.name, maxLines = 1) },
-        supportingContent = if (channel.group.isNotEmpty()) {
-            { Text(channel.group, maxLines = 1) }
-        } else {
-            null
-        },
-        trailingContent = {
+    val c = Vesper.colors
+    VRow(
+        title = channel.name,
+        subtitle = channel.group.takeIf { it.isNotEmpty() },
+        onClick = onPick,
+        leading = { LogoTile(channel.logo, channel.name) },
+        trailing = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (channel.isLive) {
                     // The phone does not play live channels (that would use the provider's connection
                     // while a recording needs it); it sends them to a TV. A TV plays them.
                     if (isTv) {
-                        IconButton(onClick = onWatch) { Icon(Icons.Filled.PlayArrow, contentDescription = "Watch ${channel.name}") }
+                        VIconButton(Ic.Play, "Watch ${channel.name}", onWatch)
                     } else {
-                        IconButton(onClick = onWatch) { Icon(Icons.Filled.Cast, contentDescription = "Cast ${channel.name} to a TV") }
+                        VIconButton(Ic.Cast, "Cast ${channel.name} to a TV", onWatch)
                     }
                 } else {
-                    IconButton(onClick = onDownload) { Icon(Icons.Filled.Download, contentDescription = "Download ${channel.name} to the server") }
+                    VIconButton(Ic.Download, "Download ${channel.name} to the server", onDownload)
                 }
-                IconButton(onClick = onStar) {
-                    Icon(
-                        if (starred) Icons.Filled.Star else Icons.Filled.StarBorder,
-                        contentDescription = if (starred) "Remove ${channel.name} from favorites" else "Add ${channel.name} to favorites",
-                    )
-                }
-                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More for ${channel.name}") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (!channel.isLive) {
-                        DropdownMenuItem(text = { Text(if (isTv) "Watch" else "Cast to a TV") }, onClick = { menu = false; onWatch() })
-                    }
-                    if (channel.isLive) {
-                        DropdownMenuItem(text = { Text("Record now") }, onClick = { menu = false; onRecordNow() })
-                        DropdownMenuItem(text = { Text("Schedule") }, onClick = { menu = false; onPick() })
-                        DropdownMenuItem(text = { Text("Guide") }, onClick = { menu = false; onGuide() })
-                        DropdownMenuItem(text = { Text("Test") }, onClick = { menu = false; onTest() })
-                        DropdownMenuItem(text = { Text("Test with a 10 second sample") }, onClick = { menu = false; onSample() })
-                    }
-                }
+                VIconButton(
+                    if (starred) Ic.StarOn else Ic.Star,
+                    if (starred) "Remove ${channel.name} from favorites" else "Add ${channel.name} to favorites",
+                    onStar,
+                    tint = if (starred) c.warn else c.textDim,
+                )
+                VIconButton(Ic.More, "More for ${channel.name}", { menu = true }, tint = c.textDim)
             }
         },
     )
+    if (menu) {
+        val actions = buildList {
+            if (!channel.isLive) add(SheetAction(if (isTv) "Watch" else "Cast to a TV", if (isTv) Ic.Play else Ic.Cast) { onWatch() })
+            if (channel.isLive) {
+                add(SheetAction("Record now", Ic.Record) { onRecordNow() })
+                add(SheetAction("Schedule", Ic.Calendar) { onPick() })
+                add(SheetAction("Guide", Ic.Guide) { onGuide() })
+                add(SheetAction("Test", Ic.Refresh) { onTest() })
+                add(SheetAction("Test with a 10 second sample", Ic.Refresh) { onSample() })
+            }
+        }
+        VActionSheet(channel.name, actions) { menu = false }
+    }
 }
 
 /** What is on a channel now and next, with a way to record each programme. */
@@ -281,46 +239,39 @@ private fun ChannelRow(
 private fun ChannelGuideDialog(channel: Channel, vm: VesperViewModel, busy: Boolean, onDismiss: () -> Unit) {
     val programmes by vm.channelGuide.collectAsState()
     var chosen by remember { mutableStateOf<GuideHit?>(null) }
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(channel.name) },
-        text = {
-            if (programmes.isEmpty()) {
-                Text("No guide for this channel. Set the guide address in the admin panel.", style = MaterialTheme.typography.bodyMedium)
-            } else {
-                LazyColumn {
-                    items(programmes) { programme ->
-                        ListItem(
-                            modifier = Modifier.clickable {
-                                chosen = GuideHit(
-                                    channelId = vm.channelGuideId ?: channel.id,
-                                    channelName = channel.name,
-                                    startAt = programme.startAt,
-                                    stopAt = programme.stopAt,
-                                    title = programme.title,
-                                    description = programme.description,
-                                )
-                            },
-                            headlineContent = { Text(programme.title, maxLines = 1) },
-                            supportingContent = { Text(formatMoment(programme.startAt)) },
-                        )
-                    }
+    VDialog(
+        onDismiss = onDismiss,
+        title = channel.name,
+        actions = { VButton("Close", onDismiss, kind = ButtonKind.Soft) },
+    ) {
+        if (programmes.isEmpty()) {
+            VText("No guide for this channel. Set the guide address in the admin panel.", style = Vesper.type.body, color = Vesper.colors.textDim)
+        } else {
+            LazyColumn(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(programmes) { programme ->
+                    VRow(
+                        title = programme.title,
+                        subtitle = formatMoment(programme.startAt),
+                        onClick = {
+                            chosen = GuideHit(
+                                channelId = vm.channelGuideId ?: channel.id,
+                                channelName = channel.name,
+                                startAt = programme.startAt,
+                                stopAt = programme.stopAt,
+                                title = programme.title,
+                                description = programme.description,
+                            )
+                        },
+                    )
                 }
             }
-        },
-        confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Close") } },
-    )
+        }
+    }
     chosen?.let { hit -> ProgrammeDialog(hit, vm, busy) { chosen = null } }
 }
 
-/** A box that shows a spinner while it has nothing to show yet. */
+/** Shows a spinner while there is nothing to show yet, and the content otherwise. */
 @Composable
-private fun Box(loading: Boolean, content: @Composable () -> Unit) {
-    if (loading) {
-        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-    } else {
-        content()
-    }
+private fun Spinning(loading: Boolean, content: @Composable () -> Unit) {
+    if (loading) LoadingBox() else content()
 }
