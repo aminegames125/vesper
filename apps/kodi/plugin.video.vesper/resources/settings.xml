@@ -24,6 +24,13 @@
             <close>true</close>
           </control>
         </setting>
+        <setting id="sign_in" type="action" label="30030" help="">
+          <level>0</level>
+          <data>RunPlugin(plugin://plugin.video.vesper/?action=sign_in)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
         <setting id="username" type="string" label="30004" help="">
           <level>0</level>
           <default></default>

@@ -93,7 +93,7 @@ def find_server():
     if len(found) == 1:
         common.set_setting("server", found[0]["address"])
         if found[0].get("mode") == "full" and not common.setting("username"):
-            bridge.say("Found %s. It has accounts: enter your username and password in the add-on settings." % found[0]["name"])
+            bridge.say("Found %s. It has accounts: open Vesper and choose Sign in." % found[0]["name"])
         else:
             bridge.say("Found %s. Press the menu button on a channel to record." % found[0]["name"])
 

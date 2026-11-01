@@ -194,3 +194,7 @@ msgstr ""
 msgctxt "#30065"
 msgid "Audio only (MP3)"
 msgstr ""
+
+msgctxt "#30030"
+msgid "Sign in (type username and password)"
+msgstr ""

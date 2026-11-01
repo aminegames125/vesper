@@ -16,8 +16,34 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Works out which parts the push or pull request touched (scripts/changes.mjs), so only those are
+  # built and tested. A part that is skipped shows as skipped, never as failed.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      server: ${{ steps.parts.outputs.server }}
+      web: ${{ steps.parts.outputs.web }}
+      kodi: ${{ steps.parts.outputs.kodi }}
+      site: ${{ steps.parts.outputs.site }}
+      tooling: ${{ steps.parts.outputs.tooling }}
+      all: ${{ steps.parts.outputs.all }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: parts
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node scripts/changes.mjs --base "$BASE" --head HEAD
+
   web:
     name: Admin panel and client (pnpm + Turborepo)
+    needs: changes
+    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.site == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,8 +58,22 @@ jobs:
       - name: Typecheck, test and build
         run: pnpm turbo run typecheck test build
 
+  tooling:
+    name: Release scripts
+    needs: changes
+    if: ${{ needs.changes.outputs.tooling == 'true' || needs.changes.outputs.all == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test scripts/*.test.mjs
+
   kodi:
     name: Kodi add-on
+    needs: changes
+    if: ${{ needs.changes.outputs.kodi == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +89,8 @@ jobs:
 
   rust:
     name: Rust (recorder and server)
+    needs: changes
+    if: ${{ needs.changes.outputs.server == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,6 +104,8 @@ jobs:
 
   e2e:
     name: End to end (a real server)
+    needs: changes
+    if: ${{ needs.changes.outputs.server == 'true' || needs.changes.outputs.kodi == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

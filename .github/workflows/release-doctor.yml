@@ -29,12 +29,15 @@ jobs:
     name: Check draft releases
     runs-on: ubuntu-latest
     steps:
+      # The whole history and the tags: the doctor works out what each release was meant to build.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Test the rules
-        run: node --test scripts/release-doctor.test.mjs
+        run: node --test scripts/release-doctor.test.mjs scripts/changes.test.mjs
       - name: Check and fix
         env:
           GH_TOKEN: ${{ github.token }}

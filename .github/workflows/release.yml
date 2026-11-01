@@ -22,8 +22,36 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Only what changed since the previous release is built (scripts/changes.mjs). A release that did
+  # not touch the server has no server files, and says so in its notes; the same for the add-on.
+  plan:
+    name: What changed since the last release
+    runs-on: ubuntu-latest
+    outputs:
+      server: ${{ steps.parts.outputs.server }}
+      kodi: ${{ steps.parts.outputs.kodi }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: parts
+        run: |
+          # Scripts come from the tag being released, which may predate this one; fall back to everything.
+          PREVIOUS=$(git tag --list 'v[0-9]*' --sort=-v:refname | grep -x -A1 -- "$TAG" | tail -n +2 | head -n 1 || true)
+          if [ -n "$PREVIOUS" ] && [ -f scripts/changes.mjs ]; then
+            node scripts/changes.mjs --base "$PREVIOUS" --head "$TAG"
+          else
+            echo "server=true" >> "$GITHUB_OUTPUT"
+            echo "kodi=true" >> "$GITHUB_OUTPUT"
+          fi
+
   draft:
     name: Create draft release
+    needs: plan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,15 +60,22 @@ jobs:
       - name: Create the draft if it does not exist yet
         env:
           GH_TOKEN: ${{ github.token }}
+          SERVER: ${{ needs.plan.outputs.server }}
+          KODI: ${{ needs.plan.outputs.kodi }}
         run: |
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             node scripts/release-notes.mjs "$TAG" > "$RUNNER_TEMP/notes.md"
+            {
+              echo
+              echo "**In this release:** server $([ "$SERVER" = true ] && echo "rebuilt" || echo "unchanged, use the previous release's files and image"), Kodi add-on $([ "$KODI" = true ] && echo "rebuilt" || echo "unchanged")."
+            } >> "$RUNNER_TEMP/notes.md"
             gh release create "$TAG" --draft --title "Vesper $TAG" --notes-file "$RUNNER_TEMP/notes.md"
           fi
 
   server:
     name: Server (${{ matrix.name }})
-    needs: draft
+    needs: [plan, draft]
+    if: ${{ needs.plan.outputs.server == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -92,7 +127,8 @@ jobs:
 
   kodi:
     name: Kodi add-on
-    needs: draft
+    needs: [plan, draft]
+    if: ${{ needs.plan.outputs.kodi == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -119,7 +155,8 @@ jobs:
 
   docker:
     name: Server image
-    needs: draft
+    needs: [plan, draft]
+    if: ${{ needs.plan.outputs.server == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -149,7 +186,9 @@ jobs:
 
   publish:
     name: Publish release
-    needs: [server, kodi, docker]
+    needs: [plan, server, kodi, docker]
+    # A part that was skipped on purpose is fine; one that failed is not.
+    if: ${{ !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - env:

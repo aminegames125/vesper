@@ -14,25 +14,38 @@
 
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { release as partsOfRelease } from "./changes.mjs";
 
 export const MAX_TRIES = 3;
 
-/** The files a finished release carries, from its tag (`v1.2.3`). */
-export function expectedAssets(tag) {
+const EVERYTHING = { server: true, kodi: true };
+
+/**
+ * The files a finished release carries, from its tag (`v1.2.3`). A release only builds the parts
+ * that changed since the one before it (see changes.mjs), so `parts` says which to expect.
+ */
+export function expectedAssets(tag, parts = EVERYTHING) {
   const version = tag.replace(/^v/, "").split("-")[0];
   const base = [
-    `vesper-server-${tag}-linux-x64.tar.gz`,
-    `vesper-server-${tag}-linux-arm64.tar.gz`,
-    `vesper-server-${tag}-windows-x64.zip`,
-    `plugin.video.vesper-${version}.zip`,
+    ...(parts.server
+      ? [
+          `vesper-server-${tag}-linux-x64.tar.gz`,
+          `vesper-server-${tag}-linux-arm64.tar.gz`,
+          `vesper-server-${tag}-windows-x64.zip`,
+        ]
+      : []),
+    ...(parts.kodi ? [`plugin.video.vesper-${version}.zip`] : []),
   ];
   // The repository add-on has its own version number, so it is matched by prefix below.
-  return { exact: base.flatMap((f) => [f, `${f}.sha256`]), prefixes: ["repository.vesper-"] };
+  return {
+    exact: base.flatMap((f) => [f, `${f}.sha256`]),
+    prefixes: parts.kodi ? ["repository.vesper-"] : [],
+  };
 }
 
-export function missingAssets(tag, names) {
+export function missingAssets(tag, names, parts = EVERYTHING) {
   const have = new Set(names);
-  const { exact, prefixes } = expectedAssets(tag);
+  const { exact, prefixes } = expectedAssets(tag, parts);
   const missing = exact.filter((f) => !have.has(f));
   for (const prefix of prefixes) {
     for (const suffix of [".zip", ".zip.sha256"]) {
@@ -56,11 +69,12 @@ export function newer(a, b) {
 /**
  * Decides what to do. `drafts` are `{ tag, assets: [names], createdAt }`, `published` is the list
  * of tags already published, `runs` are the Release workflow's
- * recent runs `{ status, conclusion, createdAt (epoch seconds) }`, `imageExists(tag)` says whether
+ * recent runs `{ status, conclusion, createdAt (epoch seconds) }`, `partsOf(tag)` says which parts
+ * (`{ server, kodi }`) that release was meant to build, `imageExists(tag)` says whether
  * the Docker image for the tag was pushed.
  * Returns a list of `{ action: "publish" | "retry" | "delete" | "give-up" | "wait", tag, why }`.
  */
-export function plan({ drafts, published = [], runs, imageExists }) {
+export function plan({ drafts, published = [], runs, imageExists, partsOf = () => EVERYTHING }) {
   if (runs.some((r) => r.status !== "completed")) {
     return [{ action: "wait", tag: "", why: "a Release run is still going" }];
   }
@@ -71,9 +85,11 @@ export function plan({ drafts, published = [], runs, imageExists }) {
   return sorted.map((draft, index) => {
     const failures = failuresFor(draft);
     const overtaken = published.find((tag) => newer(tag, draft.tag));
-    const missing = missingAssets(draft.tag, draft.assets);
+    const wanted = partsOf(draft.tag);
+    const missing = missingAssets(draft.tag, draft.assets, wanted);
     if (missing.length === 0) {
-      return imageExists(draft.tag)
+      // The image is only built when the server changed.
+      return !wanted.server || imageExists(draft.tag)
         ? { action: "publish", tag: draft.tag, why: "every file is attached" }
         : index === 0 && !overtaken && failures < MAX_TRIES
           ? { action: "retry", tag: draft.tag, why: "files are there but the Docker image is not" }
@@ -130,6 +146,7 @@ function main() {
     published,
     runs,
     imageExists: (tag) => imageExists(owner, tag),
+    partsOf: (tag) => partsOfRelease(tag),
   });
   if (steps.length === 0) console.log("No draft releases. Nothing to do.");
   for (const step of steps) {

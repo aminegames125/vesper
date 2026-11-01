@@ -250,6 +250,30 @@ class OnTopOfKodi(unittest.TestCase):
                 "Server",
             ])
 
+    def test_sign_in_asks_for_the_login_and_keeps_it(self):
+        fake.typed = ["alice", "secret"]
+        views.route("?action=sign_in")
+        self.assertEqual((settings["username"], settings["password"]), ("alice", "secret"))
+
+    def test_a_wrong_login_does_not_replace_a_working_one(self):
+        settings["username"], settings["password"] = "old", "oldpass"
+        fake.typed = ["new", "wrong"]
+
+        def refuse():
+            raise views.api.VesperError("Wrong username or password.")
+
+        views.common.client = refuse
+        views.route("?action=sign_in")
+        self.assertEqual((settings["username"], settings["password"]), ("old", "oldpass"))
+
+    def test_a_server_that_wants_a_login_puts_sign_in_on_the_home_screen(self):
+        def refuse():
+            raise views.api.VesperError("This server needs a username and password. Open Vesper and choose Sign in.")
+
+        views.common.client = refuse
+        views.route("")
+        self.assertEqual(labels()[0], "Sign in")
+
     def test_with_no_provider_it_offers_to_read_them_from_kodi(self):
         views.route("")
         self.assertEqual(labels()[-1], "Connect my IPTV providers")

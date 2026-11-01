@@ -91,7 +91,7 @@ class Vesper:
                     self._media = ("", 0.0)
                     self.sign_in(self.username, self.password)
                     return self._call(method, path, body, query, auth, timeout, _retry=False)
-                raise VesperError("Signed out. Check the username and password in the add-on settings.")
+                raise VesperError("Signed out. Open Vesper and choose Sign in to type them again.")
             if e.code == 401:
                 raise VesperError("Wrong username or password.")
             if e.code == 429:
@@ -164,7 +164,7 @@ class Vesper:
                     raise
                 self.token = ""
         if not username or not password:
-            raise VesperError("This server needs a username and password. Enter them in the add-on settings.")
+            raise VesperError("This server needs a username and password. Open Vesper and choose Sign in.")
         self.sign_in(username, password)
         return info
 

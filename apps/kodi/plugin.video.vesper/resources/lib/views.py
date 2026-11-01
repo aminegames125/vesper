@@ -80,9 +80,17 @@ def refresh():
     xbmc.executebuiltin("Container.Refresh")
 
 
+def needs_login(error):
+    text = str(error).lower()
+    return "username and password" in text or "signed out" in text or "wrong username" in text
+
+
 def failed(error):
     say(str(error), error=True)
     xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+    if needs_login(error):
+        # Do not leave the person at an empty list with nowhere to type the login.
+        xbmc.executebuiltin("RunPlugin(%s)" % url(action="sign_in"))
 
 
 def get_client():
@@ -104,6 +112,8 @@ def root():
         rows = c.recordings().get("recordings", [])
         providers = c.sources()
     except api.VesperError as e:
+        # A server that wants a login is the common case: put the sign-in box first.
+        add(url(action="sign_in"), item("Sign in", plot="Type your username and password."), False)
         add(url(action="discover"), item("Find Vesper on this network"), False)
         add(url(action="settings"), item("Open settings"), False)
         say(str(e), error=True)
@@ -177,8 +187,8 @@ def discover():
         chosen = found[pick]
     common.set_setting("server", chosen["address"])
     if chosen.get("mode") == "full" and not common.setting("username"):
-        say("Found %s. It has accounts: enter your username and password in the settings." % chosen["name"])
-        xbmc.executebuiltin("Addon.OpenSettings(plugin.video.vesper)")
+        say("Found %s. It has accounts, so sign in." % chosen["name"])
+        sign_in()
     else:
         say("Connected to " + chosen["name"])
     refresh()
@@ -659,6 +669,30 @@ def test_connection():
         say("Connected. This server has no accounts (lite mode).")
 
 
+def sign_in():
+    """Asks for the username and password with Kodi's own keyboard, checks them against the server
+    and keeps them. The settings page has the same two fields; this is the quick way in."""
+    dialog = xbmcgui.Dialog()
+    name = dialog.input("Username", defaultt=common.setting("username")).strip()
+    if not name:
+        return
+    password = dialog.input("Password for " + name, option=xbmcgui.ALPHANUM_HIDE_INPUT)
+    if not password:
+        return
+    old = (common.setting("username"), common.setting("password"))
+    common.set_setting("username", name)
+    common.set_setting("password", password)
+    try:
+        c = common.client()
+    except api.VesperError as e:
+        # Wrong login: put back what was there so a working setup is not lost.
+        common.set_setting("username", old[0])
+        common.set_setting("password", old[1])
+        return say(str(e), error=True)
+    say("Signed in as %s." % (c.username or name) if c.mode == "full" else "Connected. This server has no accounts (lite mode).")
+    refresh()
+
+
 def sign_out():
     try:
         common.client(ready=False).sign_out()
@@ -752,6 +786,8 @@ def route(query):
         status()
     elif action == "test":
         test_connection()
+    elif action == "sign_in":
+        sign_in()
     elif action == "signout":
         sign_out()
     elif action == "register":

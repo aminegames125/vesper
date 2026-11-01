@@ -17,10 +17,31 @@ permissions:
   actions: write
 
 jobs:
+  # A push that only touches docs, the landing page or release tooling ships nothing, so it gets no
+  # version and no release. (scripts/changes.mjs decides; release commits are ignored.)
+  plan:
+    name: Does this push ship anything?
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release)') }}
+    runs-on: ubuntu-latest
+    outputs:
+      shipped: ${{ steps.parts.outputs.shipped }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: parts
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: node scripts/changes.mjs --base "$BEFORE" --head HEAD
+
   # A release only starts when the code passes the same checks as CI.
   check:
     name: Lint, typecheck and test
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release)') }}
+    needs: plan
+    if: ${{ needs.plan.outputs.shipped == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,9 +56,9 @@ jobs:
 
   version:
     name: Bump version, tag and release
-    needs: check
+    needs: [plan, check]
     # The commit made below starts with "chore(release)"; skipping it prevents a loop.
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release)') }}
+    if: ${{ needs.plan.outputs.shipped == 'true' && !startsWith(github.event.head_commit.message, 'chore(release)') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

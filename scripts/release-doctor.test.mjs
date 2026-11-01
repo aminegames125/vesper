@@ -83,6 +83,26 @@ test("a broken draft older than a published release is deleted, not retried", ()
   assert.match(out[0].why, /superseded by v0\.27\.2/);
 });
 
+test("a release that only changed Kodi expects only the Kodi files and needs no image", () => {
+  const kodiOnly = { server: false, kodi: true };
+  const names = full("v1.0.0").filter((n) => !n.startsWith("vesper-server-"));
+  assert.deepEqual(missingAssets("v1.0.0", names, kodiOnly), []);
+  const out = plan({
+    ...base,
+    drafts: [{ tag: "v1.0.0", assets: names }],
+    runs: [done],
+    imageExists: () => false,
+    partsOf: () => kodiOnly,
+  });
+  assert.equal(out[0].action, "publish");
+});
+
+test("a release that only changed the server does not wait for the Kodi files", () => {
+  const serverOnly = { server: true, kodi: false };
+  const names = full("v1.0.0").filter((n) => !n.startsWith("plugin.") && !n.startsWith("repository."));
+  assert.deepEqual(missingAssets("v1.0.0", names, serverOnly), []);
+});
+
 test("files without a Docker image are not published", () => {
   const out = plan({ ...base, drafts: [{ tag: "v1.0.0", assets: full("v1.0.0") }], runs: [done], imageExists: () => false });
   assert.equal(out[0].action, "retry");
