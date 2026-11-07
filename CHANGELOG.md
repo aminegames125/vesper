@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.28.3] - 2026-11-07 <!-- release: patch; push: 43; changes: 2 -->
+
+### Fixed
+- Follow SERVER_PORT when no bind address is set, so game panels that forward a port just work
+
+### Changed
+- Carry unchanged server and Kodi files into each release, and ship less by accident
+
 ## [0.28.2] - 2026-11-01 <!-- release: patch; push: 42; changes: 1 -->
 
 ### Fixed
