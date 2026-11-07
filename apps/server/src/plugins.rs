@@ -195,7 +195,7 @@ pub async fn run(
             "VESPER_API",
             format!(
                 "http://{}",
-                state.config.bind.replace("0.0.0.0", "127.0.0.1")
+                state.config.listen_addr().replace("0.0.0.0", "127.0.0.1")
             ),
         )
         .stdin(Stdio::piped())

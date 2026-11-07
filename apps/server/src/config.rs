@@ -35,9 +35,14 @@ pub struct Config {
     #[arg(long, env = "VESPER_MODE", value_enum, default_value = "lite")]
     pub mode: Mode,
 
-    /// Address to listen on.
-    #[arg(long, env = "VESPER_BIND", default_value = "0.0.0.0:8484")]
-    pub bind: String,
+    /// Address to listen on (default 0.0.0.0:8484, or the port in SERVER_PORT when a panel sets it).
+    #[arg(long, env = "VESPER_BIND")]
+    pub bind: Option<String>,
+
+    /// Port to listen on when no address is given. Game panels (Pterodactyl, FeatherPanel) set
+    /// SERVER_PORT to the port they forward, so the server follows the allocation by itself.
+    #[arg(long, env = "SERVER_PORT", hide = true)]
+    pub port: Option<u16>,
 
     /// Where the database and recordings are stored.
     #[arg(long, env = "VESPER_DATA_DIR", default_value = "data")]
@@ -71,6 +76,15 @@ pub struct Config {
 }
 
 impl Config {
+    /// The address to listen on: an explicit bind address, else 0.0.0.0 on SERVER_PORT, else 8484.
+    pub fn listen_addr(&self) -> String {
+        match (&self.bind, self.port) {
+            (Some(bind), _) => bind.clone(),
+            (None, Some(port)) => format!("0.0.0.0:{port}"),
+            (None, None) => "0.0.0.0:8484".to_string(),
+        }
+    }
+
     pub fn recordings_dir(&self) -> PathBuf {
         self.data_dir.join("recordings")
     }

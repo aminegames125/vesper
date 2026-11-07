@@ -121,17 +121,17 @@ async fn main() {
         )
         .with_state(state.clone());
 
-    let listener = tokio::net::TcpListener::bind(&state.config.bind)
+    let listener = tokio::net::TcpListener::bind(state.config.listen_addr())
         .await
         .unwrap_or_else(|e| {
-            eprintln!("Could not listen on {}: {e}", state.config.bind);
+            eprintln!("Could not listen on {}: {e}", state.config.listen_addr());
             std::process::exit(1);
         });
     info!(
         "Vesper Cloud {} ({} mode) listening on http://{}",
         env!("CARGO_PKG_VERSION"),
         state.config.mode.as_str(),
-        state.config.bind
+        state.config.listen_addr()
     );
     if !state.config.is_lite() && state.db.user_count() == 0 {
         info!("No accounts yet: open the admin panel to create the first administrator.");

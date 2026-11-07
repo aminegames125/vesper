@@ -36,7 +36,7 @@ COPY --from=build /repo/target/release/vesper-server /usr/local/bin/vesper-serve
 USER vesper
 VOLUME /data
 EXPOSE 8484
-ENV VESPER_DATA_DIR=/data VESPER_BIND=0.0.0.0:8484
+ENV VESPER_DATA_DIR=/data
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8484/api/v1/info >/dev/null || exit 1
+    CMD curl -fsS "http://127.0.0.1:${SERVER_PORT:-8484}/api/v1/info" >/dev/null || exit 1
 ENTRYPOINT ["vesper-server"]
