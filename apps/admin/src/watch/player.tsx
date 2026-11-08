@@ -235,6 +235,20 @@ export function Player({
           let mediaRecoveries = 0;
           let networkRetries = 0;
           instance.on(HlsLib.Events.ERROR, (_, data) => {
+            // Everything needed to tell a codec the browser lacks from a damaged stream.
+            console.warn("[vesper] player error", {
+              fatal: data.fatal,
+              type: data.type,
+              details: data.details,
+              reason: data.reason ?? data.error?.message,
+              status: data.response?.code,
+              codecs: { ...codecs },
+              canPlay: Object.fromEntries(
+                [codecs.audio, codecs.video]
+                  .filter((c): c is string => !!c)
+                  .map((c) => [c, MediaSource.isTypeSupported(`video/mp4; codecs="${c}"`)]),
+              ),
+            });
             if (!data.fatal) return;
             if (data.type === HlsLib.ErrorTypes.NETWORK_ERROR) {
               // A 404 on the playlist means the session is gone; retrying would only hammer the server.
