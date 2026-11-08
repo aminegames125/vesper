@@ -8,6 +8,7 @@ import "video.js/dist/video-js.css";
 import "./player.css";
 import { Icon, type IconName } from "../icons";
 import { EASE } from "../motion";
+import { absolute, ExternalPlayer } from "./external";
 import { clock, isPlayable, useMediaToken } from "./media";
 
 type VjsPlayer = ReturnType<typeof videojs>;
@@ -34,6 +35,7 @@ export function Player({
   onClose,
   onPlay,
   onRecord,
+  onExternal,
 }: {
   client: CloudClient;
   id: string;
@@ -41,6 +43,8 @@ export function Player({
   onPlay: (id: string) => void;
   /** Given for a live session: keeps what is being watched as a real recording. */
   onRecord?: () => Promise<void>;
+  /** Called when the address is shown for another player, so a live session is kept running. */
+  onExternal?: () => void;
 }) {
   const media = useMediaToken(client);
   const mount = useRef<HTMLDivElement>(null);
@@ -56,6 +60,7 @@ export function Player({
   const [level, setLevel] = useState(-1);
   const [panel, setPanel] = useState<Panel>(null);
   const [kept, setKept] = useState(false);
+  const [external, setExternal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [paused, setPaused] = useState(true);
 
@@ -382,6 +387,8 @@ export function Player({
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+      // A dialog over the player (the external player address) owns the keys while it is open.
+      if (document.querySelector("dialog[open]")) return;
       const p = player.current;
       if (!p) return;
       const handled = (fn: () => void) => {
@@ -486,6 +493,16 @@ export function Player({
                       })
                       .catch(() => say("Could not start the recording."))
                   }
+                />
+              )}
+              {rec && media !== null && (
+                <PlateButton
+                  icon="link"
+                  label="External player"
+                  onClick={() => {
+                    onExternal?.();
+                    setExternal(true);
+                  }}
                 />
               )}
               <PlateButton
@@ -633,6 +650,22 @@ export function Player({
       transition={{ duration: 0.3, ease: EASE }}
     >
       <div ref={mount} className="size-full" />
+      {external && rec && media !== null && (
+        <ExternalPlayer
+          title={rec.title}
+          onClose={() => setExternal(false)}
+          sources={[
+            {
+              label: "Through Vesper",
+              hint:
+                rec.status === "recording"
+                  ? "Streams from this server while it records. It keeps running as long as the other player stays connected."
+                  : "Plays from your library over the network.",
+              url: absolute(client.streamUrl(rec, media)),
+            },
+          ]}
+        />
+      )}
       {host && createPortal(overlay, host)}
     </motion.div>
   );

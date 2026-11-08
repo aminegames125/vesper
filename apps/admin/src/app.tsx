@@ -1,6 +1,14 @@
 import { CloudClient, type CloudUser, type ServerInfo } from "@vesper/cloud-client";
 import { AnimatePresence } from "framer-motion";
-import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { LogoMark } from "./logo";
 import { AuditPage } from "./pages/audit";
 import { Dashboard } from "./pages/dashboard";
@@ -125,6 +133,7 @@ function Workspace({
   useSpatialNavigation();
   const isAdmin = user.role === "admin";
   const { route: wanted, go } = useRoute(isAdmin ? "manage" : "watch");
+  const external = useRef(false);
   // Accounts that are not administrators only ever see the viewer.
   const route = isAdmin ? wanted : { ...wanted, space: "watch" as const };
   const lite = info.mode === "lite";
@@ -195,8 +204,14 @@ function Workspace({
             client={client}
             id={watching}
             onClose={() => {
-              void client.endWatch(watching);
+              // With the address handed to another player the session is left to end on its own,
+              // a minute after that player stops asking for it.
+              if (!external.current) void client.endWatch(watching);
+              external.current = false;
               go("watch", "live");
+            }}
+            onExternal={() => {
+              external.current = true;
             }}
             onPlay={(id) => go("watch", "play", id)}
             onRecord={async () => {

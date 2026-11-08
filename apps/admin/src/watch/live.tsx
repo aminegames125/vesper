@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { useLoad } from "../hooks";
 import { Icon } from "../icons";
 import { Button, Empty, Field, Modal, Notice, PageHeader, Select, Skeleton, when } from "../ui";
+import { ExternalPlayer } from "./external";
 
 const PAGE = 60;
 /** How long to wait for the first picture before giving up on a channel. */
@@ -341,6 +342,7 @@ function ChannelModal({
   const [guide, setGuide] = useState<Programme[] | null>(null);
   const [seconds, setSeconds] = useState("3600");
   const [busy, setBusy] = useState<"tune" | "rec" | null>(null);
+  const [external, setExternal] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const tuning = useRef<{ id: string | null; cancelled: boolean }>({ id: null, cancelled: false });
@@ -424,6 +426,19 @@ function ChannelModal({
 
   return (
     <Modal title={channel.name} onClose={onClose} wide>
+      {external && (
+        <ExternalPlayer
+          title={channel.name}
+          onClose={() => setExternal(false)}
+          sources={[
+            {
+              label: "Original address",
+              hint: "The channel's own address from your playlist. It plays straight from the provider and works with nearly any player or format.",
+              url: channel.url,
+            },
+          ]}
+        />
+      )}
       <Notice>{error}</Notice>
       {done && (
         <p className="mb-4 rounded-lg border border-line bg-sunken px-4 py-3 text-sm">{done}</p>
@@ -432,6 +447,9 @@ function ChannelModal({
       <div className="flex flex-wrap items-end gap-3">
         <Button variant="primary" icon="play" disabled={busy !== null} onClick={() => void watch()}>
           {busy === "tune" ? "Starting the channel…" : "Watch live"}
+        </Button>
+        <Button icon="link" onClick={() => setExternal(true)}>
+          External player
         </Button>
         <Button onClick={onFavorite} aria-pressed={favorite}>
           {favorite ? "★ Favorite" : "☆ Add to favorites"}
