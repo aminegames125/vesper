@@ -447,4 +447,64 @@ live
             "the playlist text must not be saved as a recording"
         );
     }
+
+    #[test]
+    fn segments_are_found_relative_to_where_a_redirected_playlist_was_served() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut stream = stream;
+                let mut buf = [0u8; 2048];
+                let n = stream.read(&mut buf).unwrap_or(0);
+                let head = String::from_utf8_lossy(&buf[..n]).to_string();
+                let path = head.split_whitespace().nth(1).unwrap_or("").to_string();
+                let mut packet = vec![0u8; 188 * 20];
+                for chunk in packet.chunks_mut(188) {
+                    chunk[0] = 0x47;
+                }
+                let (status, extra, body): (&str, &str, Vec<u8>) = match path.as_str() {
+                    "/live/42.m3u8" => (
+                        "302 Found",
+                        "Location: /edge/abc/index.m3u8
+",
+                        Vec::new(),
+                    ),
+                    "/edge/abc/index.m3u8" => (
+                        "200 OK",
+                        "",
+                        b"#EXTM3U
+#EXT-X-TARGETDURATION:2
+#EXTINF:2,
+seg0.ts
+#EXT-X-ENDLIST
+"
+                        .to_vec(),
+                    ),
+                    "/edge/abc/seg0.ts" => ("200 OK", "", packet),
+                    _ => ("404 Not Found", "", Vec::new()),
+                };
+                let head = format!(
+                    "HTTP/1.1 {status}
+{extra}Content-Length: {}
+Connection: close
+
+",
+                    body.len()
+                );
+                let _ = stream.write_all(head.as_bytes());
+                let _ = stream.write_all(&body);
+            }
+        });
+        let dir = std::env::temp_dir().join(format!("vesper-rec-redirect-{}", std::process::id()));
+        let options = Options::new(
+            format!("http://127.0.0.1:{port}/live/42.m3u8"),
+            30,
+            Output::Segments(dir.clone()),
+        );
+        let result = record(&options, &AtomicBool::new(false), |_| {});
+        let _ = std::fs::remove_dir_all(dir);
+        let summary = result.expect("the redirected playlist should record");
+        assert!(summary.bytes > 0);
+    }
 }

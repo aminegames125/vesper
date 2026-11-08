@@ -183,13 +183,17 @@ fn audio_rendition(lines: &[&str], group: &str, base: &Url) -> Option<Url> {
     preferred.or(first)
 }
 
-fn fetch_text(client: &Client, url: &Url) -> std::result::Result<String, reqwest::Error> {
-    client
+/// The playlist text and the address it was finally served from. Relative segment addresses are
+/// relative to that address, not to the one asked for, because providers often redirect a playlist
+/// to an edge server or a token path.
+fn fetch_text(client: &Client, url: &Url) -> std::result::Result<(String, Url), reqwest::Error> {
+    let response = client
         .get(url.clone())
         .timeout(Duration::from_secs(20))
         .send()
-        .and_then(|r| r.error_for_status())
-        .and_then(|r| r.text())
+        .and_then(|r| r.error_for_status())?;
+    let served = response.url().clone();
+    response.text().map(|body| (body, served))
 }
 
 fn fetch_bytes(client: &Client, url: &Url) -> Option<Vec<u8>> {
@@ -233,10 +237,10 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
         if !run.allows(&url) {
             return Err(Error::Blocked);
         }
-        let body = match fetch_text(client, &url) {
-            Ok(body) => {
+        let (body, served) = match fetch_text(client, &url) {
+            Ok(fetched) => {
                 failures = 0;
-                body
+                fetched
             }
             Err(e) => {
                 // A single failed fetch is normal on a live stream; give up only after several in a row.
@@ -252,7 +256,7 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
             }
         };
 
-        let media = match parse_with(&body, &url, lowest)? {
+        let media = match parse_with(&body, &served, lowest)? {
             Playlist::Master(master) => {
                 // A master that points back at a master would otherwise loop forever.
                 hops += 1;
@@ -280,7 +284,7 @@ pub(crate) fn record_hls<F: FnMut(Progress)>(
             let parsed = if run.allows(&track) {
                 fetch_text(client, &track)
                     .ok()
-                    .map(|body| parse_with(&body, &track, lowest))
+                    .map(|(body, served)| parse_with(&body, &served, lowest))
             } else {
                 None
             };
