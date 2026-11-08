@@ -8,7 +8,7 @@ import "video.js/dist/video-js.css";
 import "./player.css";
 import { Icon, type IconName } from "../icons";
 import { EASE } from "../motion";
-import { absolute, ExternalPlayer } from "./external";
+import { absolute, ExternalPlayer, linkHint, linkHours } from "./external";
 import { clock, isPlayable, useMediaToken } from "./media";
 import { downloadMp4 } from "./mp4";
 import { AfterScreen, BeforeScreen, FailedScreen } from "./stage";
@@ -72,6 +72,17 @@ export function Player({
   const rec = all.find((r) => r.id === id);
   const live = rec?.status === "recording" && rec.kind === "recording";
   const streamReady = rec?.status === "done" || (rec?.status === "recording" && ready);
+  // A short link (no token to type) when the server can make one, else the long address.
+  const openExternal = () => {
+    if (!rec || media === null) return;
+    onExternal?.();
+    const long = absolute(client.streamUrl(rec, media));
+    if (rec.kind === "download") return setExternal(long);
+    void client
+      .shareRecording(rec.id, linkHours(rec))
+      .then((r) => setExternal(absolute(r.short)))
+      .catch(() => setExternal(long));
+  };
   const upNext = useMemo(
     () =>
       all
@@ -527,20 +538,7 @@ export function Player({
                 />
               )}
               {rec && media !== null && (
-                <PlateButton
-                  icon="link"
-                  label="External player"
-                  onClick={() => {
-                    onExternal?.();
-                    // A short link (no token to type) when the server can make one, else the long address.
-                    const long = absolute(client.streamUrl(rec, media));
-                    if (rec.kind === "download") return setExternal(long);
-                    void client
-                      .shareRecording(rec.id, 24)
-                      .then((r) => setExternal(absolute(r.short)))
-                      .catch(() => setExternal(long));
-                  }}
-                />
+                <PlateButton icon="link" label="External player" onClick={openExternal} />
               )}
               <PlateButton
                 icon="bookmark"
@@ -673,7 +671,7 @@ export function Player({
         </div>
       )}
       {rec && (rec.status === "scheduled" || rec.status === "queued") && (
-        <BeforeScreen rec={rec} onClose={onClose} />
+        <BeforeScreen rec={rec} onClose={onClose} onExternal={openExternal} />
       )}
       {rec?.status === "failed" && <FailedScreen rec={rec} onClose={onClose} />}
       {rec && ended && rec.status === "done" && (
@@ -725,10 +723,7 @@ export function Player({
           sources={[
             {
               label: "Through Vesper",
-              hint:
-                rec.status === "recording"
-                  ? "Streams from this server while it records. It keeps running as long as the other player stays connected. The link works for 24 hours."
-                  : "Plays from your library over the network. The link works for 24 hours.",
+              hint: linkHint(rec),
               url: external,
             },
           ]}

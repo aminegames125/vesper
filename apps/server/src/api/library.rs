@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use axum::{
     extract::{Path, State},
-    http::HeaderMap,
-    response::Response,
+    http::{header, HeaderMap},
+    response::{IntoResponse, Response},
     Json,
 };
 use rusqlite::params;
@@ -207,7 +207,9 @@ pub async fn shared_playlist(
     playlist_text(&state, &owner, &id, "").await
 }
 
-/// A short link: `/s/<code>` is the playlist and `/s/<code>/<segment>` its pieces.
+/// A short link: `/s/<code>` is the playlist and `/s/<code>/<segment>` its pieces. Before the
+/// recording has video the playlist is the Vesper waiting screen, which turns into the recording by
+/// itself (see `slate`).
 pub async fn short_playlist(
     State(state): State<AppState>,
     Path(token): Path<String>,
@@ -217,7 +219,35 @@ pub async fn short_playlist(
     if crate::watch::is_session(&state, &id) {
         crate::watch::touch(&id);
     }
-    playlist_with(&state, &owner, &id, &format!("{token}/"), "").await
+    let status: String = state
+        .db
+        .conn()
+        .query_row("SELECT status FROM recordings WHERE id = ?1", [&id], |r| {
+            r.get(0)
+        })
+        .unwrap_or_default();
+    let raw = tokio::fs::read_to_string(recording_dir(&state, &owner, &id).join("index.m3u8"))
+        .await
+        .ok()
+        .filter(|text| text.contains("#EXTINF"));
+    let text = match (raw, status.as_str()) {
+        (Some(raw), _) if crate::slate::was_waiting(&id) => {
+            crate::slate::live_playlist(&token, &id, &raw, now())
+        }
+        (Some(_), _) => return playlist_with(&state, &owner, &id, &format!("{token}/"), "").await,
+        (None, "scheduled" | "queued" | "recording") => {
+            crate::slate::waiting_playlist(&token, &id, now())
+        }
+        (None, _) => return Err(ApiError::not_found("Nothing has been recorded yet.")),
+    };
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/vnd.apple.mpegurl"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        text,
+    )
+        .into_response())
 }
 
 pub async fn short_segment(
@@ -226,6 +256,16 @@ pub async fn short_segment(
     Path((token, name)): Path<(String, String)>,
 ) -> ApiResult<Response> {
     let (owner, id) = shared(&state, &token)?;
+    if crate::slate::clip_number(&name).is_some() {
+        return Ok((
+            [
+                (header::CONTENT_TYPE, "video/mp2t"),
+                (header::CACHE_CONTROL, "public, max-age=3600"),
+            ],
+            crate::slate::CLIP,
+        )
+            .into_response());
+    }
     segment_file(&state, &owner, &id, &name, &headers).await
 }
 

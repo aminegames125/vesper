@@ -280,7 +280,15 @@ You do not need Kodi to use Vesper. Open the server's address in a browser, sign
 - Search channels by name or group, then open one to **Watch live**, **Record** it now for 30 minutes, 1 hour, 2 hours or until you stop it, or **Record** a programme from the guide (a minute early, three minutes late; a programme that has not started is scheduled).
 - While watching, **Record this** keeps what you have seen and carries on recording.
 
-Watching works by capturing the channel on the server and playing it back as it grows, so the picture starts after a few seconds and lags the broadcast by about one segment. It is a recording that counts toward your concurrent-recording limit, is tagged `.watch`, and is left out of lists (`GET /recordings`), webhooks and plugin events. It ends by itself about a minute after the browser stops fetching its playlist, and its files are deleted. Nothing is re-encoded, so the browser must be able to play the provider's codecs (H.264 and AAC in practice).
+Watching works by capturing the channel on the server and playing it back as it grows, so the picture starts after a few seconds and lags the broadcast by about one segment. It is a recording that is tagged `.watch` and does not count toward your concurrent-recording limit or storage quota (each viewer can have two live channels open at once; the oldest ends when a third starts). It is left out of lists (`GET /recordings`), webhooks and plugin events. It ends by itself about a minute after the browser stops fetching its playlist, and its files are deleted. Nothing is re-encoded, so the browser must be able to play the provider's codecs (H.264 and AAC in practice).
+
+### Player addresses
+
+**External player** (in the player, on a Live TV channel, and in a Library item's menu as **Get player address**) gives an address you can open in VLC, mpv, Kodi or a phone's video app, which decode codecs a browser cannot. A recording's address is short, like `http://server:8484/s/Ab3dE9xQkz`, needs no sign-in, opens only that recording and lasts a day (for a recording that has not aired yet, until a day after it ends). A Live TV channel offers its original address from your playlist instead.
+
+You can take the address of a **scheduled** recording before it airs. Until the recording has video, the address is a live stream of the Vesper waiting screen (a looping clip built into the server, so it works without ffmpeg); when the recording starts, the same address carries on with it and the screen disappears, so the player never has to be reopened. While it runs the address behaves like a live channel (the newest few segments); once it has ended it lists the whole recording.
+
+**Download as MP4** (Library menu, player, and the finished screen) needs ffmpeg on the server. H.264 and HEVC video is copied into the MP4 as it is; anything else, such as MPEG-2 from broadcast, is encoded to H.264. The result is kept, so asking again is instant.
 
 ## Webhook
 

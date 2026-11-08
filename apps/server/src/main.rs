@@ -13,6 +13,7 @@ mod jobs;
 mod net;
 mod plugins;
 mod schedule;
+mod slate;
 mod state;
 mod tasks;
 mod watch;

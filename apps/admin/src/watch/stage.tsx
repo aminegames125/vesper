@@ -86,7 +86,15 @@ function Scanlines({ tone }: { tone: "wait" | "end" }) {
 }
 
 /** Before: it is scheduled and has not started. Counts down, then waits for the channel. */
-export function BeforeScreen({ rec, onClose }: { rec: CloudRecording; onClose: () => void }) {
+export function BeforeScreen({
+  rec,
+  onClose,
+  onExternal,
+}: {
+  rec: CloudRecording;
+  onClose: () => void;
+  onExternal: () => void;
+}) {
   const now = useSeconds();
   const left = rec.startAt - now;
   const due = left <= 0;
@@ -130,6 +138,14 @@ export function BeforeScreen({ rec, onClose }: { rec: CloudRecording; onClose: (
             `${dayOf(rec.startAt)} at ${clockOf(rec.startAt)}. This opens by itself when it starts.`
           )}
         </p>
+        <button
+          type="button"
+          onClick={onExternal}
+          className="vp-btn mt-8"
+          style={{ background: "#1E1E22" }}
+        >
+          Open in an external player
+        </button>
       </motion.div>
     </Frame>
   );

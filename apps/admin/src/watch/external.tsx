@@ -1,3 +1,4 @@
+import type { CloudRecording } from "@vesper/cloud-client";
 import { useState } from "react";
 import { Icon } from "../icons";
 import { Button, Modal } from "../ui";
@@ -22,6 +23,25 @@ const localOnly = (url: string) => {
     return false;
   }
 };
+
+/**
+ * How long a player address should last: a day, or for a recording that has not aired yet until a
+ * day after it is over (at most the server's 30 days).
+ */
+export function linkHours(rec: CloudRecording) {
+  if (rec.status !== "scheduled" && rec.status !== "queued") return 24;
+  const over = rec.startAt + Math.max(rec.maxSeconds, 0);
+  return Math.min(720, Math.max(24, Math.ceil((over - Date.now() / 1000) / 3600) + 24));
+}
+
+/** What choosing the address means, in words that fit where the recording is in its life. */
+export function linkHint(rec: CloudRecording) {
+  if (rec.status === "scheduled" || rec.status === "queued")
+    return "Open it now. Until the recording starts, the player shows the Vesper waiting screen; the picture appears by itself when it does. The link works until a day after it ends.";
+  if (rec.status === "recording")
+    return "Streams from this server while it records. It keeps running as long as the other player stays connected. The link works for 24 hours.";
+  return "Plays from your library over the network. The link works for 24 hours.";
+}
 
 /** An absolute address, since a player outside the browser cannot resolve a relative one. */
 export const absolute = (url: string) => new URL(url, window.location.href).href;

@@ -6,6 +6,7 @@ import { Icon } from "../icons";
 import { ActionMenu, Confirm, EmptyState, type MenuItem, useToast } from "../kit";
 import { EASE, useReveal } from "../motion";
 import { Button, Field, Modal, Notice, PageHeader, Segmented, Skeleton } from "../ui";
+import { absolute, ExternalPlayer, linkHint, linkHours } from "./external";
 import { MediaCard, resumable, useMediaToken } from "./media";
 import { downloadMp4 } from "./mp4";
 
@@ -37,6 +38,16 @@ export function Library({ client, onPlay }: { client: CloudClient; onPlay: (id: 
   }, [data, filter, query, folder]);
   const failed = (data?.recordings ?? []).filter((r) => r.status === "failed");
 
+  const [address, setAddress] = useState<{ rec: CloudRecording; url: string } | null>(null);
+  const showAddress = async (r: CloudRecording) => {
+    try {
+      const made = await client.shareRecording(r.id, linkHours(r));
+      setAddress({ rec: r, url: absolute(made.short) });
+    } catch (e) {
+      say(e instanceof Error ? e.message : "Could not make the address.", "error");
+    }
+  };
+
   const act = async (work: () => Promise<unknown>, done: string) => {
     try {
       await work();
@@ -49,6 +60,12 @@ export function Library({ client, onPlay }: { client: CloudClient; onPlay: (id: 
 
   const menu = (r: CloudRecording): MenuItem[] => {
     const items: MenuItem[] = [];
+    if (r.kind === "recording" && (r.status === "scheduled" || r.status === "queued"))
+      items.push({
+        label: "Get player address",
+        icon: "link",
+        onClick: () => void showAddress(r),
+      });
     if (r.status === "recording")
       items.push({
         label: "Stop recording",
@@ -69,6 +86,12 @@ export function Library({ client, onPlay }: { client: CloudClient; onPlay: (id: 
             r.watched ? "Marked as not watched" : "Marked as watched",
           ),
       });
+      if (r.kind === "recording")
+        items.push({
+          label: "Get player address",
+          icon: "link",
+          onClick: () => void showAddress(r),
+        });
       if (r.kind === "recording")
         items.push({
           label: "Download as MP4",
@@ -257,6 +280,13 @@ export function Library({ client, onPlay }: { client: CloudClient; onPlay: (id: 
           allowEmpty
           onClose={() => setMoving(null)}
           onSave={(tag) => act(() => client.patchRecording(moving.id, { tag }), "Moved")}
+        />
+      )}
+      {address && (
+        <ExternalPlayer
+          title={address.rec.title}
+          onClose={() => setAddress(null)}
+          sources={[{ label: "Through Vesper", hint: linkHint(address.rec), url: address.url }]}
         />
       )}
       {deleting && (
