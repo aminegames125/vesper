@@ -15,21 +15,21 @@
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@gsap/react": "^2.1.2",
     "@vesper/cloud-client": "workspace:*",
-    "framer-motion": "^12.43.0",
-    "gsap": "^3.15.0",
+    "framer-motion": "^14.9.1",
+    "gsap": "^3.15.1",
     "hls.js": "^1.7.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "video.js": "8.23.4"
+    "video.js": "10.3.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.2.0",
     "@types/video.js": "^7.3.58",
-    "@vitejs/plugin-react": "^6.1.2",
-    "tailwindcss": "^4.3.3",
-    "typescript": "^5.9.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "tailwindcss": "^4.3.4",
+    "typescript": "^7.0.2",
     "vite": "^8.3.5"
   }
 }
