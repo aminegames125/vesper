@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
-    "@fontsource-variable/geist": "^5.3.0",
     "@gsap/react": "^2.1.2",
     "@vesper/cloud-client": "workspace:*",
     "framer-motion": "^12.43.0",

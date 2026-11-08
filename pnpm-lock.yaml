@@ -17,10 +17,10 @@ importers:
 
   apps/admin:
     dependencies:
-      '@fontsource-variable/bricolage-grotesque':
+      '@fontsource-variable/atkinson-hyperlegible-next':
         specifier: ^5.3.0
         version: 5.3.0
-      '@fontsource-variable/geist':
+      '@fontsource-variable/bricolage-grotesque':
         specifier: ^5.3.0
         version: 5.3.0
       '@gsap/react':
@@ -191,11 +191,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@fontsource-variable/atkinson-hyperlegible-next@5.3.0':
+    resolution: {integrity: sha512-UnLzNUy1RWoLDfydAatP4NaRm99X/WbQEph7q/PymJnCFIOOwKOx3pBmp5ys8trO0dM+CKGuJgeZP9fAR4mQpA==}
+
   '@fontsource-variable/bricolage-grotesque@5.3.0':
     resolution: {integrity: sha512-TLi9Q4hJjS2UvoTMRSS2nHu6c4R56lAw60NR9QYtVRCHn0XtsFpiEhNffZ8Glsoxu6wEEwLKBP8lb94J52PNBA==}
-
-  '@fontsource-variable/geist@5.3.0':
-    resolution: {integrity: sha512-j0m+vLQuG5XAYoHtGCVu0spvlGreR3EzpECUVzkFmI1mTVnAO38l/NEPDCFgZ177JxzYJCLSmTQibIiYPilGrA==}
 
   '@gsap/react@2.1.2':
     resolution: {integrity: sha512-JqliybO1837UcgH2hVOM4VO+38APk3ECNrsuSM4MuXp+rbf+/2IG2K1YJiqfTcXQHH7XlA0m3ykniFYstfq0Iw==}
@@ -1006,9 +1006,9 @@ snapshots:
   '@biomejs/cli-win32-x64@2.6.4':
     optional: true
 
-  '@fontsource-variable/bricolage-grotesque@5.3.0': {}
+  '@fontsource-variable/atkinson-hyperlegible-next@5.3.0': {}
 
-  '@fontsource-variable/geist@5.3.0': {}
+  '@fontsource-variable/bricolage-grotesque@5.3.0': {}
 
   '@gsap/react@2.1.2(gsap@3.15.0)(react@19.3.1)':
     dependencies:

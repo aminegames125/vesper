@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/atkinson-hyperlegible-next";
 @import "@fontsource-variable/bricolage-grotesque/wdth.css";
 @import "./tokens.css";
 
@@ -17,7 +17,7 @@
   --color-dusk: var(--dusk);
   --color-ok: var(--ok);
   --color-warn: var(--warn);
-  --font-sans: "Geist Variable", system-ui, sans-serif;
+  --font-sans: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
   --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);

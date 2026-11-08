@@ -11,7 +11,7 @@ A broadcast graphics package for a home TV recorder, built for a living-room TV 
 
 ## Type
 - Headings and channel names: Bricolage Grotesque run condensed (`font-stretch: 78%`, weight 700, class `display`).
-- Text: Geist. Tabular numerals for every time, duration and size; running times sit right-aligned.
+- Text: Atkinson Hyperlegible Next (built for legibility at distance). Tabular numerals for every time, duration and size; running times sit right-aligned.
 - One rem for the whole app, `clamp(16px, 11px + 0.5vw, 26px)`, so a TV across the room reads like a laptop. Scale: 0.85 / 0.95 / 1.05 / 1.25 / 1.5 / 2 / 3 rem.
 
 ## Shape and depth

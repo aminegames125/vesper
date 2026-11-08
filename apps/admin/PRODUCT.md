@@ -24,7 +24,7 @@ Lite mode (no accounts, home network) and full mode (accounts: admin, user, gues
 - Must work with remote-style keyboard focus (arrows, Enter, Back) as well as touch and mouse.
 
 ## Brand Commitments
-Keep: the name Vesper, the four-scanline V logo mark (top bar in the accent colour), coral accent with violet secondary, Bricolage Grotesque for headings and Geist for text. The owner wants them used with intent, not replaced.
+Keep: the name Vesper, the four-scanline V logo mark (top bar in the accent colour), coral accent with cream as the second voice, Bricolage Grotesque for headings. Text is set in Atkinson Hyperlegible Next, chosen by the owner for legibility from across the room (it replaced Geist). The owner wants them used with intent, not replaced.
 
 ## Evidence on Hand
 Logo and brand assets in `brand/`. No testimonials or user counts exist; never invent any.
