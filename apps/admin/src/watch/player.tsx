@@ -207,11 +207,45 @@ export function Player({
             setLevels(data.levels.map((l) => ({ height: l.height })));
             begin();
           });
+          // What the channel is made of, so a failure can say why instead of looping silently.
+          const codecs: { audio?: string; video?: string } = {};
+          instance.on(HlsLib.Events.BUFFER_CODECS, (_, data) => {
+            codecs.audio = data.audio?.codec ?? codecs.audio;
+            codecs.video = data.video?.codec ?? codecs.video;
+          });
+          const describe = () => {
+            const bad = [codecs.audio, codecs.video].filter(
+              (c): c is string =>
+                !!c &&
+                !MediaSource.isTypeSupported(`video/mp4; codecs="${c}"`) &&
+                !MediaSource.isTypeSupported(`audio/mp4; codecs="${c}"`),
+            );
+            return bad.length
+              ? `This browser cannot decode ${bad.join(" and ")}. Try another browser, or record it and play it back elsewhere.`
+              : "This channel's video could not be decoded. Try another channel.";
+          };
+          let mediaRecoveries = 0;
+          let networkRetries = 0;
           instance.on(HlsLib.Events.ERROR, (_, data) => {
             if (!data.fatal) return;
-            if (data.type === HlsLib.ErrorTypes.NETWORK_ERROR) instance.startLoad();
-            else if (data.type === HlsLib.ErrorTypes.MEDIA_ERROR) instance.recoverMediaError();
-            else setProblem("The stream stopped working.");
+            if (data.type === HlsLib.ErrorTypes.NETWORK_ERROR) {
+              // A 404 on the playlist means the session is gone; retrying would only hammer the server.
+              if (data.response?.code === 404 || ++networkRetries > 5) {
+                setProblem(
+                  rec?.status === "recording"
+                    ? "The channel stopped sending. Go back and tune it again."
+                    : "This recording could not be loaded.",
+                );
+                instance.destroy();
+              } else instance.startLoad();
+            } else if (data.type === HlsLib.ErrorTypes.MEDIA_ERROR) {
+              mediaRecoveries += 1;
+              if (mediaRecoveries === 2) instance.swapAudioCodec();
+              if (mediaRecoveries > 3) {
+                setProblem(describe());
+                instance.destroy();
+              } else instance.recoverMediaError();
+            } else setProblem("The stream stopped working.");
           });
         } else if (el.canPlayType("application/vnd.apple.mpegurl")) {
           // Safari plays HLS natively.
