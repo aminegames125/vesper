@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.31.0] - 2026-11-08 <!-- release: minor; push: 48; changes: 1 -->
+
+### Added
+- Watch recordings live while they record
+
 ## [0.30.2] - 2026-11-08 <!-- release: patch; push: 47; changes: 1 -->
 
 ### Fixed
