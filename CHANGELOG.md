@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.33.0] - 2026-11-08 <!-- release: minor; push: 54; changes: 1 -->
+
+### Added
+- Before, now and after screens, short links, and full-mode limits fixed
+
 ## [0.32.0] - 2026-11-08 <!-- release: minor; push: 53; changes: 1 -->
 
 ### Added
