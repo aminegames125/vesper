@@ -28,6 +28,7 @@ export const MANAGE: NavItem[] = [
 
 export const WATCH: NavItem[] = [
   { id: "home", label: "Home", icon: "home" },
+  { id: "live", label: "Live TV", icon: "live" },
   { id: "library", label: "Library", icon: "library" },
 ];
 

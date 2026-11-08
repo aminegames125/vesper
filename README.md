@@ -60,6 +60,7 @@ flowchart LR
 | | |
 | --- | --- |
 | **Record from Kodi's own Live TV** | A **Record with Vesper** entry in the context menu of the channel list, the guide and guide search. A channel records now for 30 min, 1 h, 2 h or until you stop it. A programme records from the guide's times, a minute early and three minutes late, once, every day, every week, or every episode. |
+| **Or skip Kodi: use the web** | Open the server's address in any browser, sign in and use **Live TV** under Watch: add an M3U link or Xtream login, browse and search channels, **Watch live**, **Record** now or from the guide, and play your library. Pressing **Record this** while watching keeps what you have seen. See [Live TV in the browser](docs/SERVER.md#live-tv-in-the-browser). |
 | **Providers connected for you** | Playlists set up in PVR IPTV Simple Client are sent to the server once and re-checked every 6 hours. Channels are matched by name. |
 | **Watch and resume in Kodi** | Continue watching, recording now and coming up, all recordings with folders, your schedules (edit, pause, run now) and a server status screen. Kodi offers to resume; the position is kept on the server. Notifications tell you when a recording starts, finishes or fails. |
 | **Plays while it records** | Recordings are HLS, so an item that is still recording can be opened from the start. |

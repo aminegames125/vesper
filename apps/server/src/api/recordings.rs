@@ -96,6 +96,7 @@ pub async fn list(
     let mut stmt = conn.prepare(&format!(
         "SELECT {COLUMNS} FROM recordings
          WHERE user_id = ?1
+           AND (tag != '.watch' OR ?2 = '.watch')
            AND (?2 = '' OR tag = ?2)
            AND (?3 = '' OR title LIKE '%' || ?3 || '%')
            AND (?4 = '' OR kind = ?4)
@@ -108,7 +109,7 @@ pub async fn list(
         )?
         .collect::<Result<Vec<_>, _>>()?;
     let mut tags = conn.prepare(
-        "SELECT DISTINCT tag FROM recordings WHERE user_id = ?1 AND tag != '' ORDER BY tag",
+        "SELECT DISTINCT tag FROM recordings WHERE user_id = ?1 AND tag != '' AND tag != '.watch' ORDER BY tag",
     )?;
     let tags = tags
         .query_map([&user.id], |r| r.get::<_, String>(0))?
@@ -538,7 +539,10 @@ pub async fn playlist(
     parts: Parts,
     Path(id): Path<String>,
 ) -> ApiResult<Response> {
-    let (_, owner) = owned(&state, &user, &id)?;
+    let (value, owner) = owned(&state, &user, &id)?;
+    if value["tag"] == crate::watch::TAG {
+        crate::watch::touch(&id);
+    }
     let suffix = bearer(&parts)
         .map(|t| format!("?token={t}"))
         .unwrap_or_default();

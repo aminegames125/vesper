@@ -34,6 +34,9 @@ export interface Session {
   user: CloudUser;
 }
 
+/** The hidden folder the server keeps browser watch sessions in. */
+export const WATCH_TAG = ".watch";
+
 export type RecordingStatus = "queued" | "scheduled" | "recording" | "done" | "failed";
 
 export interface CloudRecording {
@@ -571,6 +574,40 @@ export class CloudClient {
   exportUrl = (id: string) =>
     `${this.baseUrl}/api/v1/recordings/${id}/export.mp4${this.token ? `?token=${this.token}` : ""}`;
   createRecording = (body: NewRecording) => this.post<{ id: string }>("/recordings", body);
+  getRecording = (id: string) => this.get<CloudRecording>(`/recordings/${id}`);
+  /**
+   * Starts watching a channel from the browser: the server captures it to a hidden, self-deleting
+   * recording that plays while it grows. Open the returned id in the player; it ends by itself a
+   * minute after nobody fetches it, or right away with `endWatch`.
+   */
+  watchChannel = (channel: { name: string; url: string; alt?: string[] }) =>
+    this.createRecording({
+      title: `Live: ${channel.name}`,
+      channel_name: channel.name,
+      url: channel.url,
+      backup_url: channel.alt?.[0],
+      seconds: 0,
+      keep_hours: 1,
+      tag: WATCH_TAG,
+    });
+  /** True once a recording has a playlist with at least one segment, so it can be played. */
+  playlistReady = async (id: string) => {
+    try {
+      const headers: Record<string, string> = {};
+      if (this.token) headers.authorization = `Bearer ${this.token}`;
+      const response = await this.doFetch(`${this.baseUrl}/api/v1/recordings/${id}/index.m3u8`, {
+        headers,
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      return response.ok && (await response.text()).includes("#EXTINF");
+    } catch {
+      return false;
+    }
+  };
+  endWatch = async (id: string) => {
+    await this.stopRecording(id).catch(() => {});
+    await this.deleteRecording(id).catch(() => {});
+  };
   stopRecording = (id: string) => this.post<{ ok: boolean }>(`/recordings/${id}/stop`);
   deleteRecording = (id: string) => this.request<{ ok: boolean }>("DELETE", `/recordings/${id}`);
   keepRecording = (id: string, hours: number) =>

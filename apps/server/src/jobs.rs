@@ -442,6 +442,10 @@ fn after_finish(
     let Some((title, status, seconds, bytes, error, schedule_id, series_id, own_hook)) = row else {
         return;
     };
+    // Watching a channel from the web is not a recording anyone asked to hear about.
+    if crate::watch::is_session(state, id) {
+        return;
+    }
 
     crate::plugins::emit(
         state,

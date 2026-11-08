@@ -15,6 +15,7 @@ mod plugins;
 mod schedule;
 mod state;
 mod tasks;
+mod watch;
 mod web;
 mod ytdlp;
 

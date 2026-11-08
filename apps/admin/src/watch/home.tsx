@@ -58,6 +58,9 @@ export function WatchHome({
               {resume[0] ? "Resume" : "Play latest"}
             </Button>
           )}
+          <Button icon="live" onClick={() => go("watch", "live")}>
+            Live TV
+          </Button>
           <Button onClick={() => go("watch", "library")}>Browse library</Button>
         </div>
         {data.storageLimit > 0 && (

@@ -16,6 +16,7 @@ import { Shell } from "./shell";
 import { Button, Field, Notice } from "./ui";
 import { WatchHome } from "./watch/home";
 import { Library } from "./watch/library";
+import { LiveTv } from "./watch/live";
 import { Player } from "./watch/player";
 
 const TOKEN_KEY = "vesper-admin-token";
@@ -140,22 +141,33 @@ function Workspace({
     content = {
       home: <WatchHome client={client} user={user} onPlay={open} go={go} />,
       library: <Library client={client} onPlay={open} />,
+      live: <LiveTv client={client} onWatch={(id) => go("watch", "tv", id)} />,
     }[route.page] ?? <WatchHome client={client} user={user} onPlay={open} go={go} />;
   }
 
   const playing = route.space === "watch" && route.page === "play" ? route.param : undefined;
+  // A channel being watched live (`#/watch/tv/<session>`), played over the Live TV page.
+  const watching = route.space === "watch" && route.page === "tv" ? route.param : undefined;
 
   return (
     <>
       <Shell
-        route={playing ? { ...route, page: "library" } : route}
+        route={
+          playing ? { ...route, page: "library" } : watching ? { ...route, page: "live" } : route
+        }
         go={go}
         info={info}
         user={user}
         isAdmin={isAdmin}
         onSignOut={onSignOut}
       >
-        {playing ? <Library client={client} onPlay={(id) => go("watch", "play", id)} /> : content}
+        {playing ? (
+          <Library client={client} onPlay={(id) => go("watch", "play", id)} />
+        ) : watching ? (
+          <LiveTv client={client} onWatch={(id) => go("watch", "tv", id)} />
+        ) : (
+          content
+        )}
       </Shell>
       <AnimatePresence>
         {playing && (
@@ -165,6 +177,21 @@ function Workspace({
             id={playing}
             onClose={() => go("watch", "library")}
             onPlay={(id) => go("watch", "play", id)}
+          />
+        )}
+        {watching && (
+          <Player
+            key={watching}
+            client={client}
+            id={watching}
+            onClose={() => {
+              void client.endWatch(watching);
+              go("watch", "live");
+            }}
+            onPlay={(id) => go("watch", "play", id)}
+            onRecord={async () => {
+              await client.patchRecording(watching, { tag: "", keep_hours: 168 });
+            }}
           />
         )}
       </AnimatePresence>

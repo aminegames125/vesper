@@ -13,6 +13,7 @@ static LAST_WAKE: Mutex<Option<i64>> = Mutex::new(None);
 /// Called every 5 seconds with a counter that starts at 1.
 pub fn run(state: &AppState, tick: u64) {
     start_queued_downloads(state);
+    crate::watch::sweep(state);
     if tick.is_multiple_of(6) {
         retry_failed(state);
         crate::epg::match_series(state);

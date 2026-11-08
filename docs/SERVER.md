@@ -272,6 +272,16 @@ Recordings can have a **folder** (`tag`), a **watched** mark and a **resume posi
 
 `POST /api/v1/sources` saves an M3U link (`"kind": "m3u"`) or an Xtream login (`"kind": "xtream"`, with `username` and `password`) and checks it right away. `GET /api/v1/channels?source=ID&q=news&group=News&offset=0&limit=100` returns the channels with their stream addresses, group and logo, so a client can offer a channel picker. Lists are cached for ten minutes.
 
+## Live TV in the browser
+
+You do not need Kodi to use Vesper. Open the server's address in a browser, sign in (lite mode needs no login) and pick **Watch**, then **Live TV**:
+
+- **Playlists** adds or removes an M3U link or an Xtream login, the same sources the Kodi add-on sends.
+- Search channels by name or group, then open one to **Watch live**, **Record** it now for 30 minutes, 1 hour, 2 hours or until you stop it, or **Record** a programme from the guide (a minute early, three minutes late; a programme that has not started is scheduled).
+- While watching, **Record this** keeps what you have seen and carries on recording.
+
+Watching works by capturing the channel on the server and playing it back as it grows, so the picture starts after a few seconds and lags the broadcast by about one segment. It is a recording that counts toward your concurrent-recording limit, is tagged `.watch`, and is left out of lists (`GET /recordings`), webhooks and plugin events. It ends by itself about a minute after the browser stops fetching its playlist, and its files are deleted. Nothing is re-encoded, so the browser must be able to play the provider's codecs (H.264 and AAC in practice).
+
 ## Webhook
 
 Set a **webhook address** in the admin panel (Settings, Notifications); a schedule can have its own. Messages wait out the **quiet hours** you set there. When a recording finishes or fails, or a channel that schedules use stops answering (checked once a day), Vesper posts JSON to it: `event`, `id`, `title`, `seconds`, `bytes`, `error`, plus `content` and `text` with a readable sentence so Discord, ntfy and Slack-style hooks show something useful.

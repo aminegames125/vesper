@@ -28,12 +28,16 @@ export function Player({
   id,
   onClose,
   onPlay,
+  onRecord,
 }: {
   client: CloudClient;
   id: string;
   onClose: () => void;
   onPlay: (id: string) => void;
+  /** Given for a live session: keeps what is being watched as a real recording. */
+  onRecord?: () => Promise<void>;
 }) {
+  const [kept, setKept] = useState(false);
   const media = useMediaToken(client);
   const box = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
@@ -82,7 +86,13 @@ export function Player({
     let alive = true;
     void client
       .listRecordings()
-      .then((r) => alive && setAll(r.recordings))
+      .then(async (r) => {
+        // A live session from the Live TV page is hidden from lists; load it by id.
+        const own = r.recordings.some((x) => x.id === id)
+          ? null
+          : await client.getRecording(id).catch(() => null);
+        if (alive) setAll(own ? [own, ...r.recordings] : r.recordings);
+      })
       .catch((e) => alive && setProblem(e instanceof Error ? e.message : "Could not load."));
     void client
       .bookmarks(id)
@@ -516,10 +526,29 @@ export function Player({
                   {rec?.channelName || (rec?.kind === "download" ? "Download" : "From Kodi")}
                 </p>
               </div>
-              {live && (
-                <span className="ml-auto inline-flex items-center rounded bg-raised px-2.5 py-1 text-xs font-semibold text-paper">
-                  Still being saved
-                </span>
+              {onRecord ? (
+                <button
+                  type="button"
+                  disabled={kept}
+                  onClick={() =>
+                    void onRecord()
+                      .then(() => {
+                        setKept(true);
+                        say("Recording. Find it in your library.");
+                      })
+                      .catch(() => say("Could not start the recording."))
+                  }
+                  className="ml-auto inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-110 disabled:opacity-60"
+                >
+                  <Icon name="rec" size={16} />
+                  {kept ? "Recording" : "Record this"}
+                </button>
+              ) : (
+                live && (
+                  <span className="ml-auto inline-flex items-center rounded bg-raised px-2.5 py-1 text-xs font-semibold text-paper">
+                    Still being saved
+                  </span>
+                )
               )}
             </motion.div>
 
