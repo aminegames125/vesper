@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.31.2] - 2026-11-08 <!-- release: patch; push: 50; changes: 1 -->
+
+### Fixed
+- Stop the player retrying forever and say why a channel cannot play
+
 ## [0.31.1] - 2026-11-08 <!-- release: patch; push: 49; changes: 1 -->
 
 ### Fixed
