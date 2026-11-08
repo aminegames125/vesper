@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.30.0] - 2026-11-08 <!-- release: minor; push: 45; changes: 1 -->
+
+### Added
+- Redesign the web app as a TV-first broadcast package, new video.js player, full Kodi parity
+
 ## [0.29.0] - 2026-11-08 <!-- release: minor; push: 44; changes: 2 -->
 
 ### Added
