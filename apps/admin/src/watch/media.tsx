@@ -87,6 +87,12 @@ export function MediaCard({
           )}
           {rec.status === "done" && rec.watched && <Badge>watched</Badge>}
         </div>
+        {rec.status === "recording" && rec.kind === "recording" && (
+          <span className="absolute bottom-2.5 right-2.5 inline-flex items-center gap-2 rounded-md bg-accent px-2.5 py-1 text-sm font-bold text-on-accent tabular">
+            <span className="size-2 animate-pulse rounded-full bg-on-accent" />
+            LIVE {formatDuration(rec.seconds)}
+          </span>
+        )}
         {rec.status === "done" && rec.kind === "recording" && (
           <span className="absolute bottom-2.5 right-2.5 rounded-md bg-black/80 px-2 py-1 text-sm font-semibold text-white tabular">
             {formatDuration(rec.seconds)}

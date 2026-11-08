@@ -174,6 +174,11 @@ export function RecordingNow({
           </div>
         )}
       </div>
+      {onOpen && (
+        <Button variant="primary" icon="play" onClick={() => onOpen(rec.id)}>
+          Watch live
+        </Button>
+      )}
       <Button
         variant="danger"
         disabled={stopping}

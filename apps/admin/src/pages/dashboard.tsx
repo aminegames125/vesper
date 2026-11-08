@@ -16,7 +16,7 @@ export function Dashboard({
   go,
 }: {
   client: CloudClient;
-  go: (space: Space, page: string) => void;
+  go: (space: Space, page: string, id?: string) => void;
 }) {
   const page = useRef<HTMLDivElement>(null);
   const { data: stats, error } = useLoad(() => client.admin.stats(), 5000);
@@ -108,7 +108,7 @@ export function Dashboard({
                       rec={r}
                       client={client}
                       onChanged={() => void reload()}
-                      onOpen={() => go("watch", "library")}
+                      onOpen={(id) => go("watch", "play", id)}
                     />
                   ))}
                 </AnimatePresence>
