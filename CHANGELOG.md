@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.31.3] - 2026-11-08 <!-- release: patch; push: 51; changes: 1 -->
+
+### Fixed
+- Send the account token with every player request
+
 ## [0.31.2] - 2026-11-08 <!-- release: patch; push: 50; changes: 1 -->
 
 ### Fixed
