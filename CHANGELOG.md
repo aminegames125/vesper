@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.30.1] - 2026-11-08 <!-- release: patch; push: 46; changes: 1 -->
+
+### Changed
+- Set text in Atkinson Hyperlegible Next for legibility from the sofa
+
 ## [0.30.0] - 2026-11-08 <!-- release: minor; push: 45; changes: 1 -->
 
 ### Added
