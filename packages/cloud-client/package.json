@@ -1,6 +1,6 @@
 {
   "name": "@vesper/cloud-client",
-  "version": "0.28.3",
+  "version": "0.29.0",
   "private": true,
   "type": "module",
   "description": "Typed client for the Vesper Cloud server API, shared by the app and the admin panel.",

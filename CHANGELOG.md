@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.29.0] - 2026-11-08 <!-- release: minor; push: 44; changes: 2 -->
+
+### Added
+- Watch and record live TV from the browser, no Kodi needed
+- Ask for the server address when signing in
+
 ## [0.28.3] - 2026-11-07 <!-- release: patch; push: 43; changes: 2 -->
 
 ### Fixed
