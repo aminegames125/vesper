@@ -350,18 +350,60 @@ pub async fn export(
         let input = dir.join("index.m3u8");
         let partial = dir.join("export.tmp.mp4");
         let (i, o) = (input.to_string_lossy(), partial.to_string_lossy());
-        let copied = ffmpeg::run(
-            &["-i", &i, "-c", "copy", "-bsf:a", "aac_adtstoasc", &o],
-            Duration::from_secs(900),
-        )
-        .await
-            // Audio that is not AAC cannot be copied into MP4; convert only the sound.
-            || ffmpeg::run(
-                &["-i", &i, "-c:v", "copy", "-c:a", "aac", &o],
+        // H.264 and HEVC go into an MP4 untouched. Anything else (MPEG-2 from broadcast, old codecs)
+        // would make an MP4 that most players refuse, so it is encoded to H.264 instead.
+        let video = ffmpeg::video_codec(&input).await;
+        let copyable = video
+            .as_deref()
+            .is_none_or(|codec| matches!(codec, "h264" | "hevc"));
+        let mut converted = false;
+        if copyable {
+            converted = ffmpeg::run(
+                &[
+                    "-i",
+                    &i,
+                    "-c",
+                    "copy",
+                    "-bsf:a",
+                    "aac_adtstoasc",
+                    "-movflags",
+                    "+faststart",
+                    &o,
+                ],
                 Duration::from_secs(900),
             )
+            .await
+                // Audio that is not AAC cannot be copied into MP4; convert only the sound.
+                || ffmpeg::run(
+                    &["-i", &i, "-c:v", "copy", "-c:a", "aac", "-movflags", "+faststart", &o],
+                    Duration::from_secs(900),
+                )
+                .await;
+        }
+        if !converted {
+            converted = ffmpeg::run(
+                &[
+                    "-i",
+                    &i,
+                    "-c:v",
+                    "libx264",
+                    "-preset",
+                    "veryfast",
+                    "-crf",
+                    "23",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    "-movflags",
+                    "+faststart",
+                    &o,
+                ],
+                Duration::from_secs(3 * 3600),
+            )
             .await;
-        if !copied || std::fs::rename(&partial, &output).is_err() {
+        }
+        if !converted || std::fs::rename(&partial, &output).is_err() {
             let _ = std::fs::remove_file(&partial);
             return Err(ApiError::bad("The recording could not be converted."));
         }

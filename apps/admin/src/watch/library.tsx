@@ -7,6 +7,7 @@ import { ActionMenu, Confirm, EmptyState, type MenuItem, useToast } from "../kit
 import { EASE, useReveal } from "../motion";
 import { Button, Field, Modal, Notice, PageHeader, Segmented, Skeleton } from "../ui";
 import { MediaCard, resumable, useMediaToken } from "./media";
+import { downloadMp4 } from "./mp4";
 
 type Filter = "all" | "now" | "unwatched" | "downloads";
 
@@ -68,6 +69,12 @@ export function Library({ client, onPlay }: { client: CloudClient; onPlay: (id: 
             r.watched ? "Marked as not watched" : "Marked as watched",
           ),
       });
+      if (r.kind === "recording")
+        items.push({
+          label: "Download as MP4",
+          icon: "download",
+          onClick: () => void downloadMp4(client, r, media, say),
+        });
       items.push({
         label: r.keepHours === null ? "Delete automatically again" : "Keep forever",
         icon: "bookmark",

@@ -55,6 +55,40 @@ pub async fn run(args: &[&str], limit: Duration) -> bool {
     }
 }
 
+/// The video codec of `input` (`h264`, `hevc`, `mpeg2video`, ...), read from what `ffmpeg -i` prints.
+pub async fn video_codec(input: &Path) -> Option<String> {
+    if !available() {
+        return None;
+    }
+    let output = tokio::time::timeout(
+        Duration::from_secs(30),
+        Command::new(binary())
+            .args([
+                "-hide_banner",
+                "-nostdin",
+                "-protocol_whitelist",
+                "file,crypto",
+                "-i",
+            ])
+            .arg(input)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .output(),
+    )
+    .await
+    .ok()?
+    .ok()?;
+    // "Stream #0:0: Video: h264 (High), yuv420p, ..." -- the word after "Video:" is the codec.
+    String::from_utf8_lossy(&output.stderr)
+        .lines()
+        .find_map(|line| line.split("Video: ").nth(1))
+        .and_then(|rest| rest.split([' ', ',', '(']).next())
+        .map(str::to_string)
+        .filter(|codec| !codec.is_empty())
+}
+
 /// Writes one frame of `input` as a small JPEG.
 pub async fn thumbnail(input: &Path, output: &Path) -> bool {
     let (input, output) = (input.to_string_lossy(), output.to_string_lossy());

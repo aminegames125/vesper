@@ -141,6 +141,7 @@ export function AfterScreen({
   next,
   onReplay,
   onKeep,
+  onDownload,
   onPlay,
   onClose,
 }: {
@@ -148,6 +149,7 @@ export function AfterScreen({
   next: CloudRecording[];
   onReplay: () => void;
   onKeep: () => void;
+  onDownload: () => void;
   onPlay: (id: string) => void;
   onClose: () => void;
 }) {
@@ -192,6 +194,11 @@ export function AfterScreen({
             <button type="button" onClick={onKeep} className="vp-btn" disabled={kept}>
               {kept ? "Kept for good" : "Keep it"}
             </button>
+            {rec.kind === "recording" && (
+              <button type="button" onClick={onDownload} className="vp-btn">
+                Download MP4
+              </button>
+            )}
           </div>
           {next.length > 0 && (
             <div className="mt-10">

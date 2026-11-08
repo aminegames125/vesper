@@ -10,6 +10,7 @@ import { Icon, type IconName } from "../icons";
 import { EASE } from "../motion";
 import { absolute, ExternalPlayer } from "./external";
 import { clock, isPlayable, useMediaToken } from "./media";
+import { downloadMp4 } from "./mp4";
 import { AfterScreen, BeforeScreen, FailedScreen } from "./stage";
 
 type VjsPlayer = ReturnType<typeof videojs>;
@@ -518,6 +519,13 @@ export function Player({
                   }
                 />
               )}
+              {rec?.status === "done" && rec.kind === "recording" && media !== null && (
+                <PlateButton
+                  icon="download"
+                  label="Download MP4"
+                  onClick={() => void downloadMp4(client, rec, media, (t) => say(t))}
+                />
+              )}
               {rec && media !== null && (
                 <PlateButton
                   icon="link"
@@ -674,6 +682,7 @@ export function Player({
           next={upNext}
           onClose={onClose}
           onPlay={onPlay}
+          onDownload={() => void downloadMp4(client, rec, media, (t) => say(t))}
           onReplay={() => {
             const p = player.current;
             if (!p) return;

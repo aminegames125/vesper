@@ -473,7 +473,12 @@ export class CloudClient {
     this.doFetch = options.fetch ?? ((...args) => fetch(...args));
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    timeoutMs = this.timeoutMs,
+  ): Promise<T> {
     const headers: Record<string, string> = {};
     if (this.token) headers.authorization = `Bearer ${this.token}`;
     if (body !== undefined) headers["content-type"] = "application/json";
@@ -483,7 +488,7 @@ export class CloudClient {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (e) {
       const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
@@ -569,13 +574,16 @@ export class CloudClient {
       expiresAt: number;
     }>(`/recordings/${id}/share`, { hours });
   /** Needs ffmpeg on the server (see `status().ffmpeg`). */
-  exportRecording = (id: string) => this.post<{ path: string }>(`/recordings/${id}/export`);
+  exportRecording = (id: string) =>
+    // Converting a long recording takes minutes, far past the usual wait for an answer.
+    this.request<{ path: string }>("POST", `/recordings/${id}/export`, {}, 45 * 60_000);
   trimRecording = (id: string, fromS: number, toS: number) =>
     this.post<{ id: string }>(`/recordings/${id}/trim`, { from_s: fromS, to_s: toS });
   thumbUrl = (id: string) =>
     `${this.baseUrl}/api/v1/recordings/${id}/thumb.jpg${this.token ? `?token=${this.token}` : ""}`;
-  exportUrl = (id: string) =>
-    `${this.baseUrl}/api/v1/recordings/${id}/export.mp4${this.token ? `?token=${this.token}` : ""}`;
+  /** The converted MP4 as a download. Pass the media token so the account's own token stays out of the address. */
+  exportUrl = (id: string, mediaToken = this.token ?? "") =>
+    `${this.baseUrl}/api/v1/recordings/${id}/export.mp4${mediaToken ? `?token=${encodeURIComponent(mediaToken)}` : ""}`;
   createRecording = (body: NewRecording) => this.post<{ id: string }>("/recordings", body);
   getRecording = (id: string) => this.get<CloudRecording>(`/recordings/${id}`);
   /**
