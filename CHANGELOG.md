@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.35.0] - 2026-11-08 <!-- release: minor; push: 56; changes: 1 -->
+
+### Added
+- External player address before a recording airs, with a Vesper waiting screen
+
 ## [0.34.0] - 2026-11-08 <!-- release: minor; push: 55; changes: 1 -->
 
 ### Added
