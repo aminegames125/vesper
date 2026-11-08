@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.30.2] - 2026-11-08 <!-- release: patch; push: 47; changes: 1 -->
+
+### Fixed
+- Follow HLS served from addresses without .m3u8, show the real start error
+
 ## [0.30.1] - 2026-11-08 <!-- release: patch; push: 46; changes: 1 -->
 
 ### Changed
