@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.32.0] - 2026-11-08 <!-- release: minor; push: 53; changes: 1 -->
+
+### Added
+- Hand a live channel or recording to an external player
+
 ## [0.31.4] - 2026-11-08 <!-- release: patch; push: 52; changes: 1 -->
 
 ### Changed
