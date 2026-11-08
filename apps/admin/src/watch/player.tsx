@@ -199,7 +199,15 @@ export function Player({
       void import("hls.js").then(({ default: HlsLib }) => {
         if (gone) return;
         if (HlsLib.isSupported()) {
-          const instance = new HlsLib({ lowLatencyMode: false, backBufferLength: 60 });
+          const instance = new HlsLib({
+            lowLatencyMode: false,
+            backBufferLength: 60,
+            // The account's own token rides on every playlist and segment request, so playback does
+            // not depend on the separate media token in the address having been issued or kept.
+            xhrSetup: (xhr) => {
+              if (client.token) xhr.setRequestHeader("Authorization", `Bearer ${client.token}`);
+            },
+          });
           hls.current = instance;
           instance.attachMedia(el);
           instance.loadSource(src);
