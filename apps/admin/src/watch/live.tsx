@@ -382,7 +382,7 @@ function ChannelModal({
           throw new Error(rec.error || "The channel did not start.");
         }
         if (Date.now() - started > TUNE_TIMEOUT) {
-          throw new Error("The channel took too long to start. Try another one.");
+          throw new Error(rec.error || "The channel took too long to start. Try another one.");
         }
         await new Promise((r) => setTimeout(r, 1500));
       }

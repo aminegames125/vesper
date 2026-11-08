@@ -229,17 +229,26 @@ pub fn record(
     };
 
     let is_hls = url.path().to_lowercase().ends_with(".m3u8");
-    let outcome = if is_hls {
+    let hls = |client: &Client, url: Url, sink: &mut dyn Sink, run: &mut Run<'_, _>| {
         hls::record_hls(
-            &client,
+            client,
             url,
-            sink.as_mut(),
-            &mut run,
+            sink,
+            run,
             options.lowest_quality,
             options.require_audio,
         )
+    };
+    let outcome = if is_hls {
+        hls(&client, url, sink.as_mut(), &mut run)
     } else {
-        record_raw(&client, url, sink.as_mut(), &mut run)
+        // Many providers serve HLS from addresses with no `.m3u8` in them, so the response, not the
+        // address, decides how the stream is followed.
+        match record_raw(&client, url, sink.as_mut(), &mut run) {
+            Ok(Some(playlist)) => hls(&client, playlist, sink.as_mut(), &mut run),
+            Ok(None) => Ok(()),
+            Err(e) => Err(e),
+        }
     };
     sink.finish(!options.more_to_come)?;
 
@@ -267,7 +276,7 @@ fn record_raw<F: FnMut(Progress)>(
     url: Url,
     sink: &mut dyn Sink,
     run: &mut Run<'_, F>,
-) -> Result<()> {
+) -> Result<Option<Url>> {
     const PACKET: usize = 188;
     const CHUNK: Duration = Duration::from_secs(10);
 
@@ -279,6 +288,12 @@ fn record_raw<F: FnMut(Progress)>(
         .send()
         .and_then(|r| r.error_for_status())
         .map_err(|e| Error::Http(e.without_url().to_string()))?;
+    let announced_playlist = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|t| t.to_lowercase().contains("mpegurl"));
+    let final_url = response.url().clone();
     // Reads happen on their own thread so a silent connection cannot block Stop or the silence check.
     let (tx, rx) = mpsc::sync_channel::<std::io::Result<Vec<u8>>>(16);
     thread::spawn(move || {
@@ -317,6 +332,18 @@ fn record_raw<F: FnMut(Progress)>(
         last_data = Instant::now();
         match received {
             Ok(data) => {
+                if run.bytes == 0 {
+                    // Skip a byte-order mark and blank space, then look for the playlist header.
+                    let head: Vec<u8> = data
+                        .iter()
+                        .copied()
+                        .skip_while(|b| b.is_ascii_whitespace() || matches!(b, 0xEF | 0xBB | 0xBF))
+                        .take(7)
+                        .collect();
+                    if announced_playlist || head == b"#EXTM3U" {
+                        return Ok(Some(final_url));
+                    }
+                }
                 let n = data.len();
                 pending.extend_from_slice(&data);
                 run.wrote(n);
@@ -335,7 +362,8 @@ fn record_raw<F: FnMut(Progress)>(
             }
         }
     }
-    flush(sink, &mut pending, chunk_start, run)
+    flush(sink, &mut pending, chunk_start, run)?;
+    Ok(None)
 }
 
 fn flush<F: FnMut(Progress)>(
@@ -397,5 +425,26 @@ mod tests {
         let result = record(&options, &AtomicBool::new(false), |_| {});
         let _ = std::fs::remove_dir_all(dir);
         assert!(matches!(result, Err(Error::Blocked)));
+    }
+
+    #[test]
+    fn a_playlist_served_without_an_m3u8_address_is_followed_as_hls() {
+        let url = serve(
+            "#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=1
+live
+",
+        )
+        .replace("master.m3u8", "live/user/pass/42");
+        let dir = std::env::temp_dir().join(format!("vesper-rec-sniff-{}", std::process::id()));
+        let options = Options::new(url, 30, Output::Segments(dir.clone()));
+        let result = record(&options, &AtomicBool::new(false), |_| {});
+        let _ = std::fs::remove_dir_all(dir);
+        // Followed as HLS it ends on the self-pointing playlist; copied as raw bytes it would have
+        // "recorded" the playlist text as video and succeeded.
+        assert!(
+            result.is_err(),
+            "the playlist text must not be saved as a recording"
+        );
     }
 }
