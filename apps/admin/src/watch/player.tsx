@@ -10,6 +10,7 @@ import { Icon, type IconName } from "../icons";
 import { EASE } from "../motion";
 import { absolute, ExternalPlayer } from "./external";
 import { clock, isPlayable, useMediaToken } from "./media";
+import { AfterScreen, BeforeScreen, FailedScreen } from "./stage";
 
 type VjsPlayer = ReturnType<typeof videojs>;
 
@@ -60,12 +61,16 @@ export function Player({
   const [level, setLevel] = useState(-1);
   const [panel, setPanel] = useState<Panel>(null);
   const [kept, setKept] = useState(false);
-  const [external, setExternal] = useState(false);
+  const [external, setExternal] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [paused, setPaused] = useState(true);
+  // The channel is delivering segments (a recording that just started has none for a few seconds).
+  const [ready, setReady] = useState(false);
+  const [ended, setEnded] = useState(false);
 
   const rec = all.find((r) => r.id === id);
   const live = rec?.status === "recording" && rec.kind === "recording";
+  const streamReady = rec?.status === "done" || (rec?.status === "recording" && ready);
   const upNext = useMemo(
     () =>
       all
@@ -111,6 +116,25 @@ export function Player({
       alive = false;
     };
   }, [client, id]);
+
+  // ---- a recording that is waiting, starting or running is followed until it ends ----
+  const phase = rec?.status;
+  useEffect(() => {
+    if (phase !== "queued" && phase !== "scheduled" && phase !== "recording") return;
+    let alive = true;
+    const tick = async () => {
+      const fresh = await client.getRecording(id).catch(() => null);
+      if (!alive || !fresh) return;
+      setAll((list) => list.map((r) => (r.id === id ? fresh : r)));
+      if (fresh.status === "recording") setReady(await client.playlistReady(id));
+    };
+    void tick();
+    const timer = setInterval(() => void tick(), 3000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [client, id, phase]);
 
   // ---- create the video.js player once ----
   useEffect(() => {
@@ -170,11 +194,7 @@ export function Player({
   // ---- attach the stream: HLS through hls.js, downloads as plain files ----
   useEffect(() => {
     const p = player.current;
-    if (!p || !rec || media === null) return;
-    if (!isPlayable(rec)) {
-      setProblem("This one is not ready to play yet.");
-      return;
-    }
+    if (!p || !rec || media === null || !streamReady) return;
     setProblem(null);
     const src = client.streamUrl(rec, media);
     let gone = false;
@@ -288,7 +308,7 @@ export function Player({
       hls.current?.destroy();
       hls.current = null;
     };
-  }, [rec?.id, rec?.status === "recording", media, client, say]);
+  }, [rec?.id, streamReady, media, client, say]);
 
   // ---- preferences follow the account ----
   useEffect(() => {
@@ -345,12 +365,15 @@ export function Player({
     if (!p) return;
     const onEnded = () => {
       save(true);
-      if (upNext[0]) onPlay(upNext[0].id);
+      setEnded(true);
     };
+    const onResume = () => setEnded(false);
     p.on("ended", onEnded);
+    p.on("playing", onResume);
     p.on("pause", () => save());
     return () => {
       p.off("ended", onEnded);
+      p.off("playing", onResume);
     };
   }, [save, upNext, onPlay]);
 
@@ -501,7 +524,13 @@ export function Player({
                   label="External player"
                   onClick={() => {
                     onExternal?.();
-                    setExternal(true);
+                    // A short link (no token to type) when the server can make one, else the long address.
+                    const long = absolute(client.streamUrl(rec, media));
+                    if (rec.kind === "download") return setExternal(long);
+                    void client
+                      .shareRecording(rec.id, 24)
+                      .then((r) => setExternal(absolute(r.short)))
+                      .catch(() => setExternal(long));
                   }}
                 />
               )}
@@ -635,6 +664,36 @@ export function Player({
           </div>
         </div>
       )}
+      {rec && (rec.status === "scheduled" || rec.status === "queued") && (
+        <BeforeScreen rec={rec} onClose={onClose} />
+      )}
+      {rec?.status === "failed" && <FailedScreen rec={rec} onClose={onClose} />}
+      {rec && ended && rec.status === "done" && (
+        <AfterScreen
+          rec={rec}
+          next={upNext}
+          onClose={onClose}
+          onPlay={onPlay}
+          onReplay={() => {
+            const p = player.current;
+            if (!p) return;
+            p.currentTime(0);
+            void p.play()?.catch(() => {});
+            setEnded(false);
+          }}
+          onKeep={() =>
+            void client
+              .keepRecording(rec.id, 0)
+              .then(() => {
+                setAll((list) =>
+                  list.map((r) => (r.id === rec.id ? { ...r, keepHours: null } : r)),
+                );
+                say("Kept for good.");
+              })
+              .catch(() => say("Could not keep it."))
+          }
+        />
+      )}
     </>
   );
 
@@ -650,18 +709,18 @@ export function Player({
       transition={{ duration: 0.3, ease: EASE }}
     >
       <div ref={mount} className="size-full" />
-      {external && rec && media !== null && (
+      {external && rec && (
         <ExternalPlayer
           title={rec.title}
-          onClose={() => setExternal(false)}
+          onClose={() => setExternal(null)}
           sources={[
             {
               label: "Through Vesper",
               hint:
                 rec.status === "recording"
-                  ? "Streams from this server while it records. It keeps running as long as the other player stays connected."
-                  : "Plays from your library over the network.",
-              url: absolute(client.streamUrl(rec, media)),
+                  ? "Streams from this server while it records. It keeps running as long as the other player stays connected. The link works for 24 hours."
+                  : "Plays from your library over the network. The link works for 24 hours.",
+              url: external,
             },
           ]}
         />

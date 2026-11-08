@@ -56,7 +56,8 @@ export function MediaCard({
   onPlay: (id: string) => void;
   wide?: boolean;
 }) {
-  const playable = isPlayable(rec);
+  const waiting = rec.status === "scheduled" || rec.status === "queued";
+  const playable = isPlayable(rec) || waiting;
   const progress =
     rec.kind === "recording" && rec.seconds > 0 ? Math.min(1, rec.positionS / rec.seconds) : 0;
   return (
@@ -86,6 +87,15 @@ export function MediaCard({
             <Badge tone="dusk">saving</Badge>
           )}
           {rec.status === "done" && rec.watched && <Badge>watched</Badge>}
+          {waiting && (
+            <Badge tone="dusk">
+              Starts{" "}
+              {new Date(rec.startAt * 1000).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </Badge>
+          )}
         </div>
         {rec.status === "recording" && rec.kind === "recording" && (
           <span className="absolute bottom-2.5 right-2.5 inline-flex items-center gap-2 rounded-md bg-accent px-2.5 py-1 text-sm font-bold text-on-accent tabular">

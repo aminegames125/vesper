@@ -165,7 +165,12 @@ async fn validate(state: &AppState, user: &User, body: &NewSchedule) -> ApiResul
         body.end_date.as_deref(),
     )
     .map_err(ApiError::bad)?;
-    check_quota(state, user, body.seconds + body.pad_before + body.pad_after)?;
+    check_quota(
+        state,
+        user,
+        body.seconds + body.pad_before + body.pad_after,
+        false,
+    )?;
     check_target(state, &body.url).await?;
     if let Some(backup) = body.backup_url.as_deref().filter(|u| !u.is_empty()) {
         check_target(state, backup).await?;
@@ -393,7 +398,7 @@ pub async fn run_now(
         None => super::recordings::keep_for(&state, &user, None),
     };
     let seconds = seconds + after;
-    check_quota(&state, &user, seconds)?;
+    check_quota(&state, &user, seconds, false)?;
     check_target(&state, &url).await?;
     let rec = uuid::Uuid::new_v4().to_string();
     state.db.conn().execute(

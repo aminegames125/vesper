@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 
 use super::{
     files,
-    recordings::{download_file, keep_for, owned, playlist_text, segment_file},
+    recordings::{download_file, keep_for, owned, playlist_text, playlist_with, segment_file},
 };
 use crate::{
     auth::AuthUser,
@@ -117,7 +117,7 @@ pub async fn create_share(
         return Err(ApiError::bad("Only recordings can be shared."));
     }
     let hours = body.and_then(|b| b.0.hours).unwrap_or(24).clamp(1, 24 * 30);
-    let token = uuid::Uuid::new_v4().simple().to_string();
+    let token = short_code();
     let expires = now() + hours * 3600;
     state.db.conn().execute(
         "INSERT INTO shares (token, recording_id, expires_at) VALUES (?1, ?2, ?3)",
@@ -127,9 +127,27 @@ pub async fn create_share(
     Ok(Json(json!({
         "token": token,
         "path": format!("/api/v1/share/{token}/index.m3u8"),
+        "short": format!("/s/{token}"),
         "download": format!("/api/v1/share/{token}/download"),
         "expiresAt": expires,
     })))
+}
+
+/// Ten letters and digits: short enough to type into a player, long enough that nobody guesses one
+/// (about 58 bits), and a link only ever opens the one recording it was made for.
+fn short_code() -> String {
+    const ALPHABET: &[u8] = b"abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let limit = (256 / ALPHABET.len() * ALPHABET.len()) as u8;
+    let mut code = String::with_capacity(10);
+    while code.len() < 10 {
+        let mut byte = [0u8; 1];
+        getrandom::getrandom(&mut byte).expect("system random source");
+        // Skip the few values that would make some characters likelier than others.
+        if byte[0] < limit {
+            code.push(ALPHABET[byte[0] as usize % ALPHABET.len()] as char);
+        }
+    }
+    code
 }
 
 /// The live links of a recording.
@@ -187,6 +205,28 @@ pub async fn shared_playlist(
 ) -> ApiResult<Response> {
     let (owner, id) = shared(&state, &token)?;
     playlist_text(&state, &owner, &id, "").await
+}
+
+/// A short link: `/s/<code>` is the playlist and `/s/<code>/<segment>` its pieces.
+pub async fn short_playlist(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> ApiResult<Response> {
+    let (owner, id) = shared(&state, &token)?;
+    // A player that follows a link is watching, so a live session stays up for as long as it does.
+    if crate::watch::is_session(&state, &id) {
+        crate::watch::touch(&id);
+    }
+    playlist_with(&state, &owner, &id, &format!("{token}/"), "").await
+}
+
+pub async fn short_segment(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path((token, name)): Path<(String, String)>,
+) -> ApiResult<Response> {
+    let (owner, id) = shared(&state, &token)?;
+    segment_file(&state, &owner, &id, &name, &headers).await
 }
 
 pub async fn shared_segment(
@@ -465,5 +505,16 @@ mod tests {
         let b = uuid::Uuid::new_v4().simple().to_string();
         assert_ne!(a, b);
         assert_eq!(a.len(), 32);
+    }
+
+    #[test]
+    fn short_codes_are_ten_unambiguous_characters_and_differ() {
+        let a = super::short_code();
+        let b = super::short_code();
+        assert_eq!(a.len(), 10);
+        assert!(a
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() && !"0OIl1".contains(c)));
+        assert_ne!(a, b);
     }
 }

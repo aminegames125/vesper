@@ -107,6 +107,14 @@ async fn main() {
 
     let app = Router::new()
         .nest("/api/v1", api::router())
+        .route(
+            "/s/{token}",
+            axum::routing::get(api::library::short_playlist),
+        )
+        .route(
+            "/s/{token}/{name}",
+            axum::routing::get(api::library::short_segment),
+        )
         .fallback(web::serve)
         .layer(cors(state.config.is_lite()))
         .layer(axum::middleware::from_fn_with_state(

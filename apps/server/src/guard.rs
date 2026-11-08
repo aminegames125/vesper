@@ -74,6 +74,7 @@ pub async fn lite(State(state): State<AppState>, request: Request, next: Next) -
         )
         && (request.uri().query().is_some_and(|q| q.contains("token="))
             || request.uri().path().contains("/share/")
+            || request.uri().path().starts_with("/s/")
             || request.method() == Method::OPTIONS);
     if !allowed || ((cross_site || foreign_origin) && !media) {
         return (
@@ -95,7 +96,8 @@ pub async fn lite(State(state): State<AppState>, request: Request, next: Next) -
 
 /// Paths that serve video or images to a player.
 fn is_media(path: &str) -> bool {
-    path.ends_with("/index.m3u8")
+    path.starts_with("/s/")
+        || path.ends_with("/index.m3u8")
         || path.contains("/seg/")
         || path.ends_with("/download")
         || path.ends_with("/thumb.jpg")

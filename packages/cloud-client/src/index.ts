@@ -561,10 +561,13 @@ export class CloudClient {
     this.request<{ ok: boolean }>("DELETE", `/recordings/${id}/bookmarks/${bookmark}`);
   /** A link that plays one recording without signing in, until it expires. */
   shareRecording = (id: string, hours = 24) =>
-    this.post<{ token: string; path: string; download: string; expiresAt: number }>(
-      `/recordings/${id}/share`,
-      { hours },
-    );
+    this.post<{
+      token: string;
+      path: string;
+      short: string;
+      download: string;
+      expiresAt: number;
+    }>(`/recordings/${id}/share`, { hours });
   /** Needs ffmpeg on the server (see `status().ffmpeg`). */
   exportRecording = (id: string) => this.post<{ path: string }>(`/recordings/${id}/export`);
   trimRecording = (id: string, fromS: number, toS: number) =>

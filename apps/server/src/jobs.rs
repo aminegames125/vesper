@@ -55,7 +55,7 @@ pub fn storage_used(state: &AppState, user_id: &str) -> i64 {
         .db
         .conn()
         .query_row(
-            "SELECT COALESCE(SUM(bytes), 0) FROM recordings WHERE user_id = ?1",
+            "SELECT COALESCE(SUM(bytes), 0) FROM recordings WHERE user_id = ?1 AND tag != '.watch'",
             [user_id],
             |r| r.get(0),
         )
@@ -63,7 +63,8 @@ pub fn storage_used(state: &AppState, user_id: &str) -> i64 {
 }
 
 /// Checks the account's rules before a recording is accepted.
-pub fn check_quota(state: &AppState, user: &User, seconds: i64) -> ApiResult<()> {
+/// A live-watch session (`session`) deletes itself, so a full quota does not stop someone from watching.
+pub fn check_quota(state: &AppState, user: &User, seconds: i64, session: bool) -> ApiResult<()> {
     if seconds > 30 * 24 * 3600 {
         return Err(ApiError::bad("A recording can be at most 30 days long."));
     }
@@ -81,7 +82,7 @@ pub fn check_quota(state: &AppState, user: &User, seconds: i64) -> ApiResult<()>
             user.max_hours
         )));
     }
-    if user.storage_bytes > 0 && storage_used(state, &user.id) >= user.storage_bytes {
+    if !session && user.storage_bytes > 0 && storage_used(state, &user.id) >= user.storage_bytes {
         return Err(ApiError::forbidden(
             "Your cloud storage is full. Delete a recording first.",
         ));
@@ -161,7 +162,7 @@ pub fn start(state: &AppState, id: &str) {
         .db
         .conn()
         .query_row(
-            "SELECT COUNT(*) FROM recordings WHERE user_id = ?1 AND status = 'recording' AND kind != 'download'",
+            "SELECT COUNT(*) FROM recordings WHERE user_id = ?1 AND status = 'recording' AND kind != 'download' AND tag != '.watch'",
             [&user_id],
             |r| r.get(0),
         )
@@ -184,7 +185,10 @@ pub fn start(state: &AppState, id: &str) {
             // Stays queued; the background tick starts it when a slot frees up.
             return;
         }
-    } else if max_concurrent > 0 && running >= max_concurrent {
+    } else if max_concurrent > 0
+        && running >= max_concurrent
+        && !crate::watch::is_session(state, id)
+    {
         // A scheduled one waits for the other to end (back-to-back programmes overlap by their padding).
         if status == "scheduled" && max_seconds > 60 {
             return;

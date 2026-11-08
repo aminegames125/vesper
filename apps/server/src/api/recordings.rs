@@ -171,7 +171,8 @@ pub async fn create(
         0 => 24 * 3600,
         n => n,
     };
-    check_quota(&state, &user, seconds)?;
+    let session = body.tag.trim() == crate::watch::TAG;
+    check_quota(&state, &user, seconds, session)?;
     check_target(&state, &body.url).await?;
     let backup = body.backup_url.as_deref().filter(|u| !u.is_empty());
     if let Some(backup) = backup {
@@ -182,6 +183,9 @@ pub async fn create(
         return Err(ApiError::bad("Give the recording a title."));
     }
 
+    if session {
+        crate::watch::make_room(&state, &user.id);
+    }
     let keep_hours = keep_for(&state, &user, body.keep_hours);
     let start_at = body.start_at.unwrap_or(0).max(0);
     let later = start_at > now() + 5;
@@ -509,6 +513,18 @@ pub async fn playlist_text(
     id: &str,
     suffix: &str,
 ) -> ApiResult<Response> {
+    playlist_with(state, owner, id, "seg/", suffix).await
+}
+
+/// The playlist with each segment line prefixed by `prefix`, so it resolves from wherever the
+/// playlist itself is served (the long API address or a short link).
+pub async fn playlist_with(
+    state: &AppState,
+    owner: &str,
+    id: &str,
+    prefix: &str,
+    suffix: &str,
+) -> ApiResult<Response> {
     let text = tokio::fs::read_to_string(recording_dir(state, owner, id).join("index.m3u8"))
         .await
         .map_err(|_| ApiError::not_found("Nothing has been recorded yet."))?;
@@ -516,7 +532,7 @@ pub async fn playlist_text(
         .lines()
         .map(|line| {
             if line.ends_with(".ts") {
-                format!("seg/{line}{suffix}\n")
+                format!("{prefix}{line}{suffix}\n")
             } else {
                 format!("{line}\n")
             }

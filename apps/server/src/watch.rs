@@ -40,6 +40,30 @@ pub fn is_session(state: &AppState, id: &str) -> bool {
         .is_ok_and(|tag| tag == TAG)
 }
 
+/// Live channels one viewer can have open at once (two tabs, or a quick switch before the old
+/// channel has been let go).
+const PER_VIEWER: usize = 2;
+
+/// Before a new session starts, ends this viewer's oldest ones so that at most `PER_VIEWER` run.
+pub fn make_room(state: &AppState, user_id: &str) {
+    let running: Vec<String> = {
+        let conn = state.db.conn();
+        let Ok(mut stmt) = conn.prepare(
+            "SELECT id FROM recordings WHERE user_id = ?1 AND tag = ?2 AND status IN ('queued', 'recording')
+             ORDER BY created_at",
+        ) else {
+            return;
+        };
+        stmt.query_map([user_id, TAG], |r| r.get(0))
+            .map(|rows| rows.flatten().collect())
+            .unwrap_or_default()
+    };
+    let surplus = (running.len() + 1).saturating_sub(PER_VIEWER);
+    for id in running.iter().take(surplus) {
+        jobs::stop(state, id);
+    }
+}
+
 /// Stops sessions nobody is watching and removes the ones that have ended. Runs every tick.
 pub fn sweep(state: &AppState) {
     let rows: Vec<(String, String, String, i64)> = {
