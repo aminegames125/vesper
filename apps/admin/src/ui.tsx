@@ -14,9 +14,9 @@ type Variant = "primary" | "soft" | "danger" | "ghost";
 
 const VARIANTS: Record<Variant, string> = {
   primary: "bg-accent text-on-accent font-semibold hover:brightness-110",
-  soft: "bg-raised text-paper hover:bg-line",
-  danger: "border border-line text-accent hover:bg-tint",
-  ghost: "text-muted hover:bg-raised hover:text-paper",
+  soft: "plate bg-raised text-paper",
+  danger: "plate bg-raised text-accent",
+  ghost: "plate text-muted",
 };
 
 export function Button({
@@ -39,9 +39,9 @@ export function Button({
       whileTap={calm ? undefined : { scale: 0.96 }}
       transition={SPRING}
       {...rest}
-      className={`inline-flex min-h-[var(--btn-h)] items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex min-h-[var(--btn-h)] items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 py-2.5 text-base font-semibold transition-colors disabled:opacity-50 ${VARIANTS[variant]} ${className}`}
     >
-      {icon && <Icon name={icon} size={17} />}
+      {icon && <Icon name={icon} size={20} />}
       {children}
     </motion.button>
   );
@@ -59,7 +59,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       {...rest}
-      className={`inline-flex size-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-paper disabled:opacity-40 ${className}`}
+      className={`plate inline-flex size-12 items-center justify-center rounded-lg text-muted disabled:opacity-40 ${className}`}
     >
       <Icon name={icon} />
     </button>
@@ -67,7 +67,7 @@ export function IconButton({
 }
 
 const CONTROL =
-  "w-full min-h-[var(--field-h)] rounded-lg border border-line bg-sunken px-3.5 py-2.5 text-paper placeholder:text-muted transition-colors focus:border-accent focus:outline-none";
+  "w-full min-h-[var(--field-h)] rounded-lg bg-raised px-4 py-2.5 text-base text-paper placeholder:text-muted transition-colors focus:outline-none focus-visible:outline-4";
 
 export function Field({
   label,
@@ -75,10 +75,10 @@ export function Field({
   ...rest
 }: { label: string; hint?: string } & InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <label className="block text-sm">
-      <span className="mb-1.5 block font-medium">{label}</span>
+    <label className="block text-base">
+      <span className="mb-2 block font-semibold">{label}</span>
       <input {...rest} className={CONTROL} />
-      {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
+      {hint && <span className="mt-1 block text-sm text-muted">{hint}</span>}
     </label>
   );
 }
@@ -94,12 +94,12 @@ export function Select({
   children: ReactNode;
 } & React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <label className="block text-sm">
-      <span className="mb-1.5 block font-medium">{label}</span>
+    <label className="block text-base">
+      <span className="mb-2 block font-semibold">{label}</span>
       <select {...rest} className={CONTROL}>
         {children}
       </select>
-      {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
+      {hint && <span className="mt-1 block text-sm text-muted">{hint}</span>}
     </label>
   );
 }
@@ -117,18 +117,18 @@ export function Toggle({
   hint?: string;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3.5 text-sm">
+    <label className="flex cursor-pointer items-start gap-4 text-base">
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative mt-0.5 h-6 w-11 flex-none rounded-full transition-colors ${checked ? "bg-accent" : "bg-line"}`}
+        className={`relative mt-0.5 h-8 w-14 flex-none rounded-full transition-colors ${checked ? "bg-accent" : "bg-line"}`}
       >
         <motion.span
           layout
           transition={SPRING}
-          className={`absolute top-0.5 size-5 rounded bg-white ${checked ? "right-0.5" : "left-0.5"}`}
+          className={`absolute top-1 size-6 rounded-full bg-paper ${checked ? "right-1" : "left-1"}`}
         />
       </button>
       <span>
@@ -153,8 +153,8 @@ export function Card({
   return (
     <section className={`surface mb-5 overflow-hidden ${className}`}>
       {(title || actions) && (
-        <div className="flex flex-wrap items-center gap-3 border-b border-line px-[var(--card-pad)] py-3.5">
-          <h2 className="text-lg font-bold">{title}</h2>
+        <div className="flex flex-wrap items-center gap-3 px-[var(--card-pad)] pt-5 pb-2">
+          <h2 className="text-xl font-bold">{title}</h2>
           <div className="ml-auto flex flex-wrap gap-2">{actions}</div>
         </div>
       )}
@@ -176,7 +176,7 @@ export function PageHeader({
     <header className="mb-6 flex flex-wrap items-end gap-x-6 gap-y-3">
       <div className="min-w-0 flex-1 basis-72">
         <h1 className="text-[length:var(--text-2xl)] font-bold leading-tight">{title}</h1>
-        {lead && <p className="mt-1 max-w-2xl text-sm text-muted">{lead}</p>}
+        {lead && <p className="mt-2 max-w-2xl text-base text-muted">{lead}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </header>
@@ -188,7 +188,7 @@ export function Notice({ children }: { children: ReactNode }) {
   return (
     <p
       role="alert"
-      className="mb-4 rounded-lg border border-accent/40 bg-tint px-4 py-3 text-sm text-accent"
+      className="mb-4 rounded-lg bg-tint px-5 py-3.5 text-base font-medium text-accent"
     >
       {children}
     </p>
@@ -211,7 +211,7 @@ export function Badge({
   };
   return (
     <span
-      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${tones[tone]}`}
+      className={`inline-flex items-center rounded-md px-2.5 py-1 text-sm font-semibold ${tones[tone]}`}
     >
       {children}
     </span>
@@ -262,7 +262,7 @@ export function Segmented<T extends string>({
   id: string;
 }) {
   return (
-    <div className="inline-flex rounded-lg bg-sunken p-1 ring-1 ring-line" role="tablist">
+    <div className="inline-flex rounded-xl bg-raised p-1.5" role="tablist">
       {options.map((o) => (
         <button
           key={o.value}
@@ -270,7 +270,7 @@ export function Segmented<T extends string>({
           role="tab"
           aria-selected={o.value === value}
           onClick={() => onChange(o.value)}
-          className={`relative rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${o.value === value ? "text-on-accent" : "text-muted hover:text-paper"}`}
+          className={`relative rounded-lg px-5 py-2.5 text-base font-semibold transition-colors ${o.value === value ? "text-on-accent" : "text-muted hover:text-paper"}`}
         >
           {o.value === value && (
             <motion.span
@@ -332,20 +332,22 @@ export function Modal({
         initial={{ opacity: 0, y: 28, scale: 0.97 }}
         animate={open ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 20, scale: 0.98 }}
         transition={{ duration: open ? 0.38 : 0.16, ease: EASE }}
-        className="flex max-h-[90dvh] flex-col rounded-xl border border-line bg-panel shadow-[var(--shadow-2)] max-sm:rounded-b-none"
+        className="flex max-h-[90dvh] flex-col rounded-2xl bg-panel shadow-[var(--shadow-2)] max-sm:rounded-b-none"
       >
-        <div className="flex items-center border-b border-line px-6 py-4">
-          <h2 className="text-xl font-semibold">{title}</h2>
+        <div className="flex items-center px-7 pt-6 pb-2">
+          <h2 className="text-2xl font-bold">{title}</h2>
           <IconButton icon="close" label="Close" onClick={close} className="ml-auto -mr-2" />
         </div>
-        <div className="overflow-y-auto p-6">{children}</div>
+        <div className="overflow-y-auto px-7 pt-3 pb-7">{children}</div>
       </motion.div>
     </dialog>
   );
 }
 
 export const Empty = ({ children }: { children: ReactNode; icon?: IconName }) => (
-  <p className="max-w-md px-[var(--card-pad)] py-10 text-sm text-muted">{children}</p>
+  <p className="max-w-md px-[var(--card-pad)] py-10 text-base leading-relaxed text-muted">
+    {children}
+  </p>
 );
 
 export const when = (epoch: number | null | undefined) =>

@@ -38,12 +38,12 @@ export function LibraryPage({ client }: { client: CloudClient }) {
                     {LABEL[r.status]}
                   </Badge>
                 </p>
-                <p className="mt-0.5 text-xs text-muted">
+                <p className="mt-0.5 text-sm text-muted">
                   {r.user} · {r.channelName || "download"} · {formatBytes(r.bytes)} ·{" "}
                   {when(r.createdAt)}
                   {r.keepUntil ? ` · removed in ${formatUntil(r.keepUntil)}` : ""}
                 </p>
-                {r.error && <p className="mt-0.5 text-xs text-accent">{r.error}</p>}
+                {r.error && <p className="mt-0.5 text-sm text-accent">{r.error}</p>}
               </div>
               <Button
                 variant="danger"

@@ -24,7 +24,7 @@ export function PluginsPage({ client }: { client: CloudClient }) {
       {data && (
         <p className="mb-5 text-sm text-muted">
           Install a plugin by copying its folder into{" "}
-          <code className="selectable rounded bg-raised px-1.5 py-0.5 font-mono text-xs">
+          <code className="selectable rounded bg-raised px-1.5 py-0.5 font-mono text-sm">
             {data.dir}
           </code>
           . It appears here within seconds.
@@ -45,7 +45,7 @@ export function PluginsPage({ client }: { client: CloudClient }) {
           <ul className="divide-y divide-line text-sm">
             {data.skipped.map((s) => (
               <li key={s.folder} className="flex gap-4 px-[var(--card-pad)] py-3">
-                <span className="w-40 flex-none truncate font-mono text-xs">{s.folder}</span>
+                <span className="w-40 flex-none truncate font-mono text-sm">{s.folder}</span>
                 <span className="text-accent">{s.error}</span>
               </li>
             ))}
@@ -128,7 +128,7 @@ function PluginCard({
           label={plugin.enabled ? "Enabled" : "Off"}
           hint={plugin.description || undefined}
         />
-        <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
+        <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
           {plugin.author && <span>by {plugin.author}</span>}
           <span className="font-mono">{plugin.id}</span>
           {plugin.hooks.map((h) => (
@@ -137,7 +137,7 @@ function PluginCard({
             </Badge>
           ))}
         </p>
-        <ul className="text-xs text-muted">
+        <ul className="text-sm text-muted">
           {plugin.hooks.map((h) => (
             <li key={h}>
               <b className="font-medium text-paper">{h}</b>: {HOOK_HELP[h] ?? ""}
@@ -151,15 +151,15 @@ function PluginCard({
             onChange={(e) => setText(e.target.value)}
             spellCheck={false}
             rows={Math.min(12, Math.max(3, text.split("\n").length))}
-            className="w-full rounded-lg border border-line bg-sunken px-3.5 py-2.5 font-mono text-xs focus:border-accent focus:outline-none"
+            className="w-full rounded-lg border border-line bg-sunken px-3.5 py-2.5 font-mono text-sm focus:border-accent focus:outline-none"
           />
-          {bad && <span className="mt-1 block text-xs text-accent">{bad}</span>}
+          {bad && <span className="mt-1 block text-sm text-accent">{bad}</span>}
         </label>
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={saveConfig} disabled={text === pretty}>
             Save configuration
           </Button>
-          {result && <span className="text-xs text-muted">{result}</span>}
+          {result && <span className="text-sm text-muted">{result}</span>}
         </div>
       </div>
     </Card>

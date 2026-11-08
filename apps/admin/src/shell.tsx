@@ -1,6 +1,6 @@
 import type { CloudUser, ServerInfo } from "@vesper/cloud-client";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Icon, type IconName } from "./icons";
 import { LogoMark } from "./logo";
 import { EASE, PAGE, SPRING } from "./motion";
@@ -29,7 +29,11 @@ export const MANAGE: NavItem[] = [
 export const WATCH: NavItem[] = [
   { id: "home", label: "Home", icon: "home" },
   { id: "live", label: "Live TV", icon: "live" },
+  { id: "guide", label: "Guide", icon: "calendar" },
+  { id: "browse", label: "Movies & shows", icon: "film" },
   { id: "library", label: "Library", icon: "library" },
+  { id: "schedules", label: "Schedules", icon: "clock" },
+  { id: "activity", label: "Activity", icon: "pulse" },
 ];
 
 /** How many items sit on the phone's tab bar before the rest move under "More". */
@@ -62,9 +66,9 @@ export function Shell({
   return (
     <LayoutGroup>
       <div className="flex h-full flex-col sm:flex-row">
-        <header className="flex flex-none items-center gap-3 border-b border-line bg-panel px-4 py-2.5 sm:hidden">
-          <LogoMark size={24} />
-          <span className="font-display text-lg font-bold">Vesper</span>
+        <header className="flex flex-none items-center gap-3 bg-panel px-4 py-3 sm:hidden">
+          <LogoMark size={28} />
+          <span className="display text-xl">Vesper</span>
           {isAdmin && (
             <div className="ml-auto">
               <SpaceSwitch space={route.space} go={go} />
@@ -74,17 +78,18 @@ export function Shell({
 
         <nav
           aria-label="Main"
-          className="z-[var(--z-nav)] hidden w-[var(--rail-w)] flex-none flex-col border-r border-line bg-panel p-3 sm:flex lg:w-[var(--nav-w)] lg:p-4"
+          className="z-[var(--z-nav)] hidden w-[var(--rail-w)] flex-none flex-col bg-panel p-3 sm:flex lg:w-[var(--nav-w)] lg:p-5"
         >
-          <div className="mb-6 flex items-center gap-3 px-1.5 lg:px-2">
-            <LogoMark size={28} animate />
+          <div className="mb-5 flex items-center gap-3 px-1.5 lg:px-2">
+            <LogoMark size={36} animate />
             <div className="hidden lg:block">
-              <p className="font-display text-lg font-bold leading-none">Vesper</p>
-              <p className="mt-1 text-xs text-muted">
+              <p className="display text-2xl leading-none">Vesper</p>
+              <p className="mt-1.5 text-sm text-muted">
                 {lite ? "Lite" : "Cloud"} {info.version}
               </p>
             </div>
           </div>
+          <Clock />
 
           {isAdmin && (
             <div className="mb-4 hidden lg:block">
@@ -115,29 +120,22 @@ export function Shell({
                   title={item.label}
                   onClick={() => go(route.space, item.id)}
                   aria-current={active(item.id) ? "page" : undefined}
-                  className="relative flex w-full items-center justify-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:text-paper aria-[current=page]:text-paper lg:justify-start"
+                  className="plate flex w-full items-center justify-center gap-4 rounded-lg px-4 py-3 text-lg font-semibold text-muted lg:justify-start"
                 >
-                  {active(item.id) && (
-                    <motion.span
-                      layoutId="nav-active"
-                      transition={SPRING}
-                      className="absolute inset-0 rounded-lg bg-raised"
-                    />
-                  )}
-                  <Icon name={item.icon} className="relative flex-none" size={18} />
-                  <span className="relative hidden lg:inline">{item.label}</span>
+                  <Icon name={item.icon} className="flex-none" size={22} />
+                  <span className="hidden lg:inline">{item.label}</span>
                 </button>
               </li>
             ))}
           </ul>
 
           {lite ? (
-            <p className="hidden border-t border-line pt-3 text-xs text-muted lg:block">
+            <p className="hidden pt-3 text-sm text-muted [@media(min-height:860px)]:lg:block">
               Lite server: anyone on your network can open this. Use full mode for accounts.
             </p>
           ) : (
-            <div className="border-t border-line pt-3">
-              <p className="hidden truncate px-2 pb-1 text-sm lg:block">
+            <div className="pt-3">
+              <p className="hidden truncate px-2 pb-1 text-base lg:block">
                 {user.username} <span className="text-muted">· {user.role}</span>
               </p>
               <button
@@ -161,7 +159,7 @@ export function Shell({
               initial="initial"
               animate="animate"
               exit="exit"
-              className="mx-auto w-full max-w-[72rem] p-[var(--page-pad)]"
+              className="mx-auto w-full max-w-[84rem] p-[var(--page-pad)]"
             >
               {children}
             </motion.div>
@@ -170,7 +168,7 @@ export function Shell({
 
         <nav
           aria-label="Main"
-          className="fixed inset-x-0 bottom-0 z-[var(--z-nav)] flex border-t border-line bg-panel pb-[env(safe-area-inset-bottom)] sm:hidden"
+          className="fixed inset-x-0 bottom-0 z-[var(--z-nav)] flex bg-panel pb-[env(safe-area-inset-bottom)] sm:hidden"
         >
           {tabs.map((item) => (
             <TabButton
@@ -271,18 +269,40 @@ function TabButton({ item, on, onClick }: { item: NavItem; on: boolean; onClick:
       type="button"
       onClick={onClick}
       aria-current={on ? "page" : undefined}
-      className="relative flex min-h-[var(--tabbar-h)] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted aria-[current=page]:text-paper"
+      className="relative flex min-h-[var(--tabbar-h)] flex-1 flex-col items-center justify-center gap-1 text-sm font-semibold text-muted aria-[current=page]:text-paper"
     >
       {on && (
         <motion.span
           layoutId="tab-active"
           transition={SPRING}
-          className="absolute inset-x-3 top-1 bottom-1 rounded-lg bg-raised"
+          className="absolute inset-x-2 top-1.5 bottom-1.5 rounded-lg bg-raised"
         />
       )}
       <Icon name={item.icon} size={20} className="relative" />
       <span className="relative">{item.label}</span>
     </button>
+  );
+}
+
+/** The time, as a channel's corner clock: big, tabular, always right. Hidden on narrow rails. */
+function Clock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 15_000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <div className="mb-6 hidden px-2 lg:block">
+      <time
+        dateTime={now.toISOString()}
+        className="display block text-[length:var(--text-hero)] leading-none tabular"
+      >
+        {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+      </time>
+      <p className="mt-2 text-base text-muted">
+        {now.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" })}
+      </p>
+    </div>
   );
 }
 
@@ -301,14 +321,14 @@ export function SpaceSwitch({
     { id: "watch", label: "Watch", page: "home" },
   ];
   return (
-    <div className={`flex rounded-lg bg-sunken p-0.5 ring-1 ring-line ${full ? "w-full" : ""}`}>
+    <div className={`flex rounded-xl bg-raised p-1 ${full ? "w-full" : ""}`}>
       {options.map((o) => (
         <button
           key={o.id}
           type="button"
           onClick={() => go(o.id, o.page)}
           aria-pressed={space === o.id}
-          className={`flex-1 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${space === o.id ? "bg-raised text-paper" : "text-muted hover:text-paper"}`}
+          className={`flex-1 rounded-lg px-4 py-2.5 text-base font-semibold transition-colors ${space === o.id ? "bg-accent text-on-accent" : "text-muted hover:text-paper"}`}
         >
           {o.label}
         </button>

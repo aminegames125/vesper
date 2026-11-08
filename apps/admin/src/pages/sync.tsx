@@ -44,12 +44,12 @@ export function SyncPage({ client }: { client: CloudClient }) {
             <li key={u.user} className={ROW}>
               <div className="min-w-0 flex-1 basis-48">
                 <p className="font-semibold">{u.user}</p>
-                <p className="mt-0.5 text-xs text-muted">
+                <p className="mt-0.5 text-sm text-muted">
                   {u.lastSync ? `Last synced ${when(u.lastSync)}` : "Never synced"}
                 </p>
               </div>
               <Badge tone={u.keys ? "ok" : "muted"}>{u.keys} items</Badge>
-              <span className="w-20 text-right text-xs text-muted">{formatBytes(u.bytes)}</span>
+              <span className="w-20 text-right text-sm text-muted">{formatBytes(u.bytes)}</span>
             </li>
           ))}
         </ul>
@@ -63,7 +63,7 @@ export function SyncPage({ client }: { client: CloudClient }) {
           ].map(([name, text]) => (
             <li key={name} className="rounded-xl bg-raised p-4">
               <p className="font-medium">{name}</p>
-              <p className="mt-1 text-xs text-muted">{text}</p>
+              <p className="mt-1 text-sm text-muted">{text}</p>
             </li>
           ))}
         </ul>

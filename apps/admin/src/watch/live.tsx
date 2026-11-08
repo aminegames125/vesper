@@ -207,9 +207,7 @@ export function LiveTv({
 
           {favorites.length > 0 && !search && !group && (
             <section className="mb-8" aria-label="Favorites">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-                Favorites
-              </h2>
+              <h2 className="mb-3 text-2xl font-bold text-paper">Favorites</h2>
               <ul className="flex snap-x gap-3 overflow-x-auto pb-2">
                 {favorites.map((c) => (
                   <li key={`fav-${c.name}`} className="w-40 flex-none snap-start">
@@ -309,7 +307,7 @@ function ChannelCard({
         </span>
         <span className="w-full min-w-0">
           <span className="block truncate text-sm font-semibold">{c.name}</span>
-          <span className="block truncate text-xs text-muted">{c.group || "Live"}</span>
+          <span className="block truncate text-sm text-muted">{c.group || "Live"}</span>
         </span>
       </button>
       <button
@@ -358,6 +356,7 @@ function ChannelModal({
   // Closing while the channel is still starting must not leave a session behind.
   useEffect(() => {
     const state = tuning.current;
+    state.cancelled = false; // StrictMode mounts, cleans up and mounts again
     return () => {
       state.cancelled = true;
       if (state.id) void client.endWatch(state.id);
@@ -468,7 +467,7 @@ function ChannelModal({
         </div>
       </div>
       {busy === "tune" && (
-        <p className="mt-3 text-xs text-muted">
+        <p className="mt-3 text-sm text-muted">
           The server is connecting to the channel. This usually takes a few seconds.
         </p>
       )}
@@ -495,7 +494,7 @@ function ChannelModal({
                       </span>
                     )}
                   </p>
-                  <p className="truncate text-xs text-muted">
+                  <p className="truncate text-sm text-muted">
                     {onNow ? `until ${hhmm(p.stopAt)}` : when(p.startAt)}
                   </p>
                 </div>
@@ -586,7 +585,7 @@ function PlaylistsModal({
             <li key={s.id} className="flex items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{s.name}</p>
-                <p className="truncate text-xs text-muted">
+                <p className="truncate text-sm text-muted">
                   {s.kind === "xtream" ? `Xtream · ${s.username}` : "M3U link"}
                 </p>
               </div>
@@ -642,7 +641,7 @@ function PlaylistsModal({
             />
           </>
         )}
-        <p className="text-xs text-muted">
+        <p className="text-sm text-muted">
           The playlist is stored on your server and read from there.
         </p>
         <Button type="submit" variant="primary" icon="plus" disabled={busy || !url.trim()}>

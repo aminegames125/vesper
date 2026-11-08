@@ -1,0 +1,352 @@
+/* The Vesper skin for video.js: coral on the logo's near-black, cream text, targets sized for a remote. */
+.vjs-vesper.video-js {
+  --vp-accent: #ff5c7a;
+  --vp-cream: #f4f1ea;
+  --vp-ink: #0d0d0f;
+  --vp-panel: #151518;
+  --vp-raised: #1e1e22;
+  font-family: "Geist Variable", system-ui, sans-serif;
+  font-size: 1.15rem;
+  color: var(--vp-cream);
+  background: #000;
+}
+.vjs-vesper .vjs-tech {
+  object-fit: contain;
+}
+
+/* The picture's own overlay is ours; hide the stock big play button and poster. */
+.vjs-vesper .vjs-big-play-button,
+.vjs-vesper .vjs-poster {
+  display: none;
+}
+
+/* Control bar: one tall bar fading up from black. */
+.vjs-vesper .vjs-control-bar {
+  height: 5.5rem;
+  padding: 0 1.25rem 0.5rem;
+  align-items: center;
+  gap: 0.25rem;
+  background: linear-gradient(to top, rgb(8 8 10 / 0.95) 15%, rgb(8 8 10 / 0));
+  transition: opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vjs-vesper .vjs-control {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.5rem;
+  transition:
+    background-color 0.12s linear,
+    color 0.12s linear;
+}
+.vjs-vesper .vjs-control .vjs-icon-placeholder:before,
+.vjs-vesper .vjs-button > .vjs-icon-placeholder:before {
+  font-size: 2rem;
+  line-height: 3.5rem;
+}
+.vjs-vesper .vjs-control:hover,
+.vjs-vesper .vjs-control:focus-visible,
+.vjs-vesper .vjs-menu-button:hover {
+  background: var(--vp-accent);
+  color: var(--vp-ink);
+  text-shadow: none;
+  outline: none;
+}
+.vjs-vesper .vjs-control:focus-visible {
+  outline: 4px solid var(--vp-accent);
+  outline-offset: 2px;
+  background: var(--vp-accent);
+}
+
+/* Time */
+.vjs-vesper .vjs-current-time,
+.vjs-vesper .vjs-duration,
+.vjs-vesper .vjs-time-divider {
+  display: flex;
+  align-items: center;
+  width: auto;
+  min-width: 0;
+  padding: 0 0.25rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--vp-cream);
+}
+.vjs-vesper .vjs-time-divider {
+  opacity: 0.5;
+}
+.vjs-vesper .vjs-time-divider div {
+  padding: 0;
+}
+.vjs-vesper .vjs-live-control {
+  align-items: center;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--vp-accent);
+  padding: 0 0.5rem;
+}
+.vjs-vesper .vjs-seek-to-live-control {
+  width: auto;
+  padding: 0 1rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.vjs-vesper .vjs-seek-to-live-control .vjs-icon-placeholder:before {
+  color: var(--vp-accent);
+  font-size: 1.4rem;
+  line-height: 3.5rem;
+}
+.vjs-vesper .vjs-seek-to-live-control:hover .vjs-icon-placeholder:before,
+.vjs-vesper .vjs-seek-to-live-control:focus-visible .vjs-icon-placeholder:before {
+  color: var(--vp-ink);
+}
+.vjs-vesper .vjs-seek-to-live-control.vjs-at-live-edge .vjs-icon-placeholder:before {
+  color: var(--vp-accent);
+}
+
+/* Progress: a thick coral bar with a large head. */
+.vjs-vesper .vjs-progress-control {
+  flex: 1;
+  height: 3.5rem;
+  min-width: 6rem;
+  align-items: center;
+}
+.vjs-vesper .vjs-progress-control .vjs-progress-holder {
+  height: 0.55rem;
+  margin: 0 0.75rem;
+  border-radius: 999px;
+  background: rgb(244 241 234 / 0.22);
+  transition: height 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vjs-vesper .vjs-progress-control:hover .vjs-progress-holder,
+.vjs-vesper .vjs-progress-control:focus-within .vjs-progress-holder {
+  height: 0.9rem;
+}
+.vjs-vesper .vjs-load-progress,
+.vjs-vesper .vjs-load-progress div {
+  background: rgb(244 241 234 / 0.28);
+  border-radius: 999px;
+}
+.vjs-vesper .vjs-play-progress {
+  background: var(--vp-accent);
+  border-radius: 999px;
+}
+.vjs-vesper .vjs-play-progress:before {
+  top: 50%;
+  right: -0.9rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  margin-top: -0.9rem;
+  border-radius: 50%;
+  background: var(--vp-cream);
+  font-size: 0;
+  color: transparent;
+  text-shadow: none;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.5);
+  transform: scale(0);
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vjs-vesper .vjs-progress-control:hover .vjs-play-progress:before,
+.vjs-vesper .vjs-progress-control:focus-within .vjs-play-progress:before,
+.vjs-vesper .vjs-scrubbing .vjs-play-progress:before {
+  transform: scale(1);
+}
+.vjs-vesper .vjs-time-tooltip,
+.vjs-vesper .vjs-mouse-display .vjs-time-tooltip,
+.vjs-vesper .vjs-play-progress .vjs-time-tooltip {
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.4rem;
+  background: var(--vp-panel);
+  color: var(--vp-cream);
+  font-size: 1.05rem;
+  font-weight: 600;
+  top: -3rem;
+}
+.vjs-vesper .vjs-mouse-display {
+  background: var(--vp-cream);
+}
+
+/* Volume */
+.vjs-vesper .vjs-volume-panel {
+  width: auto;
+}
+.vjs-vesper .vjs-volume-panel .vjs-volume-control.vjs-volume-vertical {
+  left: -1.25rem;
+}
+.vjs-vesper .vjs-volume-bar {
+  background: rgb(244 241 234 / 0.25);
+}
+.vjs-vesper .vjs-volume-level {
+  background: var(--vp-accent);
+}
+.vjs-vesper .vjs-volume-level:before {
+  color: var(--vp-cream);
+}
+
+/* Menus (speed) */
+.vjs-vesper .vjs-menu-button-popup .vjs-menu {
+  left: -4rem;
+  width: 11rem;
+  margin-bottom: 0.5rem;
+}
+.vjs-vesper .vjs-menu .vjs-menu-content {
+  max-height: 22rem;
+  padding: 0.4rem;
+  border-radius: 0.75rem;
+  background: var(--vp-panel);
+  box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.8);
+  font-family: inherit;
+}
+.vjs-vesper .vjs-menu li {
+  padding: 0.85rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-transform: none;
+}
+.vjs-vesper .vjs-menu li:hover,
+.vjs-vesper .vjs-menu li:focus-visible {
+  background: var(--vp-accent);
+  color: var(--vp-ink);
+  outline: none;
+}
+.vjs-vesper .vjs-menu li.vjs-selected,
+.vjs-vesper .vjs-menu li.vjs-selected:focus {
+  background: var(--vp-raised);
+  color: var(--vp-accent);
+}
+.vjs-vesper .vjs-playback-rate .vjs-playback-rate-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 3.5rem;
+}
+
+/* Buffering: a coral ring instead of the stock grey. */
+.vjs-vesper .vjs-loading-spinner {
+  width: 4.5rem;
+  height: 4.5rem;
+  margin: -2.25rem 0 0 -2.25rem;
+  border: 0.3rem solid rgb(244 241 234 / 0.2);
+  border-top-color: var(--vp-accent);
+  border-radius: 50%;
+  opacity: 1;
+  animation: vjs-spin 0.9s linear infinite;
+}
+.vjs-vesper .vjs-loading-spinner:before,
+.vjs-vesper .vjs-loading-spinner:after {
+  display: none;
+}
+@keyframes vjs-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Errors are drawn by the app. */
+.vjs-vesper .vjs-error-display {
+  display: none;
+}
+.vjs-vesper .vjs-text-track-display {
+  bottom: 7rem;
+}
+
+/* Hidden controls when idle (video.js toggles .vjs-user-inactive). */
+.vjs-vesper.vjs-user-inactive.vjs-playing .vjs-control-bar {
+  opacity: 0;
+}
+.vjs-vesper.vjs-user-inactive.vjs-playing {
+  cursor: none;
+}
+
+@media (max-width: 640px) {
+  .vjs-vesper .vjs-control-bar {
+    height: 4.5rem;
+    padding: 0 0.5rem 0.25rem;
+  }
+  .vjs-vesper .vjs-control {
+    width: 2.75rem;
+    height: 3rem;
+  }
+  .vjs-vesper .vjs-control .vjs-icon-placeholder:before {
+    font-size: 1.6rem;
+    line-height: 3rem;
+  }
+  .vjs-vesper .vjs-volume-panel,
+  .vjs-vesper .vjs-skip-backward-10,
+  .vjs-vesper .vjs-skip-forward-10 {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vjs-vesper .vjs-loading-spinner {
+    animation-duration: 3s;
+  }
+}
+
+/* Overlay buttons live inside video.js, whose unlayered CSS outranks utilities, so they are styled here. */
+.vjs-vesper .vp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.5rem;
+  padding: 0 1.25rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: rgb(13 13 15 / 0.82);
+  color: var(--vp-cream);
+  font:
+    600 1.15rem / 1 "Geist Variable",
+    system-ui,
+    sans-serif;
+  cursor: pointer;
+  transition:
+    background-color 0.12s linear,
+    color 0.12s linear,
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vjs-vesper .vp-btn[data-strong] {
+  background: var(--vp-accent);
+  color: var(--vp-ink);
+}
+.vjs-vesper .vp-btn:hover,
+.vjs-vesper .vp-btn:focus-visible {
+  background: var(--vp-accent);
+  color: var(--vp-ink);
+  outline: 4px solid var(--vp-cream);
+  outline-offset: 2px;
+  transform: translateY(-2px);
+}
+.vjs-vesper .vp-btn:disabled {
+  opacity: 0.6;
+  transform: none;
+}
+.vjs-vesper .vp-choice {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--vp-cream);
+  font:
+    600 1.15rem / 1.2 "Geist Variable",
+    system-ui,
+    sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.vjs-vesper .vp-choice:hover,
+.vjs-vesper .vp-choice:focus-visible {
+  background: var(--vp-accent);
+  color: var(--vp-ink);
+  outline: none;
+}
+.vjs-vesper .vp-choice[aria-pressed="true"] {
+  background: var(--vp-raised);
+  color: var(--vp-accent);
+}
+@media (max-width: 640px) {
+  .vjs-vesper .vp-btn-label {
+    display: none;
+  }
+}

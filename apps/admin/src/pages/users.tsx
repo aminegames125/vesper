@@ -55,13 +55,13 @@ export function UsersPage({ client, me }: { client: CloudClient; me: CloudUser }
                   {u.status === "suspended" && <Badge tone="accent">suspended</Badge>}
                   {u.sessions > 0 && <Badge tone="ok">online</Badge>}
                 </p>
-                <p className="mt-0.5 text-xs text-muted">
+                <p className="mt-0.5 text-sm text-muted">
                   {formatBytes(u.storageUsed)} of{" "}
                   {u.storageBytes ? formatBytes(u.storageBytes) : "unlimited"} · {u.recordings}{" "}
                   recordings · up to {limit(u.maxConcurrent)} at once, {limit(u.maxHours, "h")} each
                   · last seen {when(u.lastLogin)}
                 </p>
-                {u.note && <p className="mt-0.5 text-xs text-muted">{u.note}</p>}
+                {u.note && <p className="mt-0.5 text-sm text-muted">{u.note}</p>}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => setEditing(u)}>Edit</Button>

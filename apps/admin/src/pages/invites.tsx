@@ -50,7 +50,7 @@ export function InvitesPage({ client }: { client: CloudClient }) {
                     {i.usesLeft} use{i.usesLeft === 1 ? "" : "s"} left
                   </Badge>
                 </p>
-                <p className="mt-1 text-xs text-muted">
+                <p className="mt-1 text-sm text-muted">
                   {i.storageBytes ? formatBytes(i.storageBytes) : "unlimited"} storage · expires{" "}
                   {i.expiresAt ? when(i.expiresAt) : "never"}
                   {i.note ? ` · ${i.note}` : ""}

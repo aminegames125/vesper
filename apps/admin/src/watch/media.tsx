@@ -65,9 +65,9 @@ export function MediaCard({
       type="button"
       disabled={!playable}
       onClick={() => onPlay(rec.id)}
-      className={`group relative block text-left disabled:cursor-default disabled:opacity-60 ${wide ? "w-64 flex-none snap-start sm:w-72" : "w-full"}`}
+      className={`tile group relative block text-left disabled:cursor-default disabled:opacity-60 ${wide ? "w-72 flex-none snap-start sm:w-80" : "w-full"}`}
     >
-      <div className="relative aspect-video overflow-hidden rounded-lg bg-raised ring-1 ring-line transition-colors group-hover:ring-accent">
+      <div className="relative aspect-video overflow-hidden rounded-xl bg-raised">
         {rec.thumb && media !== null ? (
           <img
             src={client.thumbFor(rec.id, media)}
@@ -88,7 +88,7 @@ export function MediaCard({
           {rec.status === "done" && rec.watched && <Badge>watched</Badge>}
         </div>
         {rec.status === "done" && rec.kind === "recording" && (
-          <span className="absolute bottom-2 right-2 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-medium text-white tabular">
+          <span className="absolute bottom-2.5 right-2.5 rounded-md bg-black/80 px-2 py-1 text-sm font-semibold text-white tabular">
             {formatDuration(rec.seconds)}
           </span>
         )}
@@ -98,8 +98,8 @@ export function MediaCard({
           </div>
         )}
       </div>
-      <p className="mt-2.5 truncate text-sm font-semibold">{rec.title}</p>
-      <p className="truncate text-xs text-muted">
+      <p className="mt-3 truncate text-lg font-semibold">{rec.title}</p>
+      <p className="truncate text-base text-muted">
         {rec.channelName || (rec.kind === "download" ? "Download" : "From Kodi")}
         {rec.status === "failed" ? " · failed" : ""}
         {rec.status === "scheduled" || rec.status === "queued" ? " · waiting" : ""}

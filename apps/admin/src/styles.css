@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "@fontsource-variable/geist";
-@import "@fontsource-variable/bricolage-grotesque";
+@import "@fontsource-variable/bricolage-grotesque/wdth.css";
 @import "./tokens.css";
 
 @theme inline {
@@ -21,9 +21,19 @@
   --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
 }
 
 @layer base {
+  /* One rem for the whole app: it grows with the screen so a TV across the room reads like a laptop. */
+  html {
+    font-size: clamp(16px, 11px + 0.5vw, 26px);
+  }
   html,
   body,
   #root {
@@ -34,6 +44,7 @@
     color: var(--paper);
     font-family: var(--font-sans);
     font-size: var(--text-base);
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
     -webkit-tap-highlight-color: transparent;
@@ -44,11 +55,21 @@
   .selectable {
     user-select: text;
   }
+  /* Channel-graphics lettering: Bricolage run condensed. */
   h1,
   h2,
-  h3 {
+  h3,
+  .display {
     font-family: var(--font-display);
-    letter-spacing: -0.02em;
+    font-stretch: 78%;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .tabular,
+  table,
+  time {
+    font-variant-numeric: tabular-nums;
   }
   button {
     cursor: pointer;
@@ -56,16 +77,19 @@
   button:disabled {
     cursor: not-allowed;
   }
+  /* Focus is the one thing a remote user must always see: a thick coral frame. */
   :focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    outline: 4px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-md);
   }
   ::selection {
-    background: color-mix(in oklab, var(--accent) 40%, transparent);
+    background: color-mix(in oklab, var(--accent) 45%, transparent);
+    color: inherit;
   }
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
   }
   ::-webkit-scrollbar-thumb {
     background: var(--line);
@@ -73,8 +97,12 @@
     border: 3px solid transparent;
     background-clip: content-box;
   }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--accent) 60%, var(--line));
+    background-clip: content-box;
+  }
   dialog::backdrop {
-    background: rgb(5 5 8 / 0.72);
+    background: rgb(8 8 10 / 0.78);
   }
   input,
   textarea,
@@ -82,13 +110,21 @@
     caret-color: var(--accent);
     accent-color: var(--accent);
   }
+  input::placeholder {
+    color: var(--muted);
+    opacity: 0.8;
+  }
 }
 
 @layer components {
+  /* A plate: the only container. Dark themes separate it from the ground by tone alone; the light
+     theme has no tone to spare, so it gets a hairline instead. Elevation is declared once. */
   .surface {
     background: var(--panel);
+    border-radius: var(--radius-xl);
+  }
+  html[data-theme="light"] .surface {
     border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
   }
   .hairline {
     border-color: color-mix(in oklab, var(--line) 70%, transparent);
@@ -100,7 +136,7 @@
     display: none;
   }
   .scrim {
-    background: linear-gradient(to top, rgb(0 0 0 / 0.85), rgb(0 0 0 / 0));
+    background: linear-gradient(to top, rgb(8 8 10 / 0.9), rgb(8 8 10 / 0));
   }
   /* Keeps the page scrollable on phones without the bottom bar covering the last row. */
   .safe-bottom {
@@ -108,6 +144,66 @@
   }
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+
+  /*
+    The lower-third. Anything with .plate fills with the on-air colour from the left when it is
+    hovered or has focus, the way a channel graphic wipes in. Text inside flips to the ink colour.
+    This is the app's single focus signature: wherever the remote is, one plate is lit.
+  */
+  .plate {
+    position: relative;
+    isolation: isolate;
+    transition:
+      transform var(--dur-med) var(--ease-out),
+      color var(--dur-fast) linear;
+  }
+  .plate::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--accent);
+    clip-path: inset(0 100% 0 0);
+    transition: clip-path var(--dur-med) var(--ease-out);
+  }
+  .plate:hover,
+  .plate:focus-visible {
+    color: var(--on-accent);
+    transform: translateX(0.25rem);
+    outline-offset: 2px;
+  }
+  .plate:hover::before,
+  .plate:focus-visible::before {
+    clip-path: inset(0 0 0 0);
+  }
+  .plate:hover .text-muted,
+  .plate:focus-visible .text-muted {
+    color: color-mix(in oklab, var(--on-accent) 78%, transparent);
+  }
+  .plate[aria-current="page"] {
+    color: var(--paper);
+  }
+  .plate[aria-current="page"]::before {
+    background: var(--raised);
+    clip-path: inset(0 0 0 0);
+  }
+  .plate[aria-current="page"]:hover,
+  .plate[aria-current="page"]:focus-visible {
+    color: var(--on-accent);
+  }
+  .plate[aria-current="page"]:hover::before,
+  .plate[aria-current="page"]:focus-visible::before {
+    background: var(--accent);
+  }
+  /* Posters and thumbnails light up by frame, not by fill, so the picture stays visible. */
+  .tile {
+    transition: transform var(--dur-med) var(--ease-out);
+  }
+  .tile:hover,
+  .tile:focus-visible {
+    transform: scale(1.03);
   }
 }
 
@@ -117,5 +213,11 @@
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  .plate:hover,
+  .plate:focus-visible,
+  .tile:hover,
+  .tile:focus-visible {
+    transform: none;
   }
 }

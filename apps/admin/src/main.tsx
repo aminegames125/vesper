@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
+import { ToastProvider } from "./kit";
 import "./styles.css";
 
 const root = document.getElementById("root");
@@ -16,6 +17,8 @@ media.addEventListener("change", paint);
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ToastProvider>
+      <App />
+    </ToastProvider>
   </StrictMode>,
 );

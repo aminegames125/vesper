@@ -187,7 +187,7 @@ function DownloadRow({
           <Badge tone="dusk">{d.engine === "ytdlp" ? "yt-dlp" : "direct"}</Badge>
           {d.encoder !== "copy" && <Badge>{d.encoder}</Badge>}
         </p>
-        <p className="mt-0.5 text-xs text-muted">
+        <p className="mt-0.5 text-sm text-muted">
           {formatBytes(d.bytes)}
           {d.totalBytes ? ` of ${formatBytes(d.totalBytes)}` : ""}
           {active ? ` · ${formatDuration(d.seconds)} elapsed` : ""}
@@ -197,7 +197,7 @@ function DownloadRow({
             <Progress value={share} />
           </div>
         ) : null}
-        {d.error && <p className="mt-0.5 text-xs text-accent">{d.error}</p>}
+        {d.error && <p className="mt-0.5 text-sm text-accent">{d.error}</p>}
       </div>
       {active && <Button onClick={() => void run(() => client.stopRecording(d.id))}>Stop</Button>}
       <Button

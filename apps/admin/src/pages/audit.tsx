@@ -16,14 +16,14 @@ export function AuditPage({ client }: { client: CloudClient }) {
               key={`${e.at}-${e.actor}-${e.action}-${e.detail}`}
               className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 px-[var(--card-pad)] py-3 md:grid-cols-[10rem_8rem_12rem_1fr]"
             >
-              <span className="order-2 text-xs text-muted md:order-none md:text-sm">
+              <span className="order-2 text-sm text-muted md:order-none md:text-sm">
                 {when(e.at)}
               </span>
               <span className="order-1 truncate font-medium md:order-none">{e.actor}</span>
               <span className="order-3 md:order-none">
                 <Badge tone="dusk">{e.action}</Badge>
               </span>
-              <span className="order-4 col-span-2 min-w-0 truncate font-mono text-xs text-muted md:order-none md:col-span-1">
+              <span className="order-4 col-span-2 min-w-0 truncate font-mono text-sm text-muted md:order-none md:col-span-1">
                 {e.detail}
               </span>
             </li>

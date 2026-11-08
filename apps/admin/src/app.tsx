@@ -13,11 +13,16 @@ import { SyncPage } from "./pages/sync";
 import { UsersPage } from "./pages/users";
 import { useRoute } from "./router";
 import { Shell } from "./shell";
+import { useSpatialNavigation } from "./spatial";
 import { Button, Field, Notice } from "./ui";
+import { ActivityPage } from "./watch/activity";
+import { BrowsePage } from "./watch/browse";
+import { GuidePage } from "./watch/guide";
 import { WatchHome } from "./watch/home";
 import { Library } from "./watch/library";
 import { LiveTv } from "./watch/live";
 import { Player } from "./watch/player";
+import { SchedulesPage } from "./watch/schedules";
 
 const TOKEN_KEY = "vesper-admin-token";
 
@@ -117,6 +122,7 @@ function Workspace({
   user: CloudUser;
   onSignOut: () => void;
 }) {
+  useSpatialNavigation();
   const isAdmin = user.role === "admin";
   const { route: wanted, go } = useRoute(isAdmin ? "manage" : "watch");
   // Accounts that are not administrators only ever see the viewer.
@@ -142,6 +148,10 @@ function Workspace({
       home: <WatchHome client={client} user={user} onPlay={open} go={go} />,
       library: <Library client={client} onPlay={open} />,
       live: <LiveTv client={client} onWatch={(id) => go("watch", "tv", id)} />,
+      guide: <GuidePage client={client} onPlay={open} />,
+      browse: <BrowsePage client={client} onPlay={open} />,
+      schedules: <SchedulesPage client={client} onPlay={open} />,
+      activity: <ActivityPage client={client} onPlay={open} />,
     }[route.page] ?? <WatchHome client={client} user={user} onPlay={open} go={go} />;
   }
 
@@ -218,9 +228,13 @@ function SignIn({
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [invite, setInvite] = useState("");
+  const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const setup = info.needsSetup;
+  const canRegister = !setup && info.registration !== "closed";
+  const register = canRegister && creating;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -228,7 +242,11 @@ function SignIn({
     setError(null);
     try {
       onSession(
-        await (setup ? client.setup(username, password) : client.login(username, password)),
+        await (setup
+          ? client.setup(username, password)
+          : register
+            ? client.register(username, password, invite.trim() || undefined)
+            : client.login(username, password)),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -237,51 +255,81 @@ function SignIn({
     }
   };
 
+  const title = setup ? "Set up Vesper" : register ? "Create your account" : "Sign in";
+
   return (
     <div className="flex h-full items-center justify-center overflow-y-auto p-6">
-      <form
-        onSubmit={submit}
-        className="w-full max-w-sm rounded-lg border border-line bg-panel p-8 text-left"
-      >
-        <div className="mb-7 flex items-center gap-3">
-          <LogoMark size={36} animate />
+      <div className="w-full max-w-xl">
+        <div className="mb-8 flex items-center gap-5">
+          <LogoMark size={72} animate />
           <div>
-            <h1 className="text-xl font-bold leading-none">
-              {setup ? "Set up Vesper" : "Sign in"}
-            </h1>
-            <p className="mt-1 text-xs text-muted">
-              {info.mode === "lite" ? "Lite" : "Cloud"} {info.version}
+            <p className="display text-5xl leading-none">Vesper</p>
+            <p className="mt-2 text-lg text-muted">
+              Your own TV recorder · {info.mode === "lite" ? "Lite" : "Cloud"} {info.version}
             </p>
           </div>
         </div>
-        {setup && (
-          <p className="mb-5 text-sm text-muted">
-            Create the first administrator. You can add other users afterwards.
-          </p>
-        )}
-        <div className="flex flex-col gap-4">
-          <Field
-            label="Username"
-            autoComplete="username"
-            required
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <Field
-            label="Password"
-            type="password"
-            required
-            autoComplete={setup ? "new-password" : "current-password"}
-            hint={setup ? "At least 8 characters." : undefined}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <Notice>{error}</Notice>
-          <Button type="submit" variant="primary" disabled={busy}>
-            {busy ? "Please wait…" : setup ? "Create administrator" : "Sign in"}
-          </Button>
-        </div>
-      </form>
+
+        <form onSubmit={submit} className="surface flex overflow-hidden">
+          <span className="w-4 flex-none bg-accent" />
+          <div className="flex min-w-0 flex-1 flex-col gap-5 p-7 sm:p-9">
+            <h1 className="text-4xl">{title}</h1>
+            {setup && (
+              <p className="text-lg text-muted">
+                Create the first administrator. You can add other people afterwards.
+              </p>
+            )}
+            <Field
+              label="Username"
+              autoComplete="username"
+              required
+              autoFocus
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <Field
+              label="Password"
+              type="password"
+              required
+              autoComplete={setup || register ? "new-password" : "current-password"}
+              hint={setup || register ? "At least 8 characters." : undefined}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            {register && info.registration === "invite" && (
+              <Field
+                label="Invite code"
+                required
+                autoComplete="off"
+                value={invite}
+                onChange={(e) => setInvite(e.target.value)}
+                hint="Ask the person who runs this server."
+              />
+            )}
+            <Notice>{error}</Notice>
+            <Button type="submit" variant="primary" disabled={busy}>
+              {busy
+                ? "Please wait…"
+                : setup
+                  ? "Create administrator"
+                  : register
+                    ? "Create account"
+                    : "Sign in"}
+            </Button>
+            {canRegister && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setCreating((c) => !c);
+                  setError(null);
+                }}
+              >
+                {register ? "I already have an account" : "Create an account"}
+              </Button>
+            )}
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
