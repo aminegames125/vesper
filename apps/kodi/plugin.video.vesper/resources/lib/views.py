@@ -114,6 +114,7 @@ def root():
     except api.VesperError as e:
         # A server that wants a login is the common case: put the sign-in box first.
         add(url(action="sign_in"), item("Sign in", plot="Type your username and password."), False)
+        add(url(action="type_address"), item("Type the server address", plot="Currently " + (common.setting("server") or "not set")), False)
         add(url(action="discover"), item("Find Vesper on this network"), False)
         add(url(action="settings"), item("Open settings"), False)
         say(str(e), error=True)
@@ -152,9 +153,10 @@ def root():
 
 
 def type_address():
+    """Asks for the server address (IP and port, or a full URL) and keeps it."""
     text = xbmcgui.Dialog().input("Server address", defaultt=common.setting("server"))
     if not text:
-        return
+        return False
     address = api.normalise(text)
     if address.startswith("http://") and not api.is_private_host(address):
         # A server out on the internet: the password would travel unprotected.
@@ -165,9 +167,14 @@ def type_address():
             nolabel="No",
             yeslabel="Use it anyway",
         ):
-            return
+            return False
     common.set_setting("server", address)
-    refresh()
+    return True
+
+
+def change_address():
+    if type_address():
+        refresh()
 
 
 def discover():
@@ -188,7 +195,7 @@ def discover():
     common.set_setting("server", chosen["address"])
     if chosen.get("mode") == "full" and not common.setting("username"):
         say("Found %s. It has accounts, so sign in." % chosen["name"])
-        sign_in()
+        sign_in(ask_address=False)
     else:
         say("Connected to " + chosen["name"])
     refresh()
@@ -669,9 +676,13 @@ def test_connection():
         say("Connected. This server has no accounts (lite mode).")
 
 
-def sign_in():
-    """Asks for the username and password with Kodi's own keyboard, checks them against the server
-    and keeps them. The settings page has the same two fields; this is the quick way in."""
+def sign_in(ask_address=True):
+    """Asks for the server address, username and password with Kodi's own keyboard, checks them against
+    the server and keeps them. The settings page has the same fields; this is the quick way in."""
+    if ask_address and not type_address():
+        return
+    if not api.normalise(common.setting("server")):
+        return
     dialog = xbmcgui.Dialog()
     name = dialog.input("Username", defaultt=common.setting("username")).strip()
     if not name:
@@ -807,7 +818,7 @@ def route(query):
     elif action == "discover":
         discover()
     elif action == "type_address":
-        type_address()
+        change_address()
     elif action == "settings":
         xbmc.executebuiltin("Addon.OpenSettings(plugin.video.vesper)")
     # "noop" and anything unknown: nothing to do.

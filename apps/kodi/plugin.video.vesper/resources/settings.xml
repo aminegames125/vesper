@@ -10,6 +10,13 @@
             <heading>30002</heading>
           </control>
         </setting>
+        <setting id="type_address" type="action" label="30031" help="">
+          <level>0</level>
+          <data>RunPlugin(plugin://plugin.video.vesper/?action=type_address)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
         <setting id="discover" type="action" label="30003" help="">
           <level>0</level>
           <data>RunPlugin(plugin://plugin.video.vesper/?action=discover)</data>

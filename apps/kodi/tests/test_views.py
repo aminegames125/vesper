@@ -251,13 +251,14 @@ class OnTopOfKodi(unittest.TestCase):
             ])
 
     def test_sign_in_asks_for_the_login_and_keeps_it(self):
-        fake.typed = ["alice", "secret"]
+        fake.typed = ["192.168.1.9:8484", "alice", "secret"]
         views.route("?action=sign_in")
         self.assertEqual((settings["username"], settings["password"]), ("alice", "secret"))
+        self.assertEqual(settings["server"], "http://192.168.1.9:8484")
 
     def test_a_wrong_login_does_not_replace_a_working_one(self):
         settings["username"], settings["password"] = "old", "oldpass"
-        fake.typed = ["new", "wrong"]
+        fake.typed = ["192.168.1.9:8484", "new", "wrong"]
 
         def refuse():
             raise views.api.VesperError("Wrong username or password.")
