@@ -18,7 +18,7 @@
     "server:full": "cargo run -p vesper-server -- --mode full"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.4",
+    "@biomejs/biome": "^2.6.6",
     "turbo": "^2.5.0"
   },
   "engines": {
